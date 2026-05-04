@@ -87,8 +87,11 @@ describe('Project Routes', () => {
 
   describe('POST /api/projects', () => {
     test('creates project with all fields', async () => {
+      // First db.get: ownership check for clientId
+      mockDbGetOnce(mockDb, { id: 1 });
       mockDbRunSuccess(mockDb, { lastID: 1 });
-      mockDbGet(mockDb, SAMPLE_PROJECT);
+      // Second db.get: retrieve created project
+      mockDbGetOnce(mockDb, SAMPLE_PROJECT);
       const res = await request(app).post('/api/projects')
         .send({ name: 'New Project', description: 'Desc', clientId: 1, startDate: '2024-01-15', status: 'active' });
       expect(res.status).toBe(201);
@@ -102,6 +105,14 @@ describe('Project Routes', () => {
       const res = await request(app).post('/api/projects').send({ name: 'Minimal' });
       expect(res.status).toBe(201);
       expect(res.body.project.status).toBe('active');
+    });
+
+    test('rejects clientId not belonging to user', async () => {
+      mockDbGetOnce(mockDb, null); // ownership check returns no row
+      const res = await request(app).post('/api/projects')
+        .send({ name: 'Test', clientId: 999 });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/Client not found/);
     });
 
     test('rejects missing name', async () => {
@@ -148,6 +159,13 @@ describe('Project Routes', () => {
     test('returns 400 for invalid ID', async () => {
       const res = await request(app).put('/api/projects/invalid').send({ name: 'Updated' });
       expect(res.status).toBe(400);
+    });
+
+    test('rejects clientId not belonging to user on update', async () => {
+      mockDbGetOnce(mockDb, null); // ownership check returns no row
+      const res = await request(app).put('/api/projects/1').send({ clientId: 999 });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/Client not found/);
     });
 
     test('rejects empty body', async () => {

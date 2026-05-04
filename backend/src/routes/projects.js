@@ -3,7 +3,8 @@ const { authenticateUser } = require('../middleware/auth');
 const { projectSchema, updateProjectSchema } = require('../validation/schemas');
 const {
   parseId, listAll, getOne, insertAndReturn,
-  buildDynamicUpdate, checkExistsThenUpdate, deleteAll, checkExistsThenDelete
+  buildDynamicUpdate, checkExistsThenUpdate, deleteAll, checkExistsThenDelete,
+  verifyOwnership
 } = require('../helpers/crudFactory');
 
 const router = express.Router();
@@ -31,12 +32,18 @@ router.get('/:id', (req, res) => {
   getOne(`${PROJECT_SELECT} WHERE p.id = ? AND p.user_email = ?`, [id, req.userEmail], 'project', 'Project', res);
 });
 
-router.post('/', (req, res, next) => {
+router.post('/', async (req, res, next) => {
   try {
     const { error, value } = projectSchema.validate(req.body);
     if (error) return next(error);
 
     const { name, description, clientId, startDate, status } = value;
+
+    if (clientId) {
+      const check = await verifyOwnership('clients', clientId, req.userEmail, 'Client');
+      if (!check.valid) return res.status(400).json({ error: check.message });
+    }
+
     insertAndReturn(
       'INSERT INTO projects (name, description, client_id, start_date, status, user_email) VALUES (?, ?, ?, ?, ?, ?)',
       [name, description || null, clientId || null, startDate || null, status, req.userEmail],
@@ -48,13 +55,18 @@ router.post('/', (req, res, next) => {
   }
 });
 
-router.put('/:id', (req, res, next) => {
+router.put('/:id', async (req, res, next) => {
   try {
     const { error: idError, id } = parseId(req.params, 'project');
     if (idError) return res.status(400).json({ error: idError });
 
     const { error, value } = updateProjectSchema.validate(req.body);
     if (error) return next(error);
+
+    if (value.clientId) {
+      const check = await verifyOwnership('clients', value.clientId, req.userEmail, 'Client');
+      if (!check.valid) return res.status(400).json({ error: check.message });
+    }
 
     const { updates, values } = buildDynamicUpdate(FIELD_MAP, value);
     values.push(id, req.userEmail);

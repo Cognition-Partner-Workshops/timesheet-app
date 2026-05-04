@@ -121,6 +121,17 @@ function checkExistsThenDelete(table, resourceId, userEmail, resourceName, res) 
   });
 }
 
+function verifyOwnership(table, id, userEmail, label) {
+  return new Promise((resolve, reject) => {
+    const db = getDatabase();
+    db.get(`SELECT id FROM ${table} WHERE id = ? AND user_email = ?`, [id, userEmail], (err, row) => {
+      if (err) return reject(err);
+      if (!row) return resolve({ valid: false, message: `${label} not found or does not belong to user` });
+      resolve({ valid: true });
+    });
+  });
+}
+
 module.exports = {
   parseId,
   listAll,
@@ -129,5 +140,6 @@ module.exports = {
   buildDynamicUpdate,
   checkExistsThenUpdate,
   deleteAll,
-  checkExistsThenDelete
+  checkExistsThenDelete,
+  verifyOwnership
 };
