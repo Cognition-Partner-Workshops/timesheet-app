@@ -1,0 +1,3 @@
+FROM nginx:alpine
+COPY repo-documentation.html /usr/share/nginx/html/index.html
+EXPOSE 80
