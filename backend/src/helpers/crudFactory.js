@@ -57,7 +57,9 @@ function buildDynamicUpdate(fieldMap, value) {
   for (const [jsField, dbColumn] of Object.entries(fieldMap)) {
     if (value[jsField] !== undefined) {
       updates.push(`${dbColumn} = ?`);
-      values.push(value[jsField] === '' ? null : value[jsField]);
+      let val = value[jsField] === '' ? null : value[jsField];
+      if (val instanceof Date) val = val.toISOString().split('T')[0];
+      values.push(val);
     }
   }
   updates.push('updated_at = CURRENT_TIMESTAMP');

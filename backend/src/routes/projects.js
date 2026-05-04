@@ -46,7 +46,7 @@ router.post('/', async (req, res, next) => {
 
     insertAndReturn(
       'INSERT INTO projects (name, description, client_id, start_date, status, user_email) VALUES (?, ?, ?, ?, ?, ?)',
-      [name, description || null, clientId || null, startDate || null, status, req.userEmail],
+      [name, description || null, clientId || null, startDate ? startDate.toISOString().split('T')[0] : null, status, req.userEmail],
       `${PROJECT_SELECT} WHERE p.id = ?`,
       'project', 'Project', res
     );
