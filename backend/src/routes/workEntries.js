@@ -87,6 +87,10 @@ router.post('/', (req, res, next) => {
     const { clientId, hours, description, date } = value;
     const db = getDatabase();
 
+    // Normalize date to ISO string (YYYY-MM-DD) to prevent Joi's Date
+    // object from being stored as an epoch millisecond number in SQLite
+    const dateStr = date instanceof Date ? date.toISOString().split('T')[0] : date;
+
     // Verify client exists and belongs to user
     db.get(
       'SELECT id FROM clients WHERE id = ? AND user_email = ?',
@@ -104,7 +108,7 @@ router.post('/', (req, res, next) => {
         // Create work entry
         db.run(
           'INSERT INTO work_entries (client_id, user_email, hours, description, date) VALUES (?, ?, ?, ?, ?)',
-          [clientId, req.userEmail, hours, description || null, date],
+          [clientId, req.userEmail, hours, description || null, dateStr],
           function(err) {
             if (err) {
               console.error('Database error:', err);
@@ -214,7 +218,8 @@ router.put('/:id', (req, res, next) => {
 
           if (value.date !== undefined) {
             updates.push('date = ?');
-            values.push(value.date);
+            const dateVal = value.date instanceof Date ? value.date.toISOString().split('T')[0] : value.date;
+            values.push(dateVal);
           }
 
           updates.push('updated_at = CURRENT_TIMESTAMP');

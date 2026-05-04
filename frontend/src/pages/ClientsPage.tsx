@@ -29,6 +29,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
 import { type Client } from '../types/api';
+import { formatDate } from '../utils/dateUtils';
 
 const ClientsPage: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -245,7 +246,7 @@ const ClientsPage: React.FC = () => {
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" color="text.secondary">
-                        {new Date(client.created_at).toLocaleDateString()}
+                        {formatDate(client.created_at)}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
