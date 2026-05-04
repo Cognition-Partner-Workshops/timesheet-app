@@ -494,53 +494,7 @@ describe('Client Routes', () => {
   });
 
   describe('PUT /api/clients/:id - Additional Field Updates', () => {
-    test('should update client email field', async () => {
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1 });
-      });
-      mockDb.run.mockImplementation((query, params, callback) => {
-        callback(null);
-      });
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1, name: 'Client', email: 'new@example.com' });
-      });
-
-      const response = await request(app)
-        .put('/api/clients/1')
-        .send({ email: 'new@example.com' });
-
-      expect(response.status).toBe(200);
-      expect(response.body.client.email).toBe('new@example.com');
-    });
-
-    test('should update client department field', async () => {
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1 });
-      });
-      mockDb.run.mockImplementation((query, params, callback) => {
-        callback(null);
-      });
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1, name: 'Client', department: 'Engineering' });
-      });
-
-      const response = await request(app)
-        .put('/api/clients/1')
-        .send({ department: 'Engineering' });
-
-      expect(response.status).toBe(200);
-      expect(response.body.client.department).toBe('Engineering');
-    });
-
-    test('should update all fields at once', async () => {
-      const updatedClient = {
-        id: 1,
-        name: 'New Name',
-        description: 'New Desc',
-        department: 'Sales',
-        email: 'sales@example.com'
-      };
-
+    function setupUpdateMocks(updatedClient) {
       mockDb.get.mockImplementationOnce((query, params, callback) => {
         callback(null, { id: 1 });
       });
@@ -550,38 +504,44 @@ describe('Client Routes', () => {
       mockDb.get.mockImplementationOnce((query, params, callback) => {
         callback(null, updatedClient);
       });
+    }
 
-      const response = await request(app)
-        .put('/api/clients/1')
+    test('should update client email field', async () => {
+      setupUpdateMocks({ id: 1, name: 'Client', email: 'new@example.com' });
+      const response = await request(app).put('/api/clients/1').send({ email: 'new@example.com' });
+      expect(response.status).toBe(200);
+      expect(response.body.client.email).toBe('new@example.com');
+    });
+
+    test('should update client department field', async () => {
+      setupUpdateMocks({ id: 1, name: 'Client', department: 'Engineering' });
+      const response = await request(app).put('/api/clients/1').send({ department: 'Engineering' });
+      expect(response.status).toBe(200);
+      expect(response.body.client.department).toBe('Engineering');
+    });
+
+    test('should update all fields at once', async () => {
+      const updatedClient = { id: 1, name: 'New Name', description: 'New Desc', department: 'Sales', email: 'sales@example.com' };
+      setupUpdateMocks(updatedClient);
+      const response = await request(app).put('/api/clients/1')
         .send({ name: 'New Name', description: 'New Desc', department: 'Sales', email: 'sales@example.com' });
-
       expect(response.status).toBe(200);
       expect(response.body.client).toEqual(updatedClient);
     });
-
-    test('should handle unexpected error in PUT try-catch block', async () => {
-      getDatabase.mockImplementation(() => {
-        throw new Error('Unexpected');
-      });
-
-      const response = await request(app)
-        .put('/api/clients/1')
-        .send({ name: 'Updated' });
-
-      expect(response.status).toBe(500);
-    });
   });
 
-  describe('POST /api/clients - Exception Handling', () => {
-    test('should handle unexpected error in POST try-catch block', async () => {
-      getDatabase.mockImplementation(() => {
-        throw new Error('Unexpected');
-      });
+  describe('Exception Handling', () => {
+    beforeEach(() => {
+      getDatabase.mockImplementation(() => { throw new Error('Unexpected'); });
+    });
 
-      const response = await request(app)
-        .post('/api/clients')
-        .send({ name: 'Test Client' });
+    test('should handle unexpected error in PUT handler', async () => {
+      const response = await request(app).put('/api/clients/1').send({ name: 'Updated' });
+      expect(response.status).toBe(500);
+    });
 
+    test('should handle unexpected error in POST handler', async () => {
+      const response = await request(app).post('/api/clients').send({ name: 'Test Client' });
       expect(response.status).toBe(500);
     });
   });

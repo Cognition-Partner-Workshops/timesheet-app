@@ -586,34 +586,20 @@ describe('Work Entry Routes', () => {
     });
   });
 
-  describe('POST /api/work-entries - Exception Handling', () => {
-    test('should handle unexpected error in POST try-catch block', async () => {
-      getDatabase.mockImplementation(() => {
-        throw new Error('Unexpected');
-      });
+  describe('Exception Handling', () => {
+    beforeEach(() => {
+      getDatabase.mockImplementation(() => { throw new Error('Unexpected'); });
+    });
 
+    test('should handle unexpected error in POST handler', async () => {
       const response = await request(app)
         .post('/api/work-entries')
-        .send({
-          clientId: 1,
-          hours: 5,
-          date: '2024-01-15'
-        });
-
+        .send({ clientId: 1, hours: 5, date: '2024-01-15' });
       expect(response.status).toBe(500);
     });
-  });
 
-  describe('PUT /api/work-entries/:id - Exception Handling', () => {
-    test('should handle unexpected error in PUT try-catch block', async () => {
-      getDatabase.mockImplementation(() => {
-        throw new Error('Unexpected');
-      });
-
-      const response = await request(app)
-        .put('/api/work-entries/1')
-        .send({ hours: 8 });
-
+    test('should handle unexpected error in PUT handler', async () => {
+      const response = await request(app).put('/api/work-entries/1').send({ hours: 8 });
       expect(response.status).toBe(500);
     });
   });
