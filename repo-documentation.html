@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Repository Documentation</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #f4f6f9;
+    color: #1e293b;
+    line-height: 1.6;
+  }
+
+  header {
+    background: #1e293b;
+    color: #fff;
+    padding: 1.25rem 2rem;
+    text-align: center;
+  }
+
+  header h1 {
+    font-size: 1.6rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  /* Tab bar */
+  .tab-bar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: #1e3a5f;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+
+  .tab-bar button {
+    background: transparent;
+    border: none;
+    color: #cbd5e1;
+    padding: 0.85rem 1.4rem;
+    font-size: 0.88rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+    white-space: nowrap;
+  }
+
+  .tab-bar button:hover {
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+  }
+
+  .tab-bar button.active {
+    color: #fff;
+    border-bottom-color: #38bdf8;
+    background: rgba(255,255,255,0.05);
+  }
+
+  /* Content */
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .content-area {
+    max-width: 960px;
+    margin: 2rem auto;
+    padding: 0 1.5rem 3rem;
+  }
+
+  .panel {
+    background: #fff;
+    border-radius: 8px;
+    padding: 2rem 2.25rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+
+  h2 {
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+    color: #0f172a;
+  }
+
+  .subtitle {
+    color: #64748b;
+    font-size: 0.95rem;
+    margin-bottom: 1.5rem;
+  }
+
+  h3 {
+    font-size: 1.15rem;
+    margin-top: 1.75rem;
+    margin-bottom: 0.5rem;
+    color: #1e3a5f;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 0.3rem;
+  }
+
+  p, li { font-size: 0.95rem; }
+
+  ul, ol {
+    margin: 0.5rem 0 1rem 1.5rem;
+  }
+
+  li { margin-bottom: 0.3rem; }
+
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 1rem 1.25rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    margin: 0.75rem 0 1rem;
+  }
+
+  code {
+    background: #e2e8f0;
+    padding: 0.15em 0.4em;
+    border-radius: 3px;
+    font-size: 0.88em;
+  }
+
+  pre code {
+    background: none;
+    padding: 0;
+    font-size: inherit;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.75rem 0 1rem;
+    font-size: 0.9rem;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  th {
+    background: #f1f5f9;
+    font-weight: 600;
+    color: #334155;
+  }
+
+  tr:hover td {
+    background: #f8fafc;
+  }
+
+  .badge {
+    display: inline-block;
+    background: #e0f2fe;
+    color: #0369a1;
+    font-size: 0.78rem;
+    padding: 0.15em 0.55em;
+    border-radius: 4px;
+    font-weight: 500;
+    margin-right: 0.3rem;
+    margin-bottom: 0.2rem;
+  }
+
+  @media (max-width: 700px) {
+    .tab-bar button {
+      padding: 0.65rem 0.9rem;
+      font-size: 0.8rem;
+    }
+    .panel {
+      padding: 1.25rem 1rem;
+    }
+    .content-area {
+      padding: 0 0.75rem 2rem;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Repository Documentation</h1>
+</header>
+
+<nav class="tab-bar" id="tabBar">
+  <button class="active" data-tab="tab-timesheet">Timesheet App</button>
+  <button data-tab="tab-angular-realworld">Angular RealWorld</button>
+  <button data-tab="tab-petclinic">PetClinic Angular</button>
+  <button data-tab="tab-dotnet">&#46;NET Microservices</button>
+  <button data-tab="tab-bdd">BDD Test Library</button>
+  <button data-tab="tab-cve">CVE Remediation</button>
+  <button data-tab="tab-framework">Framework Upgrade</button>
+</nav>
+
+<div class="content-area">
+
+  <!-- TAB 1: Timesheet App -->
+  <div class="tab-content active" id="tab-timesheet">
+    <div class="panel">
+      <h2>Timesheet App</h2>
+      <p class="subtitle"><code>app_timesheet</code> &mdash; Full-stack employee time tracking application. React + Vite frontend, Node.js Express backend, SQLite in-memory database.</p>
+
+      <h3>Architecture</h3>
+      <p>Monorepo with two top-level directories:</p>
+      <ul>
+        <li><strong>backend/</strong> &mdash; Express + SQLite + JWT + Joi + PDFKit + csv-writer</li>
+        <li><strong>frontend/</strong> &mdash; Vite + React + Material UI + React Query + Axios</li>
+      </ul>
+      <table>
+        <tr><th>Aspect</th><th>Details</th></tr>
+        <tr><td>Auth</td><td>JWT-based, 24h token expiry, email-only login</td></tr>
+        <tr><td>Data Model</td><td>Users &rarr; Clients &rarr; Work Entries</td></tr>
+        <tr><td>Security</td><td>Rate limiting (5 attempts / 15 min), CORS, Helmet headers, parameterized queries</td></tr>
+      </table>
+<pre><code>Frontend (Vite + React) --HTTP+JWT--&gt; Backend (Express) --&gt; SQLite (in-memory)</code></pre>
+
+      <h3>Capabilities</h3>
+      <ul>
+        <li>Client CRUD management</li>
+        <li>Work entry tracking with hours, dates, descriptions</li>
+        <li>Reports per client with CSV and PDF export</li>
+        <li>JWT authentication</li>
+        <li>Input validation with Joi schemas</li>
+      </ul>
+
+      <h3>How to Test</h3>
+      <table>
+        <tr><th>Command</th><th>Description</th></tr>
+        <tr><td><code>cd backend &amp;&amp; npm test</code></td><td>Backend unit tests (Jest)</td></tr>
+        <tr><td><code>cd backend &amp;&amp; npm run test:coverage</code></td><td>Coverage report</td></tr>
+        <tr><td><code>cd backend &amp;&amp; npm run test:watch</code></td><td>Watch mode</td></tr>
+      </table>
+      <p>161 tests across 8 suites, ~90% overall coverage.</p>
+      <table>
+        <tr><th>Threshold</th><th>Minimum</th></tr>
+        <tr><td>Statements</td><td>60%</td></tr>
+        <tr><td>Branches</td><td>60%</td></tr>
+        <tr><td>Functions</td><td>65%</td></tr>
+        <tr><td>Lines</td><td>60%</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- TAB 2: Angular RealWorld -->
+  <div class="tab-content" id="tab-angular-realworld">
+    <div class="panel">
+      <h2>Angular RealWorld</h2>
+      <p class="subtitle"><code>ts-angular-realworld-example-app</code> &mdash; Angular 21 SPA implementing the RealWorld (Conduit / Medium clone) spec. Frontend-only, connects to external RealWorld API.</p>
+
+      <h3>Architecture</h3>
+      <ul>
+        <li>Angular 21 with zoneless change detection</li>
+        <li>Build: Vite / AnalogJS</li>
+        <li>Feature-based structure:
+          <ul>
+            <li><code>core/</code> &mdash; services, interceptors, guards</li>
+            <li><code>features/</code> &mdash; auth, article, profile, editor</li>
+            <li><code>shared/</code> &mdash; pipes, directives</li>
+          </ul>
+        </li>
+        <li>Auth: JWT in localStorage, injected via functional HTTP interceptor</li>
+      </ul>
+
+      <h3>Capabilities</h3>
+      <ul>
+        <li>User registration, login, profile management</li>
+        <li>Article CRUD with tags</li>
+        <li>Comments on articles</li>
+        <li>Follow users, favorite articles</li>
+        <li>Global and personal feeds</li>
+        <li>Settings / profile updates</li>
+        <li>Error handling for 400, 401, 403, 404, 500, network errors</li>
+      </ul>
+
+      <h3>How to Test</h3>
+      <table>
+        <tr><th>Command</th><th>Description</th></tr>
+        <tr><td><code>npm run test</code></td><td>Unit tests (Vitest)</td></tr>
+        <tr><td><code>npm run test:e2e</code></td><td>E2E tests (Playwright)</td></tr>
+        <tr><td><code>npm run test:e2e:security</code></td><td>Security E2E tests</td></tr>
+      </table>
+      <ul>
+        <li>Playwright config: serial execution (workers: 1), Chromium only, 15s timeout per test</li>
+        <li>CI: GitHub Actions workflows for Playwright and security tests</li>
+        <li>E2E covers: auth flows, settings updates, error handling, article CRUD, network resilience</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- TAB 3: PetClinic Angular -->
+  <div class="tab-content" id="tab-petclinic">
+    <div class="panel">
+      <h2>PetClinic Angular</h2>
+      <p class="subtitle"><code>app_petclinic-angular</code> &mdash; Angular 16 frontend for the Spring PetClinic application. Client-only &mdash; requires the <code>spring-petclinic-rest</code> backend running separately.</p>
+
+      <h3>Architecture</h3>
+      <ul>
+        <li>Angular 16 with module-per-feature layout</li>
+        <li>Modules: Owners, Pets, Visits, Vets, Specialties, PetTypes</li>
+        <li>Styling: Bootstrap 3.3.7</li>
+        <li>Each module has its own service calling the REST backend</li>
+        <li>Testing module with DummyComponent, RouterLinkStubDirective, RouterOutletStubComponent</li>
+      </ul>
+
+      <h3>Capabilities</h3>
+      <ul>
+        <li>Owner management (search, add, edit)</li>
+        <li>Pet management (add, edit per owner)</li>
+        <li>Visit scheduling and listing</li>
+        <li>Vet directory with specialties</li>
+        <li>Pet type and specialty management</li>
+      </ul>
+
+      <h3>How to Test</h3>
+      <table>
+        <tr><th>Command</th><th>Description</th></tr>
+        <tr><td><code>ng test</code></td><td>Unit tests (Karma / Jasmine)</td></tr>
+        <tr><td><code>ng test --configuration=production</code></td><td>Production test config (ChromeHeadless, coverage enabled)</td></tr>
+        <tr><td><code>ng e2e</code></td><td>E2E tests (Protractor) &mdash; serve app first with <code>ng serve</code></td></tr>
+        <tr><td><code>compodoc -p src/tsconfig.app.json -d docs</code></td><td>Documentation generation</td></tr>
+      </table>
+      <p><strong>Docker:</strong></p>
+<pre><code>docker build -t spring-petclinic-angular:latest .
+docker run --rm -p 8080:8080 spring-petclinic-angular:latest</code></pre>
+    </div>
+  </div>
+
+  <!-- TAB 4: .NET Microservices -->
+  <div class="tab-content" id="tab-dotnet">
+    <div class="panel">
+      <h2>.NET Microservices</h2>
+      <p class="subtitle"><code>app_dotnet_angular_containerized_decomposition_microservices</code> &mdash; Decomposition of the QuickApp monolith into 5 containerized .NET 10 microservices behind a YARP API Gateway.</p>
+
+      <h3>Architecture</h3>
+<pre><code>&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;  &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+&#9474;  Identity    &#9474;  &#9474;  Customer    &#9474;  &#9474;   Order      &#9474;
+&#9474;  Service     &#9474;  &#9474;  Service     &#9474;  &#9474;   Service    &#9474;
+&#9474;  (.NET 10)   &#9474;  &#9474;  (.NET 10)   &#9474;  &#9474;  (.NET 10)   &#9474;
+&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9516;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9516;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9516;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;
+       &#9474;                 &#9474;                 &#9474;
+       &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9516;&#9472;&#9472;&#9472;&#9472;&#9496;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;
+                    &#9474;
+              &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9524;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+              &#9474;  API       &#9474;
+              &#9474;  Gateway   &#9474;
+              &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9516;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;
+                    &#9474;
+&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;  &#9484;&#9524;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+&#9474;  Product     &#9474;  &#9474; Notification &#9474;
+&#9474;  Service     &#9474;  &#9474;  Service     &#9474;
+&#9474;  (.NET 10)   &#9474;  &#9474;  (.NET 10)   &#9474;
+&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;  &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</code></pre>
+
+      <table>
+        <tr><th>Service</th><th>Port</th><th>Description</th></tr>
+        <tr><td>API Gateway (YARP)</td><td>5000</td><td>Reverse proxy, request routing, rate limiting</td></tr>
+        <tr><td>Identity Service</td><td>5001</td><td>Auth, user/role management</td></tr>
+        <tr><td>Customer Service</td><td>5002</td><td>Customer CRUD</td></tr>
+        <tr><td>Order Service</td><td>5003</td><td>Order management</td></tr>
+        <tr><td>Product Service</td><td>5004</td><td>Product catalog</td></tr>
+        <tr><td>Notification Service</td><td>5005</td><td>Email / in-app notifications</td></tr>
+      </table>
+      <ul>
+        <li>Each service: 3-layer (API &rarr; Domain &larr; Infrastructure)</li>
+        <li>Shared libraries: Shared.Contracts, Shared.Infrastructure</li>
+        <li>Database-per-service pattern with PostgreSQL</li>
+        <li>Async messaging via RabbitMQ (<code>OrderPlacedEvent</code> &rarr; Notification)</li>
+        <li>Docker Compose orchestration</li>
+      </ul>
+
+      <h3>Capabilities</h3>
+      <ul>
+        <li>JWT authentication and authorization</li>
+        <li>Customer, order, product CRUD</li>
+        <li>Event-driven notifications</li>
+        <li>Health checks (<code>/healthz</code> endpoints)</li>
+        <li>Swagger / OpenAPI in development mode</li>
+        <li>Rate limiting via API Gateway</li>
+      </ul>
+
+      <h3>How to Test</h3>
+      <table>
+        <tr><th>Command / URL</th><th>Description</th></tr>
+        <tr><td><code>cd src &amp;&amp; docker-compose up --build</code></td><td>Run all services</td></tr>
+        <tr><td><code>/swagger</code></td><td>Swagger UI per service (Development mode)</td></tr>
+        <tr><td><code>curl http://localhost:{port}/healthz</code></td><td>Health check per service</td></tr>
+        <tr><td>http://localhost:15672</td><td>RabbitMQ management UI (guest / guest)</td></tr>
+      </table>
+      <p>API Gateway routes all requests through port 5000.</p>
+    </div>
+  </div>
+
+  <!-- TAB 5: BDD Test Library -->
+  <div class="tab-content" id="tab-bdd">
+    <div class="panel">
+      <h2>BDD Test Library</h2>
+      <p class="subtitle"><code>uc-bdd-test-generation-rest-api</code> &mdash; Java library providing pre-built Cucumber/Gherkin step definitions for BDD testing of Spring Boot REST APIs. Zero-code BDD &mdash; write <code>.feature</code> files, get tests.</p>
+
+      <h3>Architecture</h3>
+      <ul>
+        <li><strong>Core:</strong> <code>AbstractBddStepDefinition</code> &mdash; base class with HTTP execution engine</li>
+        <li><strong>Glue:</strong> <code>DefaultRestApiBddStepDefinition</code> &mdash; all Gherkin step bindings</li>
+        <li><strong>Scope:</strong> <code>ScenarioScope</code> &mdash; stores variables across steps (<code>$varName</code> syntax)</li>
+        <li><strong>Auth SPI:</strong> <code>BddRestTemplateAuthentication</code> interface for pluggable auth</li>
+        <li>WireMock integration for mocking third-party APIs</li>
+        <li>Uses <code>TestRestTemplate</code> for HTTP execution</li>
+      </ul>
+
+      <h3>Capabilities</h3>
+      <ul>
+        <li>Full HTTP verb support: GET, POST, PUT, PATCH, DELETE, HEAD</li>
+        <li>JSON body manipulation with JsonPath</li>
+        <li>Response validation: status codes, headers, body paths</li>
+        <li>Variable storage and reuse across scenarios</li>
+        <li>File-based request bodies</li>
+        <li>Query parameter support</li>
+        <li>Multipart / file upload steps</li>
+        <li>WireMock-based third-party API mocking</li>
+        <li>Pluggable authentication (JWT, Basic, custom)</li>
+      </ul>
+
+      <h3>How to Test</h3>
+      <p>Maven dependency: <code>fr.redfroggy.test.bdd:cucumber-restapi</code></p>
+      <ol>
+        <li>Create a <code>CucumberTest</code> runner class with <code>@RunWith(Cucumber.class)</code> and <code>@CucumberOptions</code></li>
+        <li>Create a <code>@CucumberContextConfiguration</code> class in the glue package</li>
+        <li>Write <code>.feature</code> files under <code>src/test/resources/features/</code></li>
+        <li>Run: <code>mvn test</code> or via IDE</li>
+      </ol>
+      <p>Example runner: <code>RestApiCucumberTest.java</code> with features in <code>src/test/resources/features</code> and glue <code>fr.redfroggy.bdd.restapi.glue</code></p>
+    </div>
+  </div>
+
+  <!-- TAB 6: CVE Remediation -->
+  <div class="tab-content" id="tab-cve">
+    <div class="panel">
+      <h2>CVE Remediation</h2>
+      <p class="subtitle"><code>uc-cve-remediation-regulatory-compliance</code> &mdash; Spring Boot + MyBatis + Next.js full-stack app (RealWorld/Conduit spec) focused on CVE remediation and security compliance. Includes OWASP Dependency-Check and SonarQube integration.</p>
+
+      <h3>Architecture</h3>
+      <ul>
+        <li><strong>Backend:</strong> Spring Boot, MyBatis, SQLite, Flyway migrations, JWT auth</li>
+        <li><strong>Frontend:</strong> Next.js with SWR</li>
+        <li><strong>Dual API:</strong> REST controllers + Netflix DGS GraphQL</li>
+        <li><strong>DDD four-layer:</strong> api &rarr; application &rarr; core &rarr; infrastructure</li>
+        <li>CQRS pattern for read/write separation</li>
+        <li>Security scanning: OWASP Dependency-Check (CVSS &ge; 7.0 fails build), SonarQube</li>
+        <li>Code formatting: Spotless</li>
+      </ul>
+
+      <h3>Capabilities</h3>
+      <ul>
+        <li>User registration, login, profile management</li>
+        <li>Article CRUD with tags, comments, favorites</li>
+        <li>User following</li>
+        <li>GraphQL API alongside REST</li>
+        <li>OWASP dependency CVE scanning</li>
+        <li>SonarQube static analysis</li>
+        <li>Seed data via Flyway (5 users, 4 articles, follows)</li>
+      </ul>
+
+      <h3>How to Test</h3>
+      <table>
+        <tr><th>Command</th><th>Description</th></tr>
+        <tr><td><code>./gradlew bootRun</code></td><td>Run backend (Java 11 required)</td></tr>
+        <tr><td><code>cd frontend &amp;&amp; npm install &amp;&amp; npm run dev</code></td><td>Run frontend (Node 14&ndash;16)</td></tr>
+        <tr><td><code>./gradlew test</code></td><td>Unit / integration tests</td></tr>
+        <tr><td><code>./gradlew dependencyCheckAnalyze</code></td><td>OWASP scan (report at <code>build/reports/dependency-check-report.html</code>)</td></tr>
+        <tr><td><code>./gradlew sonar -Dsonar.token=&lt;TOKEN&gt;</code></td><td>SonarQube analysis</td></tr>
+        <tr><td><code>./gradlew seleniumTest</code></td><td>Selenium E2E (TestNG)</td></tr>
+        <tr><td><code>./gradlew spotlessJavaApply</code></td><td>Code format</td></tr>
+      </table>
+      <p>Smoke tests: <code>testng-smoke.xml</code> &nbsp;|&nbsp; Full suite: <code>testng.xml</code></p>
+      <p><strong>Docker:</strong></p>
+<pre><code>./gradlew bootBuildImage --imageName spring-boot-realworld-example-app
+docker run -p 8081:8080 spring-boot-realworld-example-app</code></pre>
+      <p><strong>SonarQube:</strong></p>
+<pre><code>docker compose -f docker-compose.sonarqube.yml up -d
+./gradlew sonar -Dsonar.token=&lt;TOKEN&gt;</code></pre>
+    </div>
+  </div>
+
+  <!-- TAB 7: Framework Upgrade -->
+  <div class="tab-content" id="tab-framework">
+    <div class="panel">
+      <h2>Framework Upgrade</h2>
+      <p class="subtitle"><code>uc-framework-upgrade-monolith-to-microservices</code> &mdash; Same Spring Boot + MyBatis + Next.js stack as CVE Remediation, but focused on framework upgrades and monolith-to-microservices migration.</p>
+
+      <h3>Architecture</h3>
+      <ul>
+        <li>Identical DDD/CQRS architecture to CVE Remediation repo</li>
+        <li>Four layers: api, application, core, infrastructure</li>
+        <li>Dual REST + GraphQL API</li>
+        <li>Spring Boot + MyBatis + SQLite + Flyway</li>
+        <li>DGS GraphQL code generation from schema files</li>
+      </ul>
+
+      <h3>Capabilities</h3>
+      <ul>
+        <li>Same RealWorld/Conduit features (users, articles, comments, tags, favorites, follows)</li>
+        <li>Starting point for decomposition into microservices</li>
+        <li>GraphQL schema-first code generation</li>
+        <li>JaCoCo code coverage reporting</li>
+      </ul>
+
+      <h3>How to Test</h3>
+      <table>
+        <tr><th>Command</th><th>Description</th></tr>
+        <tr><td><code>./gradlew bootRun</code></td><td>Run backend (Java 11)</td></tr>
+        <tr><td><code>cd frontend &amp;&amp; npm install &amp;&amp; npm run dev</code></td><td>Run frontend (Node 14&ndash;16)</td></tr>
+        <tr><td><code>./gradlew test</code></td><td>Unit / integration tests (JUnit 5, excludes Selenium, JaCoCo report generated)</td></tr>
+        <tr><td><code>./gradlew seleniumTest</code></td><td>Selenium E2E (TestNG with <code>testng-smoke.xml</code>)</td></tr>
+        <tr><td><code>./gradlew spotlessJavaApply</code></td><td>Code format</td></tr>
+      </table>
+      <p><strong>Docker:</strong></p>
+<pre><code>./gradlew bootBuildImage --imageName spring-boot-realworld-example-app
+docker run -p 8081:8080 spring-boot-realworld-example-app</code></pre>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  var buttons = document.querySelectorAll('.tab-bar button');
+  var panels = document.querySelectorAll('.tab-content');
+
+  buttons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      buttons.forEach(function (b) { b.classList.remove('active'); });
+      panels.forEach(function (p) { p.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById(btn.getAttribute('data-tab')).classList.add('active');
+    });
+  });
+})();
+</script>
+</body>
+</html>
