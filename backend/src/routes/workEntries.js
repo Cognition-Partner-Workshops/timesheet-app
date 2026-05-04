@@ -5,6 +5,15 @@ const { workEntrySchema, updateWorkEntrySchema } = require('../validation/schema
 
 const router = express.Router();
 
+/**
+ * Normalize a Joi-parsed date to an ISO date string (YYYY-MM-DD).
+ * Joi's date().iso() converts strings to Date objects, which SQLite
+ * would otherwise store as epoch milliseconds.
+ */
+function toISODateString(value) {
+  return value instanceof Date ? value.toISOString().split('T')[0] : value;
+}
+
 // All routes require authentication
 router.use(authenticateUser);
 
@@ -87,9 +96,7 @@ router.post('/', (req, res, next) => {
     const { clientId, hours, description, date } = value;
     const db = getDatabase();
 
-    // Normalize date to ISO string (YYYY-MM-DD) to prevent Joi's Date
-    // object from being stored as an epoch millisecond number in SQLite
-    const dateStr = date instanceof Date ? date.toISOString().split('T')[0] : date;
+    const dateStr = toISODateString(date);
 
     // Verify client exists and belongs to user
     db.get(
@@ -218,8 +225,7 @@ router.put('/:id', (req, res, next) => {
 
           if (value.date !== undefined) {
             updates.push('date = ?');
-            const dateVal = value.date instanceof Date ? value.date.toISOString().split('T')[0] : value.date;
-            values.push(dateVal);
+            values.push(toISODateString(value.date));
           }
 
           updates.push('updated_at = CURRENT_TIMESTAMP');
