@@ -35,7 +35,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import apiClient from '../api/client';
 import { type WorkEntry } from '../types/api';
-import { parseLocalDate, formatDateForApi } from '../utils/dateUtils';
+import { parseLocalDate, formatDateForApi, displayLocalDate } from '../utils/dateUtils';
 
 const WorkEntriesPage: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -234,7 +234,7 @@ const WorkEntriesPage: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2">
-                            {parseLocalDate(entry.date).toLocaleDateString()}
+                            {displayLocalDate(entry.date)}
                           </Typography>
                         </TableCell>
                         <TableCell>

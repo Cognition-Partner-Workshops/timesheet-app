@@ -18,3 +18,8 @@ export function formatDateForApi(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
+
+/** Parse a "YYYY-MM-DD" string and return a locale-formatted display string. */
+export function displayLocalDate(dateStr: string): string {
+  return parseLocalDate(dateStr).toLocaleDateString();
+}
