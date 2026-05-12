@@ -142,6 +142,67 @@ describe('Database Initialization', () => {
 
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
+
+    test('should resolve when db is null and no connection exists', async () => {
+      jest.resetModules();
+
+      jest.doMock('sqlite3', () => {
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, callback) => {
+              callback(null);
+              return {
+                serialize: jest.fn((cb) => cb()),
+                run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
+                close: jest.fn((cb) => cb(null))
+              };
+            })
+          }))
+        };
+      });
+
+      const { closeDatabase: closeFresh } = require('../../database/init');
+      // closeDatabase without ever calling getDatabase — db is null
+      await expect(closeFresh()).resolves.toBeUndefined();
+    });
+
+    test('should wait when close is already in progress', async () => {
+      jest.resetModules();
+
+      let closeCallback = null;
+      jest.doMock('sqlite3', () => {
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, callback) => {
+              callback(null);
+              return {
+                serialize: jest.fn((cb) => cb()),
+                run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
+                close: jest.fn((cb) => {
+                  // Capture the callback but don't call it yet
+                  closeCallback = cb;
+                })
+              };
+            })
+          }))
+        };
+      });
+
+      const { getDatabase: getDb, closeDatabase: closeDb } = require('../../database/init');
+      getDb(); // Create the db instance
+
+      // Start first close (will hang because we captured the callback)
+      const firstClose = closeDb();
+
+      // Start second close while first is in progress (isClosing = true)
+      const secondClose = closeDb();
+
+      // Now complete the first close
+      closeCallback(null);
+
+      await firstClose;
+      await secondClose;
+    });
   });
 
   describe('Database Schema', () => {
