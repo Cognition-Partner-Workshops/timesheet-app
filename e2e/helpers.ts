@@ -61,3 +61,13 @@ export async function clickDeleteButton(page: Page, rowText: string): Promise<vo
   const row = page.getByRole('row').filter({ hasText: rowText });
   await row.getByRole('button').filter({ has: page.locator('[data-testid="DeleteIcon"]') }).click();
 }
+
+export async function submitClientForm(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Create' }).click();
+}
+
+export async function selectReportClient(page: Page, clientName: string): Promise<void> {
+  await page.goto('/reports');
+  await page.getByRole('combobox', { name: 'Select Client' }).click();
+  await page.getByRole('option', { name: clientName }).click();
+}

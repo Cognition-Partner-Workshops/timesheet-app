@@ -1,35 +1,23 @@
 import { test, expect } from '@playwright/test';
-import { uniqueEmail, login, createClient, createWorkEntry } from './helpers';
-
-async function setupReportData(page: import('@playwright/test').Page) {
-  const email = uniqueEmail('reports');
-  await login(page, email);
-  await createClient(page, 'Report Client');
-  await createWorkEntry(page, 'Report Client', '3', 'Report entry 1');
-  await createWorkEntry(page, 'Report Client', '5.5', 'Report entry 2');
-}
+import { uniqueEmail, login, createClient, createWorkEntry, selectReportClient } from './helpers';
 
 test.describe('Reporting', () => {
-  test('should show correct totals for a client report', async ({ page }) => {
-    await setupReportData(page);
-    await page.goto('/reports');
+  test('should show correct totals and individual entries for a client report', async ({ page }) => {
+    const email = uniqueEmail('reports');
+    await login(page, email);
+    await createClient(page, 'Report Client');
+    await createWorkEntry(page, 'Report Client', '3', 'Report entry 1');
+    await createWorkEntry(page, 'Report Client', '5.5', 'Report entry 2');
+
+    await selectReportClient(page, 'Report Client');
     await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();
 
-    await page.getByRole('combobox', { name: 'Select Client' }).click();
-    await page.getByRole('option', { name: 'Report Client' }).click();
-
+    // Verify totals: 3 + 5.5 = 8.5 hours, 2 entries, 4.25 avg
     await expect(page.getByText('8.50')).toBeVisible();
     await expect(page.getByText('2').first()).toBeVisible();
     await expect(page.getByText('4.25')).toBeVisible();
-  });
 
-  test('should display individual entries in report table', async ({ page }) => {
-    await setupReportData(page);
-    await page.goto('/reports');
-
-    await page.getByRole('combobox', { name: 'Select Client' }).click();
-    await page.getByRole('option', { name: 'Report Client' }).click();
-
+    // Verify individual entries are listed
     await expect(page.getByText('Report entry 1')).toBeVisible();
     await expect(page.getByText('Report entry 2')).toBeVisible();
     await expect(page.getByText('3 hours')).toBeVisible();
