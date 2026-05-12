@@ -1,11 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import {
   Box,
   Typography,
   TextField,
   IconButton,
   Paper,
-  CircularProgress,
   Chip,
   Card,
   CardContent,
@@ -18,105 +17,46 @@ import {
   Architecture as ArchIcon,
   Help as HelpIcon,
 } from '@mui/icons-material';
-import apiClient from '../api/client';
+import ChatMessageList from '../components/ChatMessageList';
+import { useChat } from '../hooks/useChat';
 
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-}
+const QUICK_ACTIONS = [
+  { label: 'Diagnose a bug', icon: <BugIcon fontSize="small" />, prompt: 'I have a bug where' },
+  { label: 'Suggest a fix', icon: <FixIcon fontSize="small" />, prompt: 'How can I fix the issue with' },
+  { label: 'Explain architecture', icon: <ArchIcon fontSize="small" />, prompt: 'Explain how the application handles' },
+  { label: 'General help', icon: <HelpIcon fontSize="small" />, prompt: 'Help me understand' },
+];
 
 const AssistantPage: React.FC = () => {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [botStatus, setBotStatus] = useState<{ available: boolean; features: string[] } | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const {
+    messages,
+    input,
+    setInput,
+    isLoading,
+    botAvailable,
+    messagesEndRef,
+    checkBotStatus,
+    sendMessage,
+    handleKeyPress,
+  } = useChat();
 
   useEffect(() => {
-    checkStatus();
-  }, []);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  const checkStatus = async () => {
-    try {
-      const status = await apiClient.getChatStatus();
-      setBotStatus(status);
-    } catch {
-      setBotStatus({ available: false, features: [] });
-    }
-  };
-
-  const sendMessage = async (messageText?: string) => {
-    const text = messageText || input.trim();
-    if (!text || isLoading) return;
-
-    const userMessage: ChatMessage = {
-      role: 'user',
-      content: text,
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
-    setInput('');
-    setIsLoading(true);
-
-    try {
-      const history = messages.map((m) => ({ role: m.role, content: m.content }));
-      const response = await apiClient.sendChatMessage(text, history);
-
-      const assistantMessage: ChatMessage = {
-        role: 'assistant',
-        content: response.response,
-        timestamp: new Date(),
-      };
-
-      setMessages((prev) => [...prev, assistantMessage]);
-    } catch (error: unknown) {
-      const errMsg = error instanceof Error ? error.message : 'Failed to get response';
-      const errorMessage: ChatMessage = {
-        role: 'assistant',
-        content: `Sorry, I encountered an error: ${errMsg}. Please try again.`,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
-
-  const quickActions = [
-    { label: 'Diagnose a bug', icon: <BugIcon fontSize="small" />, prompt: 'I have a bug where' },
-    { label: 'Suggest a fix', icon: <FixIcon fontSize="small" />, prompt: 'How can I fix the issue with' },
-    { label: 'Explain architecture', icon: <ArchIcon fontSize="small" />, prompt: 'Explain how the application handles' },
-    { label: 'General help', icon: <HelpIcon fontSize="small" />, prompt: 'Help me understand' },
-  ];
+    checkBotStatus();
+  }, [checkBotStatus]);
 
   return (
     <Box sx={{ height: 'calc(100vh - 112px)', display: 'flex', flexDirection: 'column' }}>
-      {/* Status Bar */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
         <BotIcon color="primary" />
         <Typography variant="h5">Issue Assistant</Typography>
         <Chip
-          label={botStatus?.available ? 'AI Powered (Claude)' : 'Basic Mode'}
+          label={botAvailable ? 'AI Powered (Claude)' : 'Basic Mode'}
           size="small"
-          color={botStatus?.available ? 'success' : 'warning'}
+          color={botAvailable ? 'success' : 'warning'}
           variant="outlined"
         />
       </Box>
 
-      {/* Messages Area */}
       <Paper
         elevation={0}
         sx={{
@@ -142,7 +82,7 @@ const AssistantPage: React.FC = () => {
             </Typography>
 
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', mb: 4 }}>
-              {quickActions.map((action) => (
+              {QUICK_ACTIONS.map((action) => (
                 <Card
                   key={action.label}
                   sx={{
@@ -163,7 +103,7 @@ const AssistantPage: React.FC = () => {
               ))}
             </Box>
 
-            {botStatus && !botStatus.available && (
+            {botAvailable === false && (
               <Paper sx={{ p: 2, bgcolor: 'warning.light', maxWidth: 400, mx: 'auto' }}>
                 <Typography variant="body2">
                   Running in basic mode. Set the <code>ANTHROPIC_API_KEY</code> environment
@@ -174,51 +114,14 @@ const AssistantPage: React.FC = () => {
           </Box>
         )}
 
-        {messages.map((msg, index) => (
-          <Box
-            key={index}
-            sx={{
-              display: 'flex',
-              justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-              mb: 2,
-            }}
-          >
-            <Paper
-              elevation={1}
-              sx={{
-                p: 2,
-                maxWidth: '75%',
-                bgcolor: msg.role === 'user' ? 'primary.main' : 'white',
-                color: msg.role === 'user' ? 'white' : 'text.primary',
-                borderRadius: 2,
-              }}
-            >
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                {msg.content}
-              </Typography>
-              <Typography
-                variant="caption"
-                sx={{ display: 'block', mt: 1, opacity: 0.7, textAlign: 'right' }}
-              >
-                {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </Typography>
-            </Paper>
-          </Box>
-        ))}
-
-        {isLoading && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-            <CircularProgress size={20} />
-            <Typography variant="body2" color="text.secondary">
-              Analyzing your issue...
-            </Typography>
-          </Box>
-        )}
-
-        <div ref={messagesEndRef} />
+        <ChatMessageList
+          messages={messages}
+          isLoading={isLoading}
+          messagesEndRef={messagesEndRef}
+          maxWidth="75%"
+        />
       </Paper>
 
-      {/* Input Area */}
       <Box sx={{ display: 'flex', gap: 1, mt: 2, alignItems: 'flex-end' }}>
         <TextField
           fullWidth
