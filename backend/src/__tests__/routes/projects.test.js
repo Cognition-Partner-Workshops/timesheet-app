@@ -137,7 +137,11 @@ describe('Project Routes', () => {
         callback.call(this, null);
       });
 
-      mockDb.get.mockImplementation((query, params, callback) => {
+      // First get: client ownership check; second get: retrieve created project
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
         callback(null, createdProject);
       });
 
@@ -148,6 +152,19 @@ describe('Project Routes', () => {
       expect(response.status).toBe(201);
       expect(response.body.message).toBe('Project created successfully');
       expect(response.body.project).toEqual(createdProject);
+    });
+
+    test('should return 400 when clientId does not belong to user', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, null);
+      });
+
+      const response = await request(app)
+        .post('/api/projects')
+        .send({ name: 'Project', clientId: 999 });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Client not found or does not belong to user' });
     });
 
     test('should create project with only name', async () => {
@@ -312,6 +329,24 @@ describe('Project Routes', () => {
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ error: 'Failed to update project' });
+    });
+
+    test('should return 400 when updating clientId to one not belonging to user', async () => {
+      // First call: project existence check
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+      // Second call: client ownership check fails
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, null);
+      });
+
+      const response = await request(app)
+        .put('/api/projects/1')
+        .send({ clientId: 999 });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Client not found or does not belong to user' });
     });
   });
 
