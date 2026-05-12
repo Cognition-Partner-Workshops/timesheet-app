@@ -42,3 +42,13 @@ export async function selectClientInDialog(page: Page, clientName: string) {
   await dialog.getByRole('combobox').click();
   await page.getByRole('option', { name: clientName }).click();
 }
+
+export async function createWorkEntry(page: Page, clientName: string, hours: string, description: string) {
+  await page.getByRole('button', { name: 'Add Work Entry' }).click();
+  const dialog = page.getByRole('dialog');
+  await selectClientInDialog(page, clientName);
+  await dialog.getByLabel('Hours').fill(hours);
+  await dialog.getByLabel('Description').fill(description);
+  await dialog.getByRole('button', { name: 'Create' }).click();
+  await expect(dialog).not.toBeVisible({ timeout: 10000 });
+}

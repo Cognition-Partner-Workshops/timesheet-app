@@ -1,5 +1,12 @@
-import { test, expect } from '@playwright/test';
-import { login, navigateTo, createClient, selectClientInDialog, uniqueName, resetDatabase } from './helpers';
+import { test, expect, Locator } from '@playwright/test';
+import { login, navigateTo, createClient, createWorkEntry, selectClientInDialog, uniqueName, resetDatabase } from './helpers';
+
+async function expectDialogHandled(page: import('@playwright/test').Page, dialog: Locator) {
+  await page.waitForTimeout(3000);
+  const dialogClosed = !(await dialog.isVisible());
+  const errorShown = await page.getByRole('alert').isVisible().catch(() => false);
+  expect(dialogClosed || errorShown || (await dialog.isVisible())).toBeTruthy();
+}
 
 test.describe('Edge Cases', () => {
   test.beforeAll(async () => { await resetDatabase(); });
@@ -14,11 +21,7 @@ test.describe('Edge Cases', () => {
       await page.getByRole('button', { name: 'Add Client' }).click();
       const dialog = page.getByRole('dialog');
       await expect(dialog).toBeVisible();
-
-      // Leave name empty, try to submit
       await dialog.getByRole('button', { name: 'Create' }).click();
-
-      // Should show validation error or not close the dialog
       await expect(dialog).toBeVisible();
     });
 
@@ -29,11 +32,8 @@ test.describe('Edge Cases', () => {
 
       await page.getByRole('button', { name: 'Add Work Entry' }).click();
       const dialog = page.getByRole('dialog');
-      // Don't select client, fill hours, try to submit
       await dialog.getByLabel('Hours').fill('5');
       await dialog.getByRole('button', { name: 'Create' }).click();
-
-      // Should show validation error or dialog stays open
       await expect(dialog).toBeVisible({ timeout: 3000 });
     });
 
@@ -45,11 +45,8 @@ test.describe('Edge Cases', () => {
       await page.getByRole('button', { name: 'Add Work Entry' }).click();
       const dialog = page.getByRole('dialog');
       await selectClientInDialog(page, clientName);
-      // Clear hours field (default might be "0")
       await dialog.getByLabel('Hours').clear();
       await dialog.getByRole('button', { name: 'Create' }).click();
-
-      // Should show validation error or stay on form
       await expect(dialog).toBeVisible({ timeout: 3000 });
     });
   });
@@ -64,7 +61,6 @@ test.describe('Edge Cases', () => {
       await dialog.getByLabel('Client Name').fill(specialName);
       await dialog.getByRole('button', { name: 'Create' }).click();
       await expect(dialog).not.toBeVisible({ timeout: 10000 });
-
       await expect(page.getByRole('cell', { name: specialName })).toBeVisible({ timeout: 5000 });
     });
 
@@ -77,7 +73,6 @@ test.describe('Edge Cases', () => {
       await dialog.getByLabel('Client Name').fill(unicodeName);
       await dialog.getByRole('button', { name: 'Create' }).click();
       await expect(dialog).not.toBeVisible({ timeout: 10000 });
-
       await expect(page.getByRole('cell', { name: unicodeName })).toBeVisible({ timeout: 5000 });
     });
 
@@ -86,16 +81,8 @@ test.describe('Edge Cases', () => {
       await createClient(page, clientName);
       await navigateTo(page, 'Work Entries');
 
-      await page.getByRole('button', { name: 'Add Work Entry' }).click();
-      const dialog = page.getByRole('dialog');
-      await selectClientInDialog(page, clientName);
-      await dialog.getByLabel('Hours').fill('1');
-
       const specialDesc = "Fixed bug #123: handle quotes and ampersands & more";
-      await dialog.getByLabel('Description').fill(specialDesc);
-      await dialog.getByRole('button', { name: 'Create' }).click();
-      await expect(dialog).not.toBeVisible({ timeout: 10000 });
-
+      await createWorkEntry(page, clientName, '1', specialDesc);
       await expect(page.getByRole('cell', { name: specialDesc })).toBeVisible({ timeout: 5000 });
     });
   });
@@ -106,15 +93,9 @@ test.describe('Edge Cases', () => {
       await page.getByRole('button', { name: 'Add Client' }).click();
       const dialog = page.getByRole('dialog');
 
-      const longName = 'A'.repeat(200);
-      await dialog.getByLabel('Client Name').fill(longName);
+      await dialog.getByLabel('Client Name').fill('A'.repeat(200));
       await dialog.getByRole('button', { name: 'Create' }).click();
-
-      // Wait for response - either created (dialog closes) or rejected (dialog stays)
-      await page.waitForTimeout(3000);
-      const dialogClosed = !(await dialog.isVisible());
-      const errorShown = await page.getByRole('alert').isVisible().catch(() => false);
-      expect(dialogClosed || errorShown || (await dialog.isVisible())).toBeTruthy();
+      await expectDialogHandled(page, dialog);
     });
 
     test('should handle a very long work entry description', async ({ page }) => {
@@ -126,16 +107,9 @@ test.describe('Edge Cases', () => {
       const dialog = page.getByRole('dialog');
       await selectClientInDialog(page, clientName);
       await dialog.getByLabel('Hours').fill('1');
-
-      const longDescription = 'Detailed work description. '.repeat(50);
-      await dialog.getByLabel('Description').fill(longDescription);
+      await dialog.getByLabel('Description').fill('Detailed work description. '.repeat(50));
       await dialog.getByRole('button', { name: 'Create' }).click();
-
-      // Wait for response
-      await page.waitForTimeout(3000);
-      const dialogClosed = !(await dialog.isVisible());
-      const errorShown = await page.getByRole('alert').isVisible().catch(() => false);
-      expect(dialogClosed || errorShown || (await dialog.isVisible())).toBeTruthy();
+      await expectDialogHandled(page, dialog);
     });
   });
 });
