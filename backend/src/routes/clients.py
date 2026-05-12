@@ -77,23 +77,26 @@ def update_client(
             if not cur.fetchone():
                 raise HTTPException(status_code=404, detail="Client not found")
 
-            updates = []
-            values = []
             data = body.model_dump(exclude_unset=True)
             if not data:
                 raise HTTPException(status_code=400, detail="No fields to update")
 
-            for field in ("name", "description", "department", "email"):
+            allowed_columns = {"name": "name", "description": "description",
+                               "department": "department", "email": "email"}
+            updates = []
+            values = []
+            for field, column in allowed_columns.items():
                 if field in data:
-                    updates.append(f"{field} = %s")
+                    updates.append(column + " = %s")
                     val = data[field]
                     values.append(val if val else None)
 
             updates.append("updated_at = CURRENT_TIMESTAMP")
             values.extend([client_id, user_email])
 
+            set_clause = ", ".join(updates)
             cur.execute(
-                f"UPDATE clients SET {', '.join(updates)} WHERE id = %s AND user_email = %s",
+                "UPDATE clients SET " + set_clause + " WHERE id = %s AND user_email = %s",
                 values,
             )
             cur.execute(

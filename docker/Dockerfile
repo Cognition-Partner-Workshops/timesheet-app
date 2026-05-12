@@ -45,7 +45,7 @@ ENV DB_HOST=mysql
 ENV DB_PORT=3306
 ENV DB_USER=timesheet
 ENV DB_NAME=timesheet
-ENV FRONTEND_URL=*
+ENV FRONTEND_URL=http://localhost:3001
 
 # Switch to non-root user
 USER appuser

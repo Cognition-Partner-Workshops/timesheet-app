@@ -123,20 +123,22 @@ def update_work_entry(
                         status_code=400, detail="Client not found or does not belong to user"
                     )
 
+            allowed_columns = {"clientId": "client_id", "hours": "hours",
+                               "description": "description", "date": "date"}
             updates = []
             values = []
-            field_map = {"clientId": "client_id", "hours": "hours", "description": "description", "date": "date"}
-            for py_field, db_field in field_map.items():
+            for py_field, db_column in allowed_columns.items():
                 if py_field in data:
-                    updates.append(f"{db_field} = %s")
+                    updates.append(db_column + " = %s")
                     val = data[py_field]
                     values.append(val if val else None)
 
             updates.append("updated_at = CURRENT_TIMESTAMP")
             values.extend([entry_id, user_email])
 
+            set_clause = ", ".join(updates)
             cur.execute(
-                f"UPDATE work_entries SET {', '.join(updates)} WHERE id = %s AND user_email = %s",
+                "UPDATE work_entries SET " + set_clause + " WHERE id = %s AND user_email = %s",
                 values,
             )
             row = _fetch_entry_with_client(cur, entry_id)
