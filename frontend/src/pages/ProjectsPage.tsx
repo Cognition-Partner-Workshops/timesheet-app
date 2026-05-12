@@ -149,6 +149,11 @@ const ProjectsPage: React.FC = () => {
       return;
     }
 
+    if (formData.name.trim().length > 255) {
+      setError('Project name must be 255 characters or fewer');
+      return;
+    }
+
     const payload = {
       name: formData.name,
       description: formData.description || undefined,
@@ -321,6 +326,8 @@ const ProjectsPage: React.FC = () => {
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               disabled={createMutation.isPending || updateMutation.isPending}
+              inputProps={{ maxLength: 255 }}
+              helperText={`${formData.name.length}/255`}
             />
             <FormControl fullWidth margin="dense">
               <InputLabel id="client-select-label">Client</InputLabel>

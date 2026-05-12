@@ -179,6 +179,14 @@ describe('Project Routes', () => {
       expect(response.status).toBe(400);
     });
 
+    test('should return 400 for name exceeding max length', async () => {
+      const response = await request(app)
+        .post('/api/projects')
+        .send({ name: 'a'.repeat(256) });
+
+      expect(response.status).toBe(400);
+    });
+
     test('should return 400 for invalid status', async () => {
       const response = await request(app)
         .post('/api/projects')
