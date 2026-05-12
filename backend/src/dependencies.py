@@ -1,16 +1,14 @@
-import re
-
 from fastapi import Header, HTTPException
 
 from src.database import get_connection
+from src.schemas import _is_valid_email
 
 
 def get_authenticated_user(x_user_email: str = Header(default=None)) -> str:
     if not x_user_email:
         raise HTTPException(status_code=401, detail="User email required in x-user-email header")
 
-    pattern = r"^[^\s@]+@[^\s@]+\.[^\s@]+$"
-    if not re.match(pattern, x_user_email):
+    if not _is_valid_email(x_user_email):
         raise HTTPException(status_code=400, detail="Invalid email format")
 
     conn = get_connection()

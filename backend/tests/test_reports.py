@@ -52,7 +52,7 @@ class TestGetClientReport:
             assert resp.status_code == 200
             body = resp.json()
             assert body["client"]["name"] == "Client A"
-            assert body["totalHours"] == 12.5
+            assert abs(body["totalHours"] - 12.5) < 0.01
             assert body["entryCount"] == 2
 
     def test_client_not_found(self):

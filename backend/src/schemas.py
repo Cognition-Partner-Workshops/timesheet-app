@@ -1,7 +1,15 @@
-import re
 from typing import Optional
 
 from pydantic import BaseModel, field_validator
+
+
+def _is_valid_email(value: str) -> bool:
+    if not value or "@" not in value or " " in value:
+        return False
+    local, _, domain = value.rpartition("@")
+    if not local or not domain or "." not in domain:
+        return False
+    return True
 
 
 class LoginRequest(BaseModel):
@@ -10,8 +18,7 @@ class LoginRequest(BaseModel):
     @field_validator("email")
     @classmethod
     def validate_email(cls, v: str) -> str:
-        pattern = r"^[^\s@]+@[^\s@]+\.[^\s@]+$"
-        if not re.match(pattern, v):
+        if not _is_valid_email(v):
             raise ValueError("Invalid email format")
         return v
 
@@ -34,8 +41,7 @@ class CreateClientRequest(BaseModel):
     @classmethod
     def validate_email(cls, v: Optional[str]) -> Optional[str]:
         if v is not None and v != "":
-            pattern = r"^[^\s@]+@[^\s@]+\.[^\s@]+$"
-            if not re.match(pattern, v):
+            if not _is_valid_email(v):
                 raise ValueError("Invalid email format")
         return v or None
 
@@ -50,8 +56,7 @@ class UpdateClientRequest(BaseModel):
     @classmethod
     def validate_email(cls, v: Optional[str]) -> Optional[str]:
         if v is not None and v != "":
-            pattern = r"^[^\s@]+@[^\s@]+\.[^\s@]+$"
-            if not re.match(pattern, v):
+            if not _is_valid_email(v):
                 raise ValueError("Invalid email format")
         return v
 
