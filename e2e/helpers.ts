@@ -38,9 +38,26 @@ export async function createWorkEntry(
   await expect(page.getByRole('dialog')).not.toBeVisible();
 }
 
+export async function openClientDialog(page: Page): Promise<void> {
+  await page.goto('/clients');
+  await page.getByRole('button', { name: 'Add Client' }).click();
+}
+
 export async function openWorkEntryDialog(page: Page, clientName: string): Promise<void> {
   await page.goto('/work-entries');
   await page.getByRole('button', { name: 'Add Work Entry' }).click();
   await page.getByRole('combobox', { name: 'Client' }).click();
   await page.getByRole('option', { name: clientName }).click();
+}
+
+export async function clickEditButton(page: Page, rowText: string): Promise<void> {
+  const row = page.getByRole('row').filter({ hasText: rowText });
+  await row.getByRole('button').filter({ has: page.locator('[data-testid="EditIcon"]') }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+}
+
+export async function clickDeleteButton(page: Page, rowText: string): Promise<void> {
+  page.on('dialog', (dialog) => dialog.accept());
+  const row = page.getByRole('row').filter({ hasText: rowText });
+  await row.getByRole('button').filter({ has: page.locator('[data-testid="DeleteIcon"]') }).click();
 }

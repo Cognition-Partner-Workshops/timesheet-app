@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { uniqueEmail, login, createClient } from './helpers';
+import { uniqueEmail, login, createClient, openClientDialog, clickEditButton, clickDeleteButton } from './helpers';
 
 test.describe('Client Management', () => {
   test('should create a new client', async ({ page }) => {
@@ -25,10 +25,7 @@ test.describe('Client Management', () => {
     await login(page, uniqueEmail('client'));
     await createClient(page, 'Edit Me Corp');
 
-    const row = page.getByRole('row').filter({ hasText: 'Edit Me Corp' });
-    await row.getByRole('button').filter({ has: page.locator('[data-testid="EditIcon"]') }).click();
-    await expect(page.getByRole('dialog')).toBeVisible();
-
+    await clickEditButton(page, 'Edit Me Corp');
     await page.getByLabel('Client Name').clear();
     await page.getByLabel('Client Name').fill('Updated Corp');
     await page.getByRole('button', { name: 'Update' }).click();
@@ -42,9 +39,7 @@ test.describe('Client Management', () => {
     await login(page, uniqueEmail('client'));
     await createClient(page, 'Delete Me Corp');
 
-    page.on('dialog', (dialog) => dialog.accept());
-    const row = page.getByRole('row').filter({ hasText: 'Delete Me Corp' });
-    await row.getByRole('button').filter({ has: page.locator('[data-testid="DeleteIcon"]') }).click();
+    await clickDeleteButton(page, 'Delete Me Corp');
     await expect(page.getByText('Delete Me Corp')).not.toBeVisible();
   });
 

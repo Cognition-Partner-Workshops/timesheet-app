@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { uniqueEmail, login, createClient, createWorkEntry } from './helpers';
+import { uniqueEmail, login, createClient, createWorkEntry, clickEditButton, clickDeleteButton } from './helpers';
 
 test.describe('Work Entry Lifecycle', () => {
   test('should create a work entry for a client', async ({ page }) => {
@@ -18,10 +18,7 @@ test.describe('Work Entry Lifecycle', () => {
     await createWorkEntry(page, 'WE Edit Client', '3', 'Initial entry');
     await expect(page.getByText('3 hours')).toBeVisible();
 
-    const row = page.getByRole('row').filter({ hasText: 'Initial entry' });
-    await row.getByRole('button').filter({ has: page.locator('[data-testid="EditIcon"]') }).click();
-    await expect(page.getByRole('dialog')).toBeVisible();
-
+    await clickEditButton(page, 'Initial entry');
     await page.getByLabel('Hours').clear();
     await page.getByLabel('Hours').fill('6');
     await page.getByRole('button', { name: 'Update' }).click();
@@ -37,9 +34,7 @@ test.describe('Work Entry Lifecycle', () => {
     await createWorkEntry(page, 'WE Delete Client', '2', 'Entry to delete');
     await expect(page.getByText('Entry to delete')).toBeVisible();
 
-    page.on('dialog', (dialog) => dialog.accept());
-    const row = page.getByRole('row').filter({ hasText: 'Entry to delete' });
-    await row.getByRole('button').filter({ has: page.locator('[data-testid="DeleteIcon"]') }).click();
+    await clickDeleteButton(page, 'Entry to delete');
     await expect(page.getByText('Entry to delete')).not.toBeVisible();
   });
 

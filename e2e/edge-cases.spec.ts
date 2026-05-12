@@ -1,11 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { uniqueEmail, login, createClient, openWorkEntryDialog } from './helpers';
+import { uniqueEmail, login, createClient, openClientDialog, openWorkEntryDialog } from './helpers';
 
 test.describe('Edge Cases', () => {
   test('should show validation error when submitting client form with empty name', async ({ page }) => {
     await login(page, uniqueEmail('edge'));
-    await page.goto('/clients');
-    await page.getByRole('button', { name: 'Add Client' }).click();
+    await openClientDialog(page);
     await expect(page.getByRole('dialog')).toBeVisible();
     await page.getByRole('button', { name: 'Create' }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
@@ -13,8 +12,7 @@ test.describe('Edge Cases', () => {
 
   test('should handle special characters in client name', async ({ page }) => {
     await login(page, uniqueEmail('edge'));
-    await page.goto('/clients');
-    await page.getByRole('button', { name: 'Add Client' }).click();
+    await openClientDialog(page);
 
     const specialName = "O'Brien & Associates <Ltd>";
     await page.getByLabel('Client Name').fill(specialName);
@@ -25,8 +23,7 @@ test.describe('Edge Cases', () => {
 
   test('should handle very long text in client description', async ({ page }) => {
     await login(page, uniqueEmail('edge'));
-    await page.goto('/clients');
-    await page.getByRole('button', { name: 'Add Client' }).click();
+    await openClientDialog(page);
 
     await page.getByLabel('Client Name').fill('Long Desc Client');
     await page.getByLabel('Description').fill('A'.repeat(500));
@@ -37,8 +34,7 @@ test.describe('Edge Cases', () => {
 
   test('should reject description exceeding max length', async ({ page }) => {
     await login(page, uniqueEmail('edge'));
-    await page.goto('/clients');
-    await page.getByRole('button', { name: 'Add Client' }).click();
+    await openClientDialog(page);
 
     await page.getByLabel('Client Name').fill('Overflow Client');
     await page.getByLabel('Description').fill('B'.repeat(1001));
