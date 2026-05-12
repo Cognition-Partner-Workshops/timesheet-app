@@ -1,3 +1,14 @@
+/**
+ * @fileoverview Passwordless login page.
+ *
+ * Presents an email-only form that authenticates users against the backend.
+ * On success the user is redirected to the dashboard; on failure an inline
+ * error alert is displayed. Intentionally omits a password field — see the
+ * in-page info banner for context.
+ *
+ * @module pages/LoginPage
+ */
+
 import React, { useState } from 'react';
 import {
   Container,
@@ -12,6 +23,10 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 
+/**
+ * Full-screen login view centered vertically and horizontally.
+ * Manages its own loading and error UI state independent of global stores.
+ */
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
@@ -19,6 +34,10 @@ const LoginPage: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  /**
+   * Form submission handler — calls the auth context `login` action and
+   * navigates to `/dashboard` on success.
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');

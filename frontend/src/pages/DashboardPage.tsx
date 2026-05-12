@@ -1,3 +1,13 @@
+/**
+ * @fileoverview Dashboard overview page.
+ *
+ * Displays high-level statistics (total clients, work entries, hours) as
+ * clickable summary cards, a list of the five most recent work entries, and
+ * quick-action buttons for common tasks.
+ *
+ * @module pages/DashboardPage
+ */
+
 import React from 'react';
 import {
   Grid,
@@ -18,6 +28,10 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
 
+/**
+ * Landing page shown after login. Fetches clients and work entries to derive
+ * aggregate statistics and recent activity.
+ */
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
 
@@ -34,9 +48,12 @@ const DashboardPage: React.FC = () => {
   const clients = clientsData?.clients || [];
   const workEntries = workEntriesData?.workEntries || [];
 
+  /** Sum of all logged hours across every work entry. */
   const totalHours = workEntries.reduce((sum: number, entry: { hours: number }) => sum + entry.hours, 0);
+  /** Most recent five work entries shown in the activity feed. */
   const recentEntries = workEntries.slice(0, 5);
 
+  /** Configuration for the three KPI cards at the top of the page. */
   const statsCards = [
     {
       title: 'Total Clients',
