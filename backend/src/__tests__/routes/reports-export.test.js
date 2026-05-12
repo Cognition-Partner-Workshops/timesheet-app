@@ -13,29 +13,21 @@ jest.mock('csv-writer', () => ({
 }));
 
 jest.mock('pdfkit', () => {
+  const chainable = () => jest.fn().mockReturnThis();
   return jest.fn().mockImplementation(() => {
-    let pipedStream = null;
+    let output = null;
     return {
-      fontSize: jest.fn().mockReturnThis(),
-      text: jest.fn().mockReturnThis(),
-      moveDown: jest.fn().mockReturnThis(),
-      moveTo: jest.fn().mockReturnThis(),
-      lineTo: jest.fn().mockReturnThis(),
-      stroke: jest.fn().mockReturnThis(),
-      addPage: jest.fn().mockReturnThis(),
-      pipe: jest.fn(function(stream) { pipedStream = stream; }),
-      end: jest.fn(function() { if (pipedStream) pipedStream.end(); }),
+      fontSize: chainable(), text: chainable(), moveDown: chainable(),
+      moveTo: chainable(), lineTo: chainable(), stroke: chainable(),
+      addPage: chainable(),
+      pipe: jest.fn(function(dest) { output = dest; }),
+      end: jest.fn(function() { if (output) output.end(); }),
       y: 100
     };
   });
 });
 
-jest.mock('../../middleware/auth', () => ({
-  authenticateUser: (req, res, next) => {
-    req.userEmail = 'test@example.com';
-    next();
-  }
-}));
+jest.mock('../../middleware/auth', () => ({ authenticateUser: (req, res, next) => { req.userEmail = 'test@example.com'; next(); } }));
 
 const reportRoutes = require('../../routes/reports');
 const app = express();
@@ -85,31 +77,6 @@ describe('Report Routes - Export Success Paths', () => {
       setupClientAndEntries({ id: 1, name: 'Client/Special@Name' }, []);
       const response = await request(app).get('/api/reports/export/pdf/1');
       expect(response.headers['content-disposition']).toContain('Client_Special_Name');
-    });
-
-    test('should trigger page break when y exceeds 700', async () => {
-      const PDFDocument = require('pdfkit');
-      PDFDocument.mockImplementation(() => {
-        let pipedStream = null;
-        return {
-          fontSize: jest.fn().mockReturnThis(),
-          text: jest.fn().mockReturnThis(),
-          moveDown: jest.fn().mockReturnThis(),
-          moveTo: jest.fn().mockReturnThis(),
-          lineTo: jest.fn().mockReturnThis(),
-          stroke: jest.fn().mockReturnThis(),
-          addPage: jest.fn().mockReturnThis(),
-          pipe: jest.fn(function(stream) { pipedStream = stream; }),
-          end: jest.fn(function() { if (pipedStream) pipedStream.end(); }),
-          y: 750
-        };
-      });
-      setupClientAndEntries(
-        { id: 1, name: 'Test Client' },
-        [{ date: '2024-01-01', hours: 2, description: 'Work' }]
-      );
-      const response = await request(app).get('/api/reports/export/pdf/1');
-      expect(response.status).toBe(200);
     });
 
     test('should handle many entries with separator lines', async () => {

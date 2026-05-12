@@ -3,12 +3,7 @@ const { getDatabase } = require('../../database/init');
 const { createMockDb, createTestApp, mockDbRunSuccess, mockDbRunError } = require('../helpers/testUtils');
 
 jest.mock('../../database/init');
-jest.mock('../../middleware/auth', () => ({
-  authenticateUser: (req, res, next) => {
-    req.userEmail = 'test@example.com';
-    next();
-  }
-}));
+jest.mock('../../middleware/auth', () => ({ authenticateUser: (req, res, next) => { req.userEmail = 'test@example.com'; next(); } }));
 
 const clientRoutes = require('../../routes/clients');
 const app = createTestApp('/api/clients', clientRoutes);
