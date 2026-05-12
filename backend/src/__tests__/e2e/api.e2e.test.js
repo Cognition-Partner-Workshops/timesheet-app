@@ -1,38 +1,10 @@
 const request = require('supertest');
-const express = require('express');
-const { initializeDatabase, closeDatabase } = require('../../database/init');
-const authRoutes = require('../../routes/auth');
-const clientRoutes = require('../../routes/clients');
-const workEntryRoutes = require('../../routes/workEntries');
-const reportRoutes = require('../../routes/reports');
-const { errorHandler } = require('../../middleware/errorHandler');
+const { getApp, teardown } = require('./steps/shared-setup');
 
 let app;
 
-beforeAll(async () => {
-  app = express();
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
-
-  app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
-  });
-
-  app.use('/api/auth', authRoutes);
-  app.use('/api/clients', clientRoutes);
-  app.use('/api/work-entries', workEntryRoutes);
-  app.use('/api/reports', reportRoutes);
-  app.use(errorHandler);
-  app.use('*', (req, res) => {
-    res.status(404).json({ error: 'Route not found' });
-  });
-
-  await initializeDatabase();
-});
-
-afterAll(async () => {
-  await closeDatabase();
-});
+beforeAll(async () => { app = await getApp(); });
+afterAll(async () => { await teardown(); });
 
 const TEST_EMAIL = 'e2e-test@example.com';
 const OTHER_EMAIL = 'other-user@example.com';
@@ -72,14 +44,15 @@ async function createWorkEntry(clientId, hours, date, description, email = TEST_
 
 // ─── Error-pattern helpers ───────────────────────────────────────────────────
 
-async function expectNotFound(method, path, body) {
-  const res = body ? method(path, body) : method(path);
-  expect((await res).status).toBe(404);
-}
-
-async function expectBadId(method, path, body) {
-  const res = body ? method(path, body) : method(path);
-  expect((await res).status).toBe(400);
+function addIdErrorTests(method, basePath, body) {
+  test('should return 404 for non-existent ID', async () => {
+    const res = body ? method(`${basePath}/99999`, body) : method(`${basePath}/99999`);
+    expect((await res).status).toBe(404);
+  });
+  test('should return 400 for invalid ID', async () => {
+    const res = body ? method(`${basePath}/abc`, body) : method(`${basePath}/abc`);
+    expect((await res).status).toBe(400);
+  });
 }
 
 // ─── Health Check ────────────────────────────────────────────────────────────
@@ -224,13 +197,7 @@ describe('Clients - /api/clients', () => {
       expect(res.body.client.id).toBe(clientId);
     });
 
-    test('should return 404 for non-existent client', async () => {
-      await expectNotFound(authedGet, '/api/clients/99999');
-    });
-
-    test('should return 400 for invalid client ID', async () => {
-      await expectBadId(authedGet, '/api/clients/abc');
-    });
+    addIdErrorTests(authedGet, '/api/clients');
 
     test('should not return another user\'s client', async () => {
       const res = await authedGet(`/api/clients/${clientId}`, OTHER_EMAIL);
@@ -247,13 +214,7 @@ describe('Clients - /api/clients', () => {
       expect(res.body.client.department).toBe('Sales');
     });
 
-    test('should return 404 when updating non-existent client', async () => {
-      await expectNotFound(authedPut, '/api/clients/99999', { name: 'Ghost' });
-    });
-
-    test('should return 400 for invalid client ID', async () => {
-      await expectBadId(authedPut, '/api/clients/abc', { name: 'Invalid' });
-    });
+    addIdErrorTests(authedPut, '/api/clients', { name: 'Test' });
 
     test('should return 400 when no fields provided', async () => {
       const res = await authedPut(`/api/clients/${clientId}`, {});
@@ -277,13 +238,7 @@ describe('Clients - /api/clients', () => {
       expect(check.status).toBe(404);
     });
 
-    test('should return 404 for non-existent client', async () => {
-      await expectNotFound(authedDelete, '/api/clients/99999');
-    });
-
-    test('should return 400 for invalid client ID', async () => {
-      await expectBadId(authedDelete, '/api/clients/abc');
-    });
+    addIdErrorTests(authedDelete, '/api/clients');
   });
 });
 
@@ -380,13 +335,7 @@ describe('Work Entries - /api/work-entries', () => {
       expect(res.body.workEntry.client_name).toBe('Work Client A');
     });
 
-    test('should return 404 for non-existent entry', async () => {
-      await expectNotFound(authedGet, '/api/work-entries/99999');
-    });
-
-    test('should return 400 for invalid entry ID', async () => {
-      await expectBadId(authedGet, '/api/work-entries/abc');
-    });
+    addIdErrorTests(authedGet, '/api/work-entries');
 
     test('should not return another user\'s entry', async () => {
       const res = await authedGet(`/api/work-entries/${entryId}`, OTHER_EMAIL);
@@ -412,13 +361,7 @@ describe('Work Entries - /api/work-entries', () => {
       await authedPut(`/api/work-entries/${entryId}`, { clientId });
     });
 
-    test('should return 404 for non-existent entry', async () => {
-      await expectNotFound(authedPut, '/api/work-entries/99999', { hours: 1 });
-    });
-
-    test('should return 400 for invalid entry ID', async () => {
-      await expectBadId(authedPut, '/api/work-entries/abc', { hours: 1 });
-    });
+    addIdErrorTests(authedPut, '/api/work-entries', { hours: 1 });
 
     test('should return 400 when no fields provided', async () => {
       const res = await authedPut(`/api/work-entries/${entryId}`, {});
@@ -446,13 +389,7 @@ describe('Work Entries - /api/work-entries', () => {
       expect(check.status).toBe(404);
     });
 
-    test('should return 404 for non-existent entry', async () => {
-      await expectNotFound(authedDelete, '/api/work-entries/99999');
-    });
-
-    test('should return 400 for invalid entry ID', async () => {
-      await expectBadId(authedDelete, '/api/work-entries/abc');
-    });
+    addIdErrorTests(authedDelete, '/api/work-entries');
 
     test('should not allow another user to delete entry', async () => {
       const res = await authedDelete(`/api/work-entries/${entryId}`, OTHER_EMAIL);
@@ -482,13 +419,7 @@ describe('Reports - /api/reports', () => {
       expect(res.body.workEntries).toHaveLength(2);
     });
 
-    test('should return 404 for non-existent client', async () => {
-      await expectNotFound(authedGet, '/api/reports/client/99999');
-    });
-
-    test('should return 400 for invalid client ID', async () => {
-      await expectBadId(authedGet, '/api/reports/client/abc');
-    });
+    addIdErrorTests(authedGet, '/api/reports/client');
 
     test('should not return report for another user\'s client', async () => {
       const res = await authedGet(`/api/reports/client/${clientId}`, OTHER_EMAIL);
@@ -506,13 +437,7 @@ describe('Reports - /api/reports', () => {
       expect(body).toContain('Hours');
     });
 
-    test('should return 404 for non-existent client', async () => {
-      await expectNotFound(authedGet, '/api/reports/export/csv/99999');
-    });
-
-    test('should return 400 for invalid client ID', async () => {
-      await expectBadId(authedGet, '/api/reports/export/csv/abc');
-    });
+    addIdErrorTests(authedGet, '/api/reports/export/csv');
   });
 
   describe('GET /api/reports/export/pdf/:clientId', () => {
@@ -524,13 +449,7 @@ describe('Reports - /api/reports', () => {
       expect(res.body.length).toBeGreaterThan(0);
     });
 
-    test('should return 404 for non-existent client', async () => {
-      await expectNotFound(authedGet, '/api/reports/export/pdf/99999');
-    });
-
-    test('should return 400 for invalid client ID', async () => {
-      await expectBadId(authedGet, '/api/reports/export/pdf/abc');
-    });
+    addIdErrorTests(authedGet, '/api/reports/export/pdf');
   });
 });
 
