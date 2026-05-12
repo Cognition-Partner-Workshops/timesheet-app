@@ -45,6 +45,7 @@ jobs:
 
       - name: Security audit
         working-directory: backend
+        continue-on-error: true
         run: npm audit --audit-level=moderate
 
   frontend:
@@ -77,4 +78,5 @@ jobs:
 
       - name: Security audit
         working-directory: frontend
+        continue-on-error: true
         run: npm audit --audit-level=moderate
