@@ -10,9 +10,7 @@ export async function login(page: Page, email: string = TEST_EMAIL) {
   await page.getByRole('heading', { name: 'Dashboard' }).waitFor({ timeout: 5000 });
 }
 
-export async function createClient(page: Page, name: string, options?: { department?: string; email?: string; description?: string }) {
-  await page.goto('/clients');
-  await page.getByRole('button', { name: 'Add Client' }).waitFor({ timeout: 5000 });
+export async function fillAndSubmitClientForm(page: Page, name: string, options?: { department?: string; email?: string; description?: string }) {
   await page.getByRole('button', { name: 'Add Client' }).click();
   await page.getByLabel('Client Name').fill(name);
   if (options?.department) await page.getByLabel('Department').fill(options.department);
@@ -20,6 +18,12 @@ export async function createClient(page: Page, name: string, options?: { departm
   if (options?.description) await page.getByLabel('Description').fill(options.description);
   await page.getByRole('button', { name: 'Create' }).click();
   await expect(page.getByRole('dialog')).toBeHidden({ timeout: 5000 });
+}
+
+export async function createClient(page: Page, name: string, options?: { department?: string; email?: string; description?: string }) {
+  await page.goto('/clients');
+  await page.getByRole('button', { name: 'Add Client' }).waitFor({ timeout: 5000 });
+  await fillAndSubmitClientForm(page, name, options);
 }
 
 export async function ensureClientExists(page: Page, name: string) {

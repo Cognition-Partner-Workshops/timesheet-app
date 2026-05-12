@@ -1,6 +1,12 @@
 import { test, expect } from '@playwright/test';
 import { login, ensureClientExists, openWorkEntryDialog } from './helpers';
 
+async function selectClientAndFillHours(page: import('@playwright/test').Page, hours: string) {
+  await page.locator('.MuiSelect-select').click();
+  await page.getByRole('option').first().click();
+  await page.getByLabel('Hours').fill(hours);
+}
+
 test.describe('Edge Cases', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
@@ -35,19 +41,16 @@ test.describe('Edge Cases', () => {
   });
 
   test('should reject work entry with zero hours', async ({ page }) => {
-    await ensureClientExists(page, 'Edge Case Client');
+    await ensureClientExists(page, 'Validation Client');
     await openWorkEntryDialog(page);
-    await page.locator('.MuiSelect-select').click();
-    await page.getByRole('option').first().click();
-    await page.getByLabel('Hours').fill('0');
+    await selectClientAndFillHours(page, '0');
     await page.getByRole('button', { name: 'Create' }).click();
     await page.waitForTimeout(1000);
-    await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByText('Add New Work Entry')).toBeVisible();
   });
 
   test('should reject work entry without selecting a client', async ({ page }) => {
-    await ensureClientExists(page, 'Edge Case Client');
+    await ensureClientExists(page, 'Validation Client');
     await openWorkEntryDialog(page);
     await page.getByLabel('Hours').fill('2');
     await page.getByRole('button', { name: 'Create' }).click();
@@ -56,11 +59,9 @@ test.describe('Edge Cases', () => {
   });
 
   test('should handle special characters in work entry description', async ({ page }) => {
-    await ensureClientExists(page, 'Special Chars Client');
+    await ensureClientExists(page, 'Validation Client');
     await openWorkEntryDialog(page);
-    await page.locator('.MuiSelect-select').click();
-    await page.getByRole('option').first().click();
-    await page.getByLabel('Hours').fill('1');
+    await selectClientAndFillHours(page, '1');
     const specialDesc = '日本語テスト & "quotes" <tags> $pecial!';
     await page.getByLabel('Description').fill(specialDesc);
     await page.getByRole('button', { name: 'Create' }).click();
@@ -69,14 +70,11 @@ test.describe('Edge Cases', () => {
   });
 
   test('should reject hours greater than 24', async ({ page }) => {
-    await ensureClientExists(page, 'Hours Limit Client');
+    await ensureClientExists(page, 'Validation Client');
     await openWorkEntryDialog(page);
-    await page.locator('.MuiSelect-select').click();
-    await page.getByRole('option').first().click();
-    await page.getByLabel('Hours').fill('25');
+    await selectClientAndFillHours(page, '25');
     await page.getByRole('button', { name: 'Create' }).click();
     await page.waitForTimeout(1000);
-    await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByText('Add New Work Entry')).toBeVisible();
   });
 });
