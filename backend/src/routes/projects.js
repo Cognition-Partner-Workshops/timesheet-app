@@ -64,7 +64,7 @@ router.get('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   const projectId = parseId(req, res, 'project');
-  if (!projectId) return;
+  if (projectId === null) return;
 
   try {
     const db = getDatabase();
@@ -105,7 +105,7 @@ router.post('/', async (req, res, next) => {
 router.put('/:id', async (req, res, next) => {
   try {
     const projectId = parseId(req, res, 'project');
-    if (!projectId) return;
+    if (projectId === null) return;
 
     const { error, value } = updateProjectSchema.validate(req.body);
     if (error) return next(error);
@@ -150,7 +150,7 @@ router.put('/:id', async (req, res, next) => {
 
 router.delete('/:id', async (req, res) => {
   const projectId = parseId(req, res, 'project');
-  if (!projectId) return;
+  if (projectId === null) return;
 
   try {
     const db = getDatabase();
