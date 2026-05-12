@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { uniqueEmail, login, createClient, openClientDialog, clickEditButton, clickDeleteButton } from './helpers';
 
 test.describe('Client Management', () => {
-  test('should create a new client', async ({ page }) => {
+  test('should create a new client with all fields', async ({ page }) => {
     await login(page, uniqueEmail('client'));
     await page.goto('/clients');
     await expect(page.getByRole('heading', { name: 'Clients' })).toBeVisible();
@@ -21,26 +21,22 @@ test.describe('Client Management', () => {
     await expect(page.getByText('Engineering')).toBeVisible();
   });
 
-  test('should edit an existing client', async ({ page }) => {
+  test('should edit and then delete a client', async ({ page }) => {
     await login(page, uniqueEmail('client'));
-    await createClient(page, 'Edit Me Corp');
+    await createClient(page, 'Lifecycle Corp');
 
-    await clickEditButton(page, 'Edit Me Corp');
+    // Edit
+    await clickEditButton(page, 'Lifecycle Corp');
     await page.getByLabel('Client Name').clear();
-    await page.getByLabel('Client Name').fill('Updated Corp');
+    await page.getByLabel('Client Name').fill('Renamed Corp');
     await page.getByRole('button', { name: 'Update' }).click();
     await expect(page.getByRole('dialog')).not.toBeVisible();
+    await expect(page.getByText('Renamed Corp')).toBeVisible();
+    await expect(page.getByText('Lifecycle Corp')).not.toBeVisible();
 
-    await expect(page.getByText('Updated Corp')).toBeVisible();
-    await expect(page.getByText('Edit Me Corp')).not.toBeVisible();
-  });
-
-  test('should delete a client', async ({ page }) => {
-    await login(page, uniqueEmail('client'));
-    await createClient(page, 'Delete Me Corp');
-
-    await clickDeleteButton(page, 'Delete Me Corp');
-    await expect(page.getByText('Delete Me Corp')).not.toBeVisible();
+    // Delete the renamed client
+    await clickDeleteButton(page, 'Renamed Corp');
+    await expect(page.getByText('Renamed Corp')).not.toBeVisible();
   });
 
   test('should show empty state when no clients exist', async ({ page }) => {

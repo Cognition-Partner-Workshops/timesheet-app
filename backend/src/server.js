@@ -26,7 +26,7 @@ app.use(cors({
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX, 10) || 100
+  max: Number.isNaN(parseInt(process.env.RATE_LIMIT_MAX, 10)) ? 100 : parseInt(process.env.RATE_LIMIT_MAX, 10)
 });
 app.use(limiter);
 

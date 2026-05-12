@@ -12,30 +12,24 @@ test.describe('Work Entry Lifecycle', () => {
     await expect(page.getByText('Frontend development work')).toBeVisible();
   });
 
-  test('should edit hours on an existing work entry', async ({ page }) => {
+  test('should edit hours and then delete a work entry', async ({ page }) => {
     await login(page, uniqueEmail('work'));
-    await createClient(page, 'WE Edit Client');
-    await createWorkEntry(page, 'WE Edit Client', '3', 'Initial entry');
+    await createClient(page, 'WE Lifecycle Client');
+    await createWorkEntry(page, 'WE Lifecycle Client', '3', 'Lifecycle entry');
     await expect(page.getByText('3 hours')).toBeVisible();
 
-    await clickEditButton(page, 'Initial entry');
+    // Edit hours
+    await clickEditButton(page, 'Lifecycle entry');
     await page.getByLabel('Hours').clear();
     await page.getByLabel('Hours').fill('6');
     await page.getByRole('button', { name: 'Update' }).click();
     await expect(page.getByRole('dialog')).not.toBeVisible();
-
     await expect(page.getByText('6 hours')).toBeVisible();
     await expect(page.getByText('3 hours')).not.toBeVisible();
-  });
 
-  test('should delete a work entry', async ({ page }) => {
-    await login(page, uniqueEmail('work'));
-    await createClient(page, 'WE Delete Client');
-    await createWorkEntry(page, 'WE Delete Client', '2', 'Entry to delete');
-    await expect(page.getByText('Entry to delete')).toBeVisible();
-
-    await clickDeleteButton(page, 'Entry to delete');
-    await expect(page.getByText('Entry to delete')).not.toBeVisible();
+    // Delete the entry
+    await clickDeleteButton(page, 'Lifecycle entry');
+    await expect(page.getByText('Lifecycle entry')).not.toBeVisible();
   });
 
   test('should show empty state when no entries exist', async ({ page }) => {
