@@ -33,6 +33,8 @@ export class LoginPage extends BasePage {
     await this.enterEmail(email);
     await this.clickLoginButton();
     await this.waitForNavigation();
+    // Wait for auth state to settle and Layout to render
+    await this.page.waitForSelector('.MuiAppBar-root', { state: 'visible', timeout: 15000 });
   }
 
   async getPageTitle(): Promise<string> {

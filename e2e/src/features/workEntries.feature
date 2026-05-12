@@ -58,12 +58,12 @@ Feature: Work Entries Management
 
   @positive
   Scenario: Delete an existing work entry
-    Given a client "Test Client" exists
-    And a work entry for "Test Client" with "4" hours exists
+    Given a client "Delete Test Client" exists
+    And a work entry for "Delete Test Client" with "4" hours exists
     And I am on the work entries page
-    When I click the delete button for work entry "Test Client"
+    When I click the delete button for work entry "Delete Test Client"
     And I confirm the deletion
-    Then the work entry for "Test Client" should not appear in the table
+    Then the work entry for "Delete Test Client" should not appear in the table
 
   @positive
   Scenario: Cancel work entry creation

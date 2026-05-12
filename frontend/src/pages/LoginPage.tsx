@@ -82,7 +82,7 @@ const LoginPage: React.FC = () => {
             fullWidth
             variant="contained"
             sx={{ mt: 2, mb: 1 }}
-            disabled={isLoading || !email}
+            disabled={isLoading || !email.trim()}
           >
             {isLoading ? <CircularProgress size={24} /> : 'Log In'}
           </Button>

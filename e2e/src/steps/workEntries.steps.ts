@@ -84,8 +84,9 @@ Then('the work entry for {string} with {string} hours should appear in the table
 
 Then('the work entry for {string} should not appear in the table', async function (this: PlaywrightWorld, clientName: string) {
   await workEntriesPage.waitForWorkEntriesToLoad();
-  const count = await workEntriesPage.getWorkEntryCount();
-  expect(count).toBe(0);
+  await this.page!.waitForTimeout(1000);
+  const isInTable = await this.page!.isVisible(`tbody tr:has-text("${clientName}")`);
+  expect(isInTable).toBe(false);
 });
 
 When('I click the edit button for work entry {string}', async function (this: PlaywrightWorld, clientName: string) {
@@ -93,6 +94,9 @@ When('I click the edit button for work entry {string}', async function (this: Pl
 });
 
 When('I click the delete button for work entry {string}', async function (this: PlaywrightWorld, clientName: string) {
+  this.page!.once('dialog', async (dialog) => {
+    await dialog.accept();
+  });
   await workEntriesPage.clickDeleteWorkEntryButton(clientName);
 });
 

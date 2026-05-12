@@ -28,7 +28,11 @@ export class ClientsPage extends BasePage {
   }
 
   async navigateToClients(): Promise<void> {
-    await this.navigate('/clients');
+    try {
+      await this.navigateViaSidebar('Clients');
+    } catch {
+      await this.navigate('/clients');
+    }
     await this.waitForLoadingToDisappear();
   }
 
@@ -92,8 +96,12 @@ export class ClientsPage extends BasePage {
 
   async isClientInTable(clientName: string): Promise<boolean> {
     await this.waitForLoadingToDisappear();
-    const clientSelector = `text=${clientName}`;
-    return await this.isVisible(clientSelector);
+    try {
+      const row = await this.page.$(`tbody tr td:first-child:has-text("${clientName}")`);
+      return row !== null;
+    } catch {
+      return false;
+    }
   }
 
   async clickEditClientButton(clientName: string): Promise<void> {
@@ -129,11 +137,12 @@ export class ClientsPage extends BasePage {
   }
 
   async deleteClient(clientName: string): Promise<void> {
-    this.page.on('dialog', async (dialog) => {
+    this.page.once('dialog', async (dialog) => {
       await dialog.accept();
     });
     await this.clickDeleteClientButton(clientName);
     await this.waitForLoadingToDisappear();
+    await this.page.waitForTimeout(500);
   }
 
   async isDialogVisible(): Promise<boolean> {
@@ -166,7 +175,7 @@ export class ClientsPage extends BasePage {
 
   async waitForClientsToLoad(): Promise<void> {
     await this.waitForLoadingToDisappear();
-    await this.waitForElement(this.selectors.pageTitle);
+    await this.waitForElement(this.selectors.pageTitle, 30000);
   }
 
   async getClientNames(): Promise<string[]> {

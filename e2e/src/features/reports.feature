@@ -27,11 +27,11 @@ Feature: Reports Functionality
 
   @positive
   Scenario: Report shows correct totals
-    Given a client "Test Client" exists
-    And a work entry for "Test Client" with "4" hours exists
-    And a work entry for "Test Client" with "6" hours exists
+    Given a client "Totals Report Client" exists
+    And a work entry for "Totals Report Client" with "4" hours exists
+    And a work entry for "Totals Report Client" with "6" hours exists
     And I am on the reports page
-    When I select client "Test Client" from the dropdown
+    When I select client "Totals Report Client" from the dropdown
     Then the Total Hours should be "10.00"
     And the Total Entries should be "2"
     And the Average Hours per Entry should be "5.00"
@@ -68,6 +68,7 @@ Feature: Reports Functionality
 
   @negative
   Scenario: Reports page shows message when no clients exist
+    Given I am logged in as "no-clients-user@example.com"
     Given no clients exist
     And I am on the reports page
     Then I should see the create client first message on reports
