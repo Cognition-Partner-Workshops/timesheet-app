@@ -1,14 +1,12 @@
 import { test, expect } from '@playwright/test';
 import {
-  login, clearAllClients, createClient, setupDialogHandler,
+  resetTestState, clearAllClients, createClient,
   navigateToWorkEntries, createWorkEntry, clickRowAction,
 } from './helpers';
 
 test.describe('Work Entry Lifecycle', () => {
   test.beforeEach(async ({ page }) => {
-    setupDialogHandler(page);
-    await login(page);
-    await clearAllClients(page);
+    await resetTestState(page);
     await createClient(page, 'Test Client Co');
   });
 
@@ -44,7 +42,6 @@ test.describe('Work Entry Lifecycle', () => {
     await expect(page.getByText('To be removed')).toBeVisible();
 
     await clickRowAction(page, 'Test Client Co', 'DeleteIcon');
-
     await expect(page.getByText('To be removed')).toBeHidden({ timeout: 5000 });
     await expect(page.getByText(/No work entries found/)).toBeVisible();
   });
