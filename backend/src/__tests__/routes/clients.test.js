@@ -454,20 +454,21 @@ describe('Client Routes', () => {
       expect(response.status).toBe(200);
     });
 
-    test('should update client email field', async () => {
-      const updatedClient = { id: 1, name: 'Client', email: 'new@example.com' };
-
+    function setupSuccessfulUpdate(updatedClient) {
       mockDb.get.mockImplementationOnce((query, params, callback) => {
         callback(null, { id: 1 });
       });
-
       mockDb.run.mockImplementation((query, params, callback) => {
         callback(null);
       });
-
       mockDb.get.mockImplementationOnce((query, params, callback) => {
         callback(null, updatedClient);
       });
+    }
+
+    test('should update client email field', async () => {
+      const updatedClient = { id: 1, name: 'Client', email: 'new@example.com' };
+      setupSuccessfulUpdate(updatedClient);
 
       const response = await request(app)
         .put('/api/clients/1')
@@ -478,19 +479,7 @@ describe('Client Routes', () => {
     });
 
     test('should update email to null when empty string provided', async () => {
-      const updatedClient = { id: 1, name: 'Client', email: null };
-
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1 });
-      });
-
-      mockDb.run.mockImplementation((query, params, callback) => {
-        callback(null);
-      });
-
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, updatedClient);
-      });
+      setupSuccessfulUpdate({ id: 1, name: 'Client', email: null });
 
       const response = await request(app)
         .put('/api/clients/1')
