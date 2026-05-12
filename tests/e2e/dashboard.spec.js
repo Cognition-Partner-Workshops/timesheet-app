@@ -1,14 +1,12 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
+const { login } = require('../helpers/e2e-login');
 
 const TEST_EMAIL = 'e2e-dashboard@example.com';
 
 test.describe('Dashboard', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/login');
-    await page.getByLabel(/email address/i).fill(TEST_EMAIL);
-    await page.getByRole('button', { name: /log in/i }).click();
-    await expect(page).toHaveURL(/dashboard/);
+    await login(page, TEST_EMAIL);
   });
 
   test('should display dashboard with stats cards', async ({ page }) => {

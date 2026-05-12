@@ -6,11 +6,19 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 
-// We need to require the actual source files, resolving from the backend dir
 const BACKEND_SRC = path.resolve(__dirname, '../../backend/src');
 
+const TEST_CORS_OPTIONS = { origin: 'http://localhost' };
+
+function clearModuleCache() {
+  Object.keys(require.cache).forEach((key) => {
+    if (key.startsWith(BACKEND_SRC)) {
+      delete require.cache[key];
+    }
+  });
+}
+
 function createTestApp() {
-  // Clear any cached modules so we get a fresh DB each time
   clearModuleCache();
 
   const { initializeDatabase } = require(path.join(BACKEND_SRC, 'database/init'));
@@ -22,7 +30,7 @@ function createTestApp() {
 
   const app = express();
 
-  app.use(cors());
+  app.use(cors(TEST_CORS_OPTIONS));
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true }));
 
@@ -42,15 +50,6 @@ function createTestApp() {
   });
 
   return { app, initializeDatabase };
-}
-
-function clearModuleCache() {
-  const backendSrc = path.resolve(__dirname, '../../backend/src');
-  Object.keys(require.cache).forEach((key) => {
-    if (key.startsWith(backendSrc)) {
-      delete require.cache[key];
-    }
-  });
 }
 
 async function setupTestApp() {

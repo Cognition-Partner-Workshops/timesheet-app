@@ -3,14 +3,11 @@ const { test, expect } = require('@playwright/test');
 
 const TEST_EMAIL = 'e2e-clients@example.com';
 
+const { login } = require('../helpers/e2e-login');
+
 /** Login and go to the Clients page. */
 async function loginAndGoToClients(page) {
-  await page.goto('/login');
-  await page.getByLabel(/email address/i).fill(TEST_EMAIL);
-  await page.getByRole('button', { name: /log in/i }).click();
-  await expect(page).toHaveURL(/dashboard/);
-
-  // Navigate via sidebar
+  await login(page, TEST_EMAIL);
   await page.locator('nav').getByText('Clients').click();
   await expect(page).toHaveURL(/clients/);
 }
