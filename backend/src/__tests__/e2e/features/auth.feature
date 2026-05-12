@@ -4,7 +4,7 @@ Feature: Authentication API
     When I login with email "bdd-auth@example.com"
     Then the response status should be 201
     And the response body "message" should equal "User created and logged in successfully"
-    And the response body path "user.email" should equal "bdd-auth@example.com"
+    And the nested response "user.email" should equal "bdd-auth@example.com"
 
   Scenario: Returning user login
     Given a user "bdd-auth@example.com" exists
@@ -26,7 +26,7 @@ Feature: Authentication API
     Given a user "bdd-auth@example.com" exists
     When I get my profile as "bdd-auth@example.com"
     Then the response status should be 200
-    And the response body path "user.email" should equal "bdd-auth@example.com"
+    And the nested response "user.email" should equal "bdd-auth@example.com"
 
   Scenario: Get current user without auth header
     When I send a GET request to "/api/auth/me"
@@ -41,4 +41,4 @@ Feature: Authentication API
   Scenario: Auth middleware auto-provisions new user
     When I get my profile as "auto-provision-bdd@example.com"
     Then the response status should be 200
-    And the response body path "user.email" should equal "auto-provision-bdd@example.com"
+    And the nested response "user.email" should equal "auto-provision-bdd@example.com"

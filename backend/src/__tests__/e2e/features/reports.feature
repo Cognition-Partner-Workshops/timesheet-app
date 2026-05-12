@@ -7,9 +7,9 @@ Feature: Reports API
     And a work entry exists on that client for "bdd-rpt@example.com" with 5 hours on "2025-02-02"
     When I get the report for that client as "bdd-rpt@example.com"
     Then the response status should be 200
-    And the response body path "client.name" should equal "ReportingCo"
-    And the response body path "totalHours" should equal 8
-    And the response body path "entryCount" should equal 2
+    And the nested response "client.name" should equal "ReportingCo"
+    And the nested response "totalHours" should be number 8
+    And the nested response "entryCount" should be number 2
 
   Scenario: Report for non-existent client returns 404
     Given a user "bdd-rpt@example.com" exists

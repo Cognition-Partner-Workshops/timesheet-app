@@ -1,13 +1,13 @@
 Feature: Work Entries API
 
-  Scenario: Create a work entry
+  Scenario: Create a work entry with description
     Given a user "bdd-we@example.com" exists
     And a client named "ProjectAlpha" exists for "bdd-we@example.com"
     When I create a work entry on that client as "bdd-we@example.com" with 4.5 hours on "2025-01-15" described "Backend dev"
     Then the response status should be 201
     And the response body "message" should equal "Work entry created successfully"
-    And the response body path "workEntry.hours" should equal 4.5
-    And the response body path "workEntry.client_name" should equal "ProjectAlpha"
+    And the nested response "workEntry.hours" should be number 4.5
+    And the nested response "workEntry.client_name" should equal "ProjectAlpha"
 
   Scenario: Create a work entry without description
     Given a user "bdd-we@example.com" exists
@@ -41,7 +41,7 @@ Feature: Work Entries API
     Given a user "bdd-we@example.com" exists
     When I list work entries as "bdd-we@example.com"
     Then the response status should be 200
-    And the response body path "workEntries" should be an array
+    And the nested response "workEntries" should be an array
 
   Scenario: Filter work entries by clientId
     Given a user "bdd-we@example.com" exists
@@ -60,7 +60,7 @@ Feature: Work Entries API
     Given a user "bdd-we-other@example.com" exists
     When I list work entries as "bdd-we-other@example.com"
     Then the response status should be 200
-    And the response body path "workEntries" should be an empty array
+    And the nested response "workEntries" should be an empty array
 
   Scenario: Get a specific work entry by ID
     Given a user "bdd-we@example.com" exists
@@ -68,7 +68,7 @@ Feature: Work Entries API
     And a work entry exists on that client for "bdd-we@example.com" with 7 hours on "2025-03-01"
     When I get that work entry as "bdd-we@example.com"
     Then the response status should be 200
-    And the response body path "workEntry.hours" should equal 7
+    And the nested response "workEntry.hours" should be number 7
 
   Scenario: Get non-existent work entry returns 404
     Given a user "bdd-we@example.com" exists
@@ -94,7 +94,7 @@ Feature: Work Entries API
     When I update that work entry as "bdd-we@example.com" with hours 6
     Then the response status should be 200
     And the response body "message" should equal "Work entry updated successfully"
-    And the response body path "workEntry.hours" should equal 6
+    And the nested response "workEntry.hours" should be number 6
 
   Scenario: Update work entry client assignment
     Given a user "bdd-we@example.com" exists
@@ -103,7 +103,7 @@ Feature: Work Entries API
     And a client named "TargetClient" exists for "bdd-we@example.com"
     When I reassign that work entry to the latest client as "bdd-we@example.com"
     Then the response status should be 200
-    And the response body path "workEntry.client_name" should equal "TargetClient"
+    And the nested response "workEntry.client_name" should equal "TargetClient"
 
   Scenario: Update non-existent work entry returns 404
     Given a user "bdd-we@example.com" exists

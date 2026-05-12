@@ -5,14 +5,14 @@ Feature: Clients API
     When I create a client "Acme Corp" as "bdd-cl@example.com" with department "Engineering" and email "contact@acme.com"
     Then the response status should be 201
     And the response body "message" should equal "Client created successfully"
-    And the response body path "client.name" should equal "Acme Corp"
-    And the response body path "client.department" should equal "Engineering"
+    And the nested response "client.name" should equal "Acme Corp"
+    And the nested response "client.department" should equal "Engineering"
 
   Scenario: Create a client with only name
     Given a user "bdd-cl@example.com" exists
     When I create a client named "Beta Inc" as "bdd-cl@example.com"
     Then the response status should be 201
-    And the response body path "client.name" should equal "Beta Inc"
+    And the nested response "client.name" should equal "Beta Inc"
 
   Scenario: Fail to create a client without name
     Given a user "bdd-cl@example.com" exists
@@ -30,13 +30,13 @@ Feature: Clients API
     And a client named "ListClient B" exists for "bdd-cl@example.com"
     When I list clients as "bdd-cl@example.com"
     Then the response status should be 200
-    And the response body path "clients" should have at least 2 items
+    And the nested response "clients" should have at least 2 items
 
   Scenario: Empty client list for a new user
     Given a user "bdd-cl-empty@example.com" exists
     When I list clients as "bdd-cl-empty@example.com"
     Then the response status should be 200
-    And the response body path "clients" should be an empty array
+    And the nested response "clients" should be an empty array
 
   Scenario: Clients are isolated between users
     Given a user "bdd-cl@example.com" exists
@@ -49,7 +49,7 @@ Feature: Clients API
     And a client named "SpecificCo" exists for "bdd-cl@example.com"
     When I get that client as "bdd-cl@example.com"
     Then the response status should be 200
-    And the response body path "client.name" should equal "SpecificCo"
+    And the nested response "client.name" should equal "SpecificCo"
 
   Scenario: Get non-existent client returns 404
     Given a user "bdd-cl@example.com" exists
@@ -73,7 +73,7 @@ Feature: Clients API
     When I update that client as "bdd-cl@example.com" with name "NewName"
     Then the response status should be 200
     And the response body "message" should equal "Client updated successfully"
-    And the response body path "client.name" should equal "NewName"
+    And the nested response "client.name" should equal "NewName"
 
   Scenario: Update non-existent client returns 404
     Given a user "bdd-cl@example.com" exists
@@ -122,4 +122,4 @@ Feature: Clients API
     When I delete all clients as "bdd-bulk@example.com"
     Then the response status should be 200
     And the response body "message" should equal "All clients deleted successfully"
-    And the response body "deletedCount" should equal 2
+    And the response body "deletedCount" should be number 2
