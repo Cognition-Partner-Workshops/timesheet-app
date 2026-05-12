@@ -1,16 +1,12 @@
 const request = require('supertest');
 const express = require('express');
 const jwt = require('jsonwebtoken');
-
-const TEST_SECRET = 'test-jwt-secret-for-unit-tests';
-process.env.JWT_SECRET = TEST_SECRET;
-
 const authRoutes = require('../../routes/auth');
 const { getDatabase } = require('../../database/init');
 
 jest.mock('../../database/init');
 
-const JWT_SECRET = TEST_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET;
 
 const app = express();
 app.use(express.json());
