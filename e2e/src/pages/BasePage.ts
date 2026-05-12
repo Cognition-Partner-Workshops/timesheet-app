@@ -17,8 +17,15 @@ export abstract class BasePage {
     });
   }
 
+  async navigateViaSidebar(linkText: string): Promise<void> {
+    const selector = `.MuiDrawer-docked .MuiListItemButton-root:has-text("${linkText}")`;
+    await this.page.waitForSelector(selector, { state: 'visible', timeout: 5000 });
+    await this.page.click(selector);
+    await this.page.waitForTimeout(500);
+  }
+
   async waitForElement(selector: string, timeout: number = config.timeout.element): Promise<void> {
-    await this.page.waitForSelector(selector, { timeout });
+    await this.page.waitForSelector(selector, { state: 'visible', timeout });
   }
 
   async click(selector: string): Promise<void> {

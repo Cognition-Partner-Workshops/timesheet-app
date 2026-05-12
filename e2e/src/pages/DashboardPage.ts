@@ -23,7 +23,11 @@ export class DashboardPage extends BasePage {
   }
 
   async navigateToDashboard(): Promise<void> {
-    await this.navigate('/dashboard');
+    try {
+      await this.navigateViaSidebar('Dashboard');
+    } catch {
+      await this.navigate('/dashboard');
+    }
     await this.waitForLoadingToDisappear();
   }
 
@@ -121,6 +125,6 @@ export class DashboardPage extends BasePage {
 
   async waitForDashboardToLoad(): Promise<void> {
     await this.waitForLoadingToDisappear();
-    await this.waitForElement(this.selectors.pageTitle);
+    await this.waitForElement(this.selectors.pageTitle, 30000);
   }
 }

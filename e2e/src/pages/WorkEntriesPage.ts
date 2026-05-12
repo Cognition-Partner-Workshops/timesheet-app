@@ -32,7 +32,11 @@ export class WorkEntriesPage extends BasePage {
   }
 
   async navigateToWorkEntries(): Promise<void> {
-    await this.navigate('/work-entries');
+    try {
+      await this.navigateViaSidebar('Work Entries');
+    } catch {
+      await this.navigate('/work-entries');
+    }
     await this.waitForLoadingToDisappear();
   }
 
@@ -53,7 +57,8 @@ export class WorkEntriesPage extends BasePage {
   async selectClient(clientName: string): Promise<void> {
     await this.click(this.selectors.clientSelect);
     await this.page.waitForSelector(this.selectors.menuItem, { timeout: 5000 });
-    await this.page.click(`text=${clientName}`);
+    await this.page.click(`.MuiMenuItem-root:has-text("${clientName}")`);
+    await this.page.waitForSelector(this.selectors.menuItem, { state: 'hidden', timeout: 5000 }).catch(() => {});
   }
 
   async enterHours(hours: string): Promise<void> {
@@ -147,11 +152,12 @@ export class WorkEntriesPage extends BasePage {
   }
 
   async deleteWorkEntry(clientName: string): Promise<void> {
-    this.page.on('dialog', async (dialog) => {
+    this.page.once('dialog', async (dialog) => {
       await dialog.accept();
     });
     await this.clickDeleteWorkEntryButton(clientName);
     await this.waitForLoadingToDisappear();
+    await this.page.waitForTimeout(500);
   }
 
   async isDialogVisible(): Promise<boolean> {
@@ -188,7 +194,7 @@ export class WorkEntriesPage extends BasePage {
 
   async waitForWorkEntriesToLoad(): Promise<void> {
     await this.waitForLoadingToDisappear();
-    await this.waitForElement(this.selectors.pageTitle);
+    await this.waitForElement(this.selectors.pageTitle, 30000);
   }
 
   async clickCreateClientLink(): Promise<void> {

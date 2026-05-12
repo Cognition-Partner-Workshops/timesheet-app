@@ -19,6 +19,8 @@ Feature: Dashboard Functionality
 
   @positive
   Scenario: Dashboard shows correct initial values for new user
+    Given I am logged in as "fresh-dashboard-user@example.com"
+    And I am on the dashboard page
     Then the Total Clients value should be "0"
     And the Total Work Entries value should be "0"
     And the Total Hours value should be "0.00"
@@ -60,4 +62,6 @@ Feature: Dashboard Functionality
 
   @negative
   Scenario: Dashboard shows no entries message when empty
+    Given I am logged in as "empty-dashboard-user@example.com"
+    And I am on the dashboard page
     Then I should see the no work entries message

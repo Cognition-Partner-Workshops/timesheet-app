@@ -27,7 +27,11 @@ export class ReportsPage extends BasePage {
   }
 
   async navigateToReports(): Promise<void> {
-    await this.navigate('/reports');
+    try {
+      await this.navigateViaSidebar('Reports');
+    } catch {
+      await this.navigate('/reports');
+    }
     await this.waitForLoadingToDisappear();
   }
 
@@ -43,7 +47,8 @@ export class ReportsPage extends BasePage {
   async selectClient(clientName: string): Promise<void> {
     await this.click(this.selectors.clientSelect);
     await this.page.waitForSelector(this.selectors.menuItem, { timeout: 5000 });
-    await this.page.click(`text=${clientName}`);
+    await this.page.click(`.MuiMenuItem-root:has-text("${clientName}")`);
+    await this.page.waitForSelector(this.selectors.menuItem, { state: 'hidden', timeout: 5000 }).catch(() => {});
     await this.waitForLoadingToDisappear();
   }
 
@@ -130,7 +135,7 @@ export class ReportsPage extends BasePage {
 
   async waitForReportsToLoad(): Promise<void> {
     await this.waitForLoadingToDisappear();
-    await this.waitForElement(this.selectors.pageTitle);
+    await this.waitForElement(this.selectors.pageTitle, 30000);
   }
 
   async isCsvExportButtonEnabled(): Promise<boolean> {

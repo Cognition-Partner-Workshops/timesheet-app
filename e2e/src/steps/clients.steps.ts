@@ -76,6 +76,7 @@ When('I click the Create button', async function (this: PlaywrightWorld) {
 When('I click the Update button', async function (this: PlaywrightWorld) {
   await clientsPage.clickUpdateButton();
   await this.page!.waitForTimeout(1000);
+  await this.page!.waitForLoadState('networkidle').catch(() => {});
 });
 
 When('I click the Cancel button', async function (this: PlaywrightWorld) {
@@ -89,6 +90,8 @@ Then('the client {string} should appear in the table', async function (this: Pla
 });
 
 Then('the client {string} should not appear in the table', async function (this: PlaywrightWorld, clientName: string) {
+  await this.page!.waitForTimeout(1000);
+  await this.page!.waitForLoadState('networkidle').catch(() => {});
   await clientsPage.waitForClientsToLoad();
   const isInTable = await clientsPage.isClientInTable(clientName);
   expect(isInTable).toBe(false);
@@ -103,11 +106,15 @@ When('I update the client name to {string}', async function (this: PlaywrightWor
 });
 
 When('I click the delete button for client {string}', async function (this: PlaywrightWorld, clientName: string) {
+  this.page!.once('dialog', async (dialog) => {
+    await dialog.accept();
+  });
   await clientsPage.clickDeleteClientButton(clientName);
 });
 
 When('I confirm the deletion', async function (this: PlaywrightWorld) {
-  await this.page!.waitForTimeout(500);
+  await this.page!.waitForTimeout(1000);
+  await this.page!.waitForLoadState('networkidle').catch(() => {});
 });
 
 Then('the dialog should be closed', async function (this: PlaywrightWorld) {

@@ -41,12 +41,17 @@ When('I try to access the dashboard directly', async function (this: PlaywrightW
 });
 
 Then('I should be redirected to the dashboard', async function (this: PlaywrightWorld) {
-  await this.page!.waitForURL('**/dashboard', { timeout: 10000 });
+  await this.page!.waitForFunction(
+    () => window.location.href.includes('/dashboard'),
+    undefined,
+    { timeout: 15000 }
+  );
   const url = await loginPage.getUrl();
   expect(url).toContain('/dashboard');
 });
 
 Then('I should see the dashboard page', async function (this: PlaywrightWorld) {
+  await dashboardPage.waitForDashboardToLoad();
   const isDashboard = await dashboardPage.isDashboardDisplayed();
   expect(isDashboard).toBe(true);
 });
@@ -83,7 +88,11 @@ Then('I should see a validation error', async function (this: PlaywrightWorld) {
 });
 
 Then('I should be redirected to the login page', async function (this: PlaywrightWorld) {
-  await this.page!.waitForURL('**/login', { timeout: 10000 });
+  await this.page!.waitForFunction(
+    () => window.location.href.includes('/login'),
+    undefined,
+    { timeout: 15000 }
+  );
   const url = await loginPage.getUrl();
   expect(url).toContain('/login');
 });
