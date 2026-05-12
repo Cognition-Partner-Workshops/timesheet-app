@@ -8,7 +8,7 @@ const router = express.Router();
 router.use(authenticateUser);
 
 const PROJECT_COLUMNS = `p.id, p.name, p.description, p.client_id, p.start_date, p.status, p.created_at, p.updated_at, c.name AS client_name`;
-const PROJECT_JOIN = `FROM projects p LEFT JOIN clients c ON p.client_id = c.id`;
+const PROJECT_JOIN = `FROM projects p LEFT JOIN clients c ON p.client_id = c.id AND c.user_email = p.user_email`;
 
 function parseId(req, res) {
   const id = parseInt(req.params.id);
@@ -63,9 +63,10 @@ router.post('/', (req, res, next) => {
     const { name, description, clientId, startDate, status } = value;
     const db = getDatabase();
 
-    db.run(
-      'INSERT INTO projects (name, description, client_id, start_date, status, user_email) VALUES (?, ?, ?, ?, ?, ?)',
-      [name, description || null, clientId || null, startDate || null, status || 'active', req.userEmail],
+    const doInsert = () => {
+      db.run(
+        'INSERT INTO projects (name, description, client_id, start_date, status, user_email) VALUES (?, ?, ?, ?, ?, ?)',
+        [name, description || null, clientId || null, startDate || null, status || 'active', req.userEmail],
       function(err) {
         if (err) {
           console.error('Database error:', err);
@@ -80,6 +81,20 @@ router.post('/', (req, res, next) => {
         });
       }
     );
+    };
+
+    if (clientId) {
+      db.get('SELECT id FROM clients WHERE id = ? AND user_email = ?', [clientId, req.userEmail], (err, row) => {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ error: 'Internal server error' });
+        }
+        if (!row) return res.status(400).json({ error: 'Client not found or does not belong to you' });
+        doInsert();
+      });
+    } else {
+      doInsert();
+    }
   } catch (error) {
     next(error);
   }
@@ -109,18 +124,19 @@ router.put('/:id', (req, res, next) => {
         }
         if (!row) return res.status(404).json({ error: 'Project not found' });
 
-        const updates = [];
-        const values = [];
-        for (const [key, col] of Object.entries(fieldMap)) {
-          if (value[key] !== undefined) {
-            updates.push(`${col} = ?`);
-            values.push(key === 'status' ? value[key] : (value[key] || null));
+        const doUpdate = () => {
+          const updates = [];
+          const values = [];
+          for (const [key, col] of Object.entries(fieldMap)) {
+            if (value[key] !== undefined) {
+              updates.push(`${col} = ?`);
+              values.push(key === 'status' ? value[key] : (value[key] || null));
+            }
           }
-        }
-        updates.push('updated_at = CURRENT_TIMESTAMP');
-        values.push(projectId, req.userEmail);
+          updates.push('updated_at = CURRENT_TIMESTAMP');
+          values.push(projectId, req.userEmail);
 
-        db.run(`UPDATE projects SET ${updates.join(', ')} WHERE id = ? AND user_email = ?`, values, function(err) {
+          db.run(`UPDATE projects SET ${updates.join(', ')} WHERE id = ? AND user_email = ?`, values, function(err) {
           if (err) {
             console.error('Database error:', err);
             return res.status(500).json({ error: 'Failed to update project' });
@@ -133,6 +149,20 @@ router.put('/:id', (req, res, next) => {
             res.json({ message: 'Project updated successfully', project: row });
           });
         });
+        };
+
+        if (value.clientId) {
+          db.get('SELECT id FROM clients WHERE id = ? AND user_email = ?', [value.clientId, req.userEmail], (err, clientRow) => {
+            if (err) {
+              console.error('Database error:', err);
+              return res.status(500).json({ error: 'Internal server error' });
+            }
+            if (!clientRow) return res.status(400).json({ error: 'Client not found or does not belong to you' });
+            doUpdate();
+          });
+        } else {
+          doUpdate();
+        }
       }
     );
   } catch (error) {

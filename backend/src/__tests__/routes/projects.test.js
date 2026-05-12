@@ -117,15 +117,25 @@ describe('Project Routes', () => {
   });
 
   describe('POST /api/projects', () => {
-    test('creates project with all fields', async () => {
+    test('creates project with all fields and valid client', async () => {
+      // First get: client ownership check, then run: insert, then get: fetch created project
+      mockDb.get.mockImplementationOnce((q, p, cb) => cb(null, { id: 1 }));
       mockDbInsert(mockDb, 1);
-      mockDbResult(mockDb, 'get', sampleProject);
+      mockDb.get.mockImplementationOnce((q, p, cb) => cb(null, sampleProject));
 
       const res = await request(app).post('/api/projects')
         .send({ name: 'Project A', description: 'Desc A', clientId: 1, startDate: '2024-01-01', status: 'active' });
       expect(res.status).toBe(201);
       expect(res.body.message).toBe('Project created successfully');
       expect(res.body.project).toEqual(sampleProject);
+    });
+
+    test('rejects creation with client not belonging to user', async () => {
+      mockDb.get.mockImplementationOnce((q, p, cb) => cb(null, null));
+      const res = await request(app).post('/api/projects')
+        .send({ name: 'Test', clientId: 999 });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('Client not found or does not belong to you');
     });
 
     test('creates project with only name', async () => {
@@ -156,6 +166,12 @@ describe('Project Routes', () => {
       const res = await request(app).post('/api/projects').send({ name: 'Test' });
       expect(res.status).toBe(500);
       expect(res.body.error).toBe('Failed to create project');
+    });
+
+    test('handles client ownership check db error', async () => {
+      mockDbError(mockDb, 'get');
+      const res = await request(app).post('/api/projects').send({ name: 'Test', clientId: 1 });
+      expect(res.status).toBe(500);
     });
 
     test('handles retrieval error after creation', async () => {
@@ -190,8 +206,11 @@ describe('Project Routes', () => {
       expect(res.status).toBe(200);
     });
 
-    test('updates multiple fields', async () => {
-      mockExistsAndUpdate();
+    test('updates multiple fields with valid client', async () => {
+      // exists check, then client ownership check, then run update, then fetch
+      mockDb.get.mockImplementationOnce((q, p, cb) => cb(null, { id: 1 }));
+      mockDb.get.mockImplementationOnce((q, p, cb) => cb(null, { id: 2 }));
+      mockDbRunSuccess(mockDb);
       const updated = { ...sampleProject, name: 'New', status: 'on-hold', client_id: 2 };
       mockDb.get.mockImplementationOnce((q, p, cb) => cb(null, updated));
 
@@ -199,6 +218,14 @@ describe('Project Routes', () => {
         .send({ name: 'New', status: 'on-hold', clientId: 2 });
       expect(res.status).toBe(200);
       expect(res.body.project).toEqual(updated);
+    });
+
+    test('rejects update with client not belonging to user', async () => {
+      mockDb.get.mockImplementationOnce((q, p, cb) => cb(null, { id: 1 }));
+      mockDb.get.mockImplementationOnce((q, p, cb) => cb(null, null));
+      const res = await request(app).put('/api/projects/1').send({ clientId: 999 });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('Client not found or does not belong to you');
     });
 
     test('returns 404 if not found', async () => {

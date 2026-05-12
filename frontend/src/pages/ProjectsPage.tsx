@@ -71,7 +71,7 @@ const ProjectsPage: React.FC = () => {
     if (!formData.name.trim()) { setError('Project name is required'); return; }
     const payload = {
       name: formData.name,
-      description: formData.description || undefined,
+      description: formData.description || null,
       clientId: formData.clientId ? Number(formData.clientId) : null,
       startDate: formData.startDate || null,
       status: formData.status,
