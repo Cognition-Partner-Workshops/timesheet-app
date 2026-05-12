@@ -1,0 +1,9 @@
+# frozen_string_literal: true
+
+source 'https://rubygems.org'
+
+gem 'rspec', '~> 3.12'
+gem 'cucumber', '~> 9.0'
+gem 'faraday', '~> 2.7'
+gem 'faraday-multipart', '~> 1.0'
+gem 'json'
