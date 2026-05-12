@@ -1,11 +1,7 @@
 const express = require('express');
 
 function createMockDb() {
-  return {
-    all: jest.fn(),
-    get: jest.fn(),
-    run: jest.fn()
-  };
+  return { all: jest.fn(), get: jest.fn(), run: jest.fn() };
 }
 
 function createTestApp(routePath, routeModule, opts = {}) {
@@ -27,9 +23,7 @@ function createTestApp(routePath, routeModule, opts = {}) {
 
   if (opts.errorHandler !== false) {
     app.use((err, req, res, next) => {
-      if (err.isJoi) {
-        return res.status(400).json({ error: 'Validation error' });
-      }
+      if (err.isJoi) return res.status(400).json({ error: 'Validation error' });
       res.status(500).json({ error: 'Internal server error' });
     });
   }
@@ -43,8 +37,4 @@ function setupMockDb(getDatabase) {
   return mockDb;
 }
 
-module.exports = {
-  createMockDb,
-  createTestApp,
-  setupMockDb
-};
+module.exports = { createMockDb, createTestApp, setupMockDb };

@@ -1,14 +1,14 @@
-// Use random port to avoid EADDRINUSE conflicts
-process.env.PORT = String(30000 + Math.floor(Math.random() * 10000));
+// Use process.pid for deterministic port to avoid EADDRINUSE conflicts
+process.env.PORT = String(30000 + (process.pid % 10000));
 
 const request = require('supertest');
 
 const mockDb = {
-  all: jest.fn((query, params, callback) => callback(null, [])),
-  get: jest.fn((query, params, callback) => callback(null, { email: 'test@example.com' })),
-  run: jest.fn((query, paramsOrCb, callback) => {
-    const cb = typeof paramsOrCb === 'function' ? paramsOrCb : callback;
-    if (typeof cb === 'function') cb(null);
+  all: jest.fn((q, p, cb) => cb(null, [])),
+  get: jest.fn((q, p, cb) => cb(null, { email: 'test@example.com' })),
+  run: jest.fn((q, pOrCb, cb) => {
+    const fn = typeof pOrCb === 'function' ? pOrCb : cb;
+    if (typeof fn === 'function') fn(null);
   }),
   serialize: jest.fn((cb) => cb()),
   close: jest.fn((cb) => cb && cb(null))
@@ -22,63 +22,48 @@ jest.mock('../database/init', () => ({
 
 const app = require('../server');
 
+function resetDbMocks() {
+  mockDb.all.mockImplementation((q, p, cb) => cb(null, []));
+  mockDb.get.mockImplementation((q, p, cb) => cb(null, { email: 'test@example.com' }));
+  mockDb.run.mockImplementation((q, pOrCb, cb) => {
+    const fn = typeof pOrCb === 'function' ? pOrCb : cb;
+    if (typeof fn === 'function') fn(null);
+  });
+}
+
+function stubAuthUser() {
+  mockDb.get.mockImplementation((q, p, cb) => {
+    cb(null, { email: 'test@example.com', created_at: '2024-01-01' });
+  });
+}
+
 describe('Server', () => {
   afterEach(() => {
     jest.clearAllMocks();
-    // Restore default mock implementations
-    mockDb.all.mockImplementation((query, params, callback) => callback(null, []));
-    mockDb.get.mockImplementation((query, params, callback) => callback(null, { email: 'test@example.com' }));
-    mockDb.run.mockImplementation((query, paramsOrCb, callback) => {
-      const cb = typeof paramsOrCb === 'function' ? paramsOrCb : callback;
-      if (typeof cb === 'function') cb(null);
-    });
+    resetDbMocks();
   });
 
   describe('GET /health', () => {
-    test('should return 200 with status OK', async () => {
+    test('should return 200 with status OK and valid timestamp', async () => {
       const response = await request(app).get('/health');
 
       expect(response.status).toBe(200);
       expect(response.body.status).toBe('OK');
-      expect(response.body.timestamp).toBeDefined();
-    });
-
-    test('should return valid ISO timestamp', async () => {
-      const response = await request(app).get('/health');
-
-      const timestamp = new Date(response.body.timestamp);
-      expect(timestamp.toISOString()).toBe(response.body.timestamp);
+      const ts = new Date(response.body.timestamp);
+      expect(ts.toISOString()).toBe(response.body.timestamp);
     });
   });
 
   describe('404 handler', () => {
-    test('should return 404 for unknown routes', async () => {
-      const response = await request(app).get('/api/nonexistent');
-
-      expect(response.status).toBe(404);
-      expect(response.body).toEqual({ error: 'Route not found' });
-    });
-
-    test('should return 404 for unknown POST routes', async () => {
-      const response = await request(app)
-        .post('/api/nonexistent')
-        .send({ data: 'test' });
-
-      expect(response.status).toBe(404);
-      expect(response.body).toEqual({ error: 'Route not found' });
-    });
-
-    test('should return 404 for unknown PUT routes', async () => {
-      const response = await request(app)
-        .put('/api/nonexistent')
-        .send({ data: 'test' });
-
-      expect(response.status).toBe(404);
-      expect(response.body).toEqual({ error: 'Route not found' });
-    });
-
-    test('should return 404 for unknown DELETE routes', async () => {
-      const response = await request(app).delete('/api/nonexistent');
+    test.each([
+      ['GET', 'get'],
+      ['POST', 'post'],
+      ['PUT', 'put'],
+      ['DELETE', 'delete']
+    ])('should return 404 for unknown %s routes', async (label, method) => {
+      const req = request(app)[method]('/api/nonexistent');
+      if (method === 'post' || method === 'put') req.send({ data: 'test' });
+      const response = await req;
 
       expect(response.status).toBe(404);
       expect(response.body).toEqual({ error: 'Route not found' });
@@ -87,9 +72,7 @@ describe('Server', () => {
 
   describe('Middleware', () => {
     test('should accept JSON body and process auth login', async () => {
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, { email: 'test@example.com', created_at: '2024-01-01' });
-      });
+      stubAuthUser();
 
       const response = await request(app)
         .post('/api/auth/login')
@@ -102,7 +85,6 @@ describe('Server', () => {
 
     test('should include security headers from helmet', async () => {
       const response = await request(app).get('/health');
-
       expect(response.headers).toHaveProperty('x-content-type-options');
     });
 
@@ -110,45 +92,23 @@ describe('Server', () => {
       const response = await request(app)
         .options('/health')
         .set('Origin', 'http://localhost:5173');
-
       expect(response.status).not.toBe(403);
     });
   });
 
   describe('Route mounting', () => {
     test('should mount auth routes at /api/auth', async () => {
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, { email: 'test@example.com', created_at: '2024-01-01' });
-      });
-
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send({ email: 'test@example.com' });
-
+      stubAuthUser();
+      const response = await request(app).post('/api/auth/login').send({ email: 'test@example.com' });
       expect(response.status).not.toBe(404);
     });
 
-    test('should mount client routes at /api/clients', async () => {
-      const response = await request(app)
-        .get('/api/clients')
-        .set('x-user-email', 'test@example.com');
-
-      expect(response.status).not.toBe(404);
-    });
-
-    test('should mount work entry routes at /api/work-entries', async () => {
-      const response = await request(app)
-        .get('/api/work-entries')
-        .set('x-user-email', 'test@example.com');
-
-      expect(response.status).not.toBe(404);
-    });
-
-    test('should mount report routes at /api/reports', async () => {
-      const response = await request(app)
-        .get('/api/reports/client/1')
-        .set('x-user-email', 'test@example.com');
-
+    test.each([
+      ['/api/clients'],
+      ['/api/work-entries'],
+      ['/api/reports/client/1']
+    ])('should mount route at %s', async (path) => {
+      const response = await request(app).get(path).set('x-user-email', 'test@example.com');
       expect(response.status).not.toBe(404);
     });
   });
@@ -161,11 +121,8 @@ describe('Server', () => {
   });
 
   describe('Error handler', () => {
-    test('should handle Joi validation errors through error handler', async () => {
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send({ email: 'not-valid' });
-
+    test('should handle Joi validation errors', async () => {
+      const response = await request(app).post('/api/auth/login').send({ email: 'not-valid' });
       expect(response.status).toBe(400);
     });
   });
