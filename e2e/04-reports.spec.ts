@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { login, clearAllClients, createClient, setupDialogHandler } from './helpers';
+import {
+  login, clearAllClients, createClient, setupDialogHandler,
+  navigateToWorkEntries, createWorkEntry,
+} from './helpers';
 
 test.describe('Reporting', () => {
   test.beforeEach(async ({ page }) => {
@@ -10,40 +13,20 @@ test.describe('Reporting', () => {
 
   test('should show correct totals after creating entries', async ({ page }) => {
     await createClient(page, 'Report Client');
+    await navigateToWorkEntries(page);
 
-    await page.goto('/work-entries');
-    await page.waitForLoadState('networkidle');
+    await createWorkEntry(page, 'Report Client', '5', 'Task A');
+    await createWorkEntry(page, 'Report Client', '3.5', 'Task B');
 
-    // Entry 1: 5 hours
-    await page.getByRole('button', { name: 'Add Work Entry' }).click();
-    await page.getByRole('dialog').getByRole('combobox').click();
-    await page.getByRole('option', { name: 'Report Client' }).click();
-    await page.getByLabel('Hours').fill('5');
-    await page.getByLabel('Description').fill('Task A');
-    await page.getByRole('button', { name: 'Create' }).click();
-    await expect(page.getByRole('dialog')).toBeHidden({ timeout: 10000 });
-
-    // Entry 2: 3.5 hours
-    await page.getByRole('button', { name: 'Add Work Entry' }).click();
-    await page.getByRole('dialog').getByRole('combobox').click();
-    await page.getByRole('option', { name: 'Report Client' }).click();
-    await page.getByLabel('Hours').fill('3.5');
-    await page.getByLabel('Description').fill('Task B');
-    await page.getByRole('button', { name: 'Create' }).click();
-    await expect(page.getByRole('dialog')).toBeHidden({ timeout: 10000 });
-
-    // Navigate to reports
     await page.goto('/reports');
     await page.waitForLoadState('networkidle');
 
-    // Select the client — reports page also uses MUI Select
     await page.getByRole('combobox').click();
     await page.getByRole('option', { name: 'Report Client' }).click();
 
-    // Verify totals: 5 + 3.5 = 8.5 total hours, 2 entries
+    // Verify totals: 5 + 3.5 = 8.5 total hours
     await expect(page.getByText('8.50')).toBeVisible({ timeout: 10000 });
 
-    // Verify individual entries appear in report table
     await expect(page.getByText('5 hours', { exact: true })).toBeVisible();
     await expect(page.getByText('3.5 hours', { exact: true })).toBeVisible();
     await expect(page.getByText('Task A')).toBeVisible();

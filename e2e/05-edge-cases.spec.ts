@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { login, clearAllClients, createClient, setupDialogHandler } from './helpers';
+import {
+  login, clearAllClients, createClient, setupDialogHandler,
+  navigateToWorkEntries, openWorkEntryDialog, fillWorkEntry, createWorkEntry,
+} from './helpers';
 
 test.describe('Edge Cases', () => {
   test.beforeEach(async ({ page }) => {
@@ -13,11 +16,9 @@ test.describe('Edge Cases', () => {
     await page.getByRole('button', { name: 'Add Client' }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
 
-    const nameField = page.getByLabel('Client Name');
-    await nameField.fill('');
+    await page.getByLabel('Client Name').fill('');
     await page.getByRole('button', { name: 'Create' }).click();
 
-    // Should still be on the dialog (not submitted)
     await expect(page.getByRole('dialog')).toBeVisible();
   });
 
@@ -47,7 +48,6 @@ test.describe('Edge Cases', () => {
     await page.getByLabel('Description').fill(tooLong);
     await page.getByRole('button', { name: 'Create' }).click();
 
-    // Should show error or dialog stays open
     const dialogStillOpen = await page.getByRole('dialog').isVisible();
     const errorVisible = await page.getByRole('alert').isVisible().catch(() => false);
     expect(dialogStillOpen || errorVisible).toBeTruthy();
@@ -55,59 +55,42 @@ test.describe('Edge Cases', () => {
 
   test('should reject work entry with zero hours', async ({ page }) => {
     await createClient(page, 'Hours Edge Client');
-    await page.goto('/work-entries');
-    await page.waitForLoadState('networkidle');
-    await page.getByRole('button', { name: 'Add Work Entry' }).click();
-    await page.getByRole('dialog').getByRole('combobox').click();
-    await page.getByRole('option', { name: 'Hours Edge Client' }).click();
-    await page.getByLabel('Hours').fill('0');
-    await page.getByLabel('Description').fill('Zero hours test');
+    await navigateToWorkEntries(page);
+    await openWorkEntryDialog(page);
+    await fillWorkEntry(page, 'Hours Edge Client', '0', 'Zero hours test');
     await page.getByRole('button', { name: 'Create' }).click();
 
-    // Should show error about hours — dialog stays open
     await expect(page.getByRole('dialog')).toBeVisible();
   });
 
   test('should reject work entry with hours exceeding 24', async ({ page }) => {
     await createClient(page, 'Max Hours Client');
-    await page.goto('/work-entries');
-    await page.waitForLoadState('networkidle');
-    await page.getByRole('button', { name: 'Add Work Entry' }).click();
-    await page.getByRole('dialog').getByRole('combobox').click();
-    await page.getByRole('option', { name: 'Max Hours Client' }).click();
-    await page.getByLabel('Hours').fill('25');
-    await page.getByLabel('Description').fill('Over 24 hours test');
+    await navigateToWorkEntries(page);
+    await openWorkEntryDialog(page);
+    await fillWorkEntry(page, 'Max Hours Client', '25', 'Over 24 hours test');
     await page.getByRole('button', { name: 'Create' }).click();
 
-    // Should show validation error — dialog stays open
     await expect(page.getByRole('dialog')).toBeVisible();
   });
 
   test('should handle special characters in work entry description', async ({ page }) => {
     await createClient(page, 'Special Char Client');
-    await page.goto('/work-entries');
-    await page.waitForLoadState('networkidle');
-    await page.getByRole('button', { name: 'Add Work Entry' }).click();
-    await page.getByRole('dialog').getByRole('combobox').click();
-    await page.getByRole('option', { name: 'Special Char Client' }).click();
-    await page.getByLabel('Hours').fill('1');
-    await page.getByLabel('Description').fill('<script>alert("xss")</script> & "quotes" \'apostrophe\'');
-    await page.getByRole('button', { name: 'Create' }).click();
-    await expect(page.getByRole('dialog')).toBeHidden({ timeout: 10000 });
+    await navigateToWorkEntries(page);
+    await createWorkEntry(
+      page, 'Special Char Client', '1',
+      '<script>alert("xss")</script> & "quotes" \'apostrophe\''
+    );
 
     await expect(page.getByText('<script>alert("xss")</script>')).toBeVisible();
   });
 
   test('should not submit work entry without selecting a client', async ({ page }) => {
     await createClient(page, 'Unused Client');
-    await page.goto('/work-entries');
-    await page.waitForLoadState('networkidle');
+    await navigateToWorkEntries(page);
     await page.getByRole('button', { name: 'Add Work Entry' }).click();
-    // Don't select a client
     await page.getByLabel('Hours').fill('2');
     await page.getByRole('button', { name: 'Create' }).click();
 
-    // Should show error or dialog stays open
     await expect(page.getByRole('dialog')).toBeVisible();
   });
 });

@@ -46,4 +46,47 @@ export async function createClient(
   await expect(page.getByText(name).first()).toBeVisible();
 }
 
+export async function navigateToWorkEntries(page: Page) {
+  await page.goto('/work-entries');
+  await page.waitForLoadState('networkidle');
+}
+
+export async function openWorkEntryDialog(page: Page) {
+  await page.getByRole('button', { name: 'Add Work Entry' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+}
+
+export async function fillWorkEntry(
+  page: Page,
+  clientName: string,
+  hours: string,
+  description: string
+) {
+  await page.getByRole('dialog').getByRole('combobox').click();
+  await page.getByRole('option', { name: clientName }).click();
+  await page.getByLabel('Hours').fill(hours);
+  await page.getByLabel('Description').fill(description);
+}
+
+export async function submitWorkEntry(page: Page) {
+  await page.getByRole('button', { name: 'Create' }).click();
+  await expect(page.getByRole('dialog')).toBeHidden({ timeout: 10000 });
+}
+
+export async function createWorkEntry(
+  page: Page,
+  clientName: string,
+  hours: string,
+  description: string
+) {
+  await openWorkEntryDialog(page);
+  await fillWorkEntry(page, clientName, hours, description);
+  await submitWorkEntry(page);
+}
+
+export async function clickRowAction(page: Page, rowText: string, iconTestId: string) {
+  const row = page.getByRole('row').filter({ hasText: rowText });
+  await row.getByRole('button').filter({ has: page.locator(`[data-testid="${iconTestId}"]`) }).click();
+}
+
 export { TEST_EMAIL };

@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { login, clearAllClients, createClient, setupDialogHandler } from './helpers';
+import {
+  login, clearAllClients, createClient, setupDialogHandler,
+  navigateToWorkEntries, createWorkEntry, clickRowAction,
+} from './helpers';
 
 test.describe('Work Entry Lifecycle', () => {
   test.beforeEach(async ({ page }) => {
@@ -10,20 +13,8 @@ test.describe('Work Entry Lifecycle', () => {
   });
 
   test('should create a work entry for a client', async ({ page }) => {
-    await page.goto('/work-entries');
-    await page.waitForLoadState('networkidle');
-    await page.getByRole('button', { name: 'Add Work Entry' }).click();
-    await expect(page.getByRole('dialog')).toBeVisible();
-
-    // Select client via the combobox
-    await page.getByRole('dialog').getByRole('combobox').click();
-    await page.getByRole('option', { name: 'Test Client Co' }).click();
-
-    await page.getByLabel('Hours').fill('4.5');
-    await page.getByLabel('Description').fill('Implemented new feature');
-
-    await page.getByRole('button', { name: 'Create' }).click();
-    await expect(page.getByRole('dialog')).toBeHidden({ timeout: 10000 });
+    await navigateToWorkEntries(page);
+    await createWorkEntry(page, 'Test Client Co', '4.5', 'Implemented new feature');
 
     await expect(page.getByText('Test Client Co').first()).toBeVisible();
     await expect(page.getByText('4.5 hours')).toBeVisible();
@@ -31,19 +22,11 @@ test.describe('Work Entry Lifecycle', () => {
   });
 
   test('should edit work entry hours', async ({ page }) => {
-    await page.goto('/work-entries');
-    await page.waitForLoadState('networkidle');
-    await page.getByRole('button', { name: 'Add Work Entry' }).click();
-    await page.getByRole('dialog').getByRole('combobox').click();
-    await page.getByRole('option', { name: 'Test Client Co' }).click();
-    await page.getByLabel('Hours').fill('3');
-    await page.getByLabel('Description').fill('Initial work');
-    await page.getByRole('button', { name: 'Create' }).click();
-    await expect(page.getByRole('dialog')).toBeHidden({ timeout: 10000 });
+    await navigateToWorkEntries(page);
+    await createWorkEntry(page, 'Test Client Co', '3', 'Initial work');
     await expect(page.getByText('3 hours')).toBeVisible();
 
-    const row = page.getByRole('row').filter({ hasText: 'Test Client Co' });
-    await row.getByRole('button').filter({ has: page.locator('[data-testid="EditIcon"]') }).click();
+    await clickRowAction(page, 'Test Client Co', 'EditIcon');
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.getByLabel('Hours').clear();
@@ -56,19 +39,11 @@ test.describe('Work Entry Lifecycle', () => {
   });
 
   test('should delete a work entry', async ({ page }) => {
-    await page.goto('/work-entries');
-    await page.waitForLoadState('networkidle');
-    await page.getByRole('button', { name: 'Add Work Entry' }).click();
-    await page.getByRole('dialog').getByRole('combobox').click();
-    await page.getByRole('option', { name: 'Test Client Co' }).click();
-    await page.getByLabel('Hours').fill('2');
-    await page.getByLabel('Description').fill('To be removed');
-    await page.getByRole('button', { name: 'Create' }).click();
-    await expect(page.getByRole('dialog')).toBeHidden({ timeout: 10000 });
+    await navigateToWorkEntries(page);
+    await createWorkEntry(page, 'Test Client Co', '2', 'To be removed');
     await expect(page.getByText('To be removed')).toBeVisible();
 
-    const row = page.getByRole('row').filter({ hasText: 'Test Client Co' });
-    await row.getByRole('button').filter({ has: page.locator('[data-testid="DeleteIcon"]') }).click();
+    await clickRowAction(page, 'Test Client Co', 'DeleteIcon');
 
     await expect(page.getByText('To be removed')).toBeHidden({ timeout: 5000 });
     await expect(page.getByText(/No work entries found/)).toBeVisible();

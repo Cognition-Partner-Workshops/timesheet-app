@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login, clearAllClients, setupDialogHandler } from './helpers';
+import { login, clearAllClients, setupDialogHandler, clickRowAction } from './helpers';
 
 test.describe('Client Management', () => {
   test.beforeEach(async ({ page }) => {
@@ -34,8 +34,7 @@ test.describe('Client Management', () => {
     await expect(page.getByRole('dialog')).toBeHidden({ timeout: 10000 });
     await expect(page.getByText('Old Name')).toBeVisible();
 
-    const row = page.getByRole('row').filter({ hasText: 'Old Name' });
-    await row.getByRole('button').filter({ has: page.locator('[data-testid="EditIcon"]') }).click();
+    await clickRowAction(page, 'Old Name', 'EditIcon');
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.getByLabel('Client Name').clear();
@@ -58,8 +57,7 @@ test.describe('Client Management', () => {
     await expect(page.getByRole('dialog')).toBeHidden({ timeout: 10000 });
     await expect(page.getByText('To Be Deleted')).toBeVisible();
 
-    const row = page.getByRole('row').filter({ hasText: 'To Be Deleted' });
-    await row.getByRole('button').filter({ has: page.locator('[data-testid="DeleteIcon"]') }).click();
+    await clickRowAction(page, 'To Be Deleted', 'DeleteIcon');
 
     await expect(page.getByText('To Be Deleted')).toBeHidden({ timeout: 5000 });
     await expect(page.getByText(/No clients found/)).toBeVisible();
