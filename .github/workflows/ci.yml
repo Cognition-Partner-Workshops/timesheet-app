@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  security-events: write
 
 jobs:
   backend:
@@ -36,7 +37,12 @@ jobs:
         run: npm ci
 
       - name: Run ESLint
-        run: npx eslint src/ --no-error-on-unmatched-pattern || echo "No ESLint config found — skipping"
+        run: |
+          if [ -f .eslintrc.js ] || [ -f .eslintrc.json ] || [ -f .eslintrc.yml ] || [ -f eslint.config.js ] || [ -f eslint.config.mjs ]; then
+            npx eslint src/ --no-error-on-unmatched-pattern
+          else
+            echo "No ESLint config found — skipping"
+          fi
 
       - name: Run unit tests with coverage
         run: npm run test:ci
@@ -54,6 +60,33 @@ jobs:
 
       - name: Security audit
         run: npm audit --audit-level=moderate || true
+
+  sast:
+    name: SAST Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep SAST scan
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/javascript
+            p/typescript
+            p/nodejs
+            p/owasp-top-ten
+        env:
+          SEMGREP_RULES: p/javascript p/typescript p/nodejs p/owasp-top-ten
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          format: table
 
   frontend:
     name: Frontend (Node ${{ matrix.node-version }})
