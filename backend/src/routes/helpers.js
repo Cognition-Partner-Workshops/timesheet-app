@@ -2,7 +2,7 @@ const { getDatabase } = require('../database/init');
 
 function parseId(req, res, entityName) {
   const id = parseInt(req.params.id);
-  if (isNaN(id)) {
+  if (isNaN(id) || id <= 0) {
     res.status(400).json({ error: `Invalid ${entityName} ID` });
     return null;
   }

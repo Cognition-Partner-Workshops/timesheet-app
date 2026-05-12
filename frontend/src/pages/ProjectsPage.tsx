@@ -126,7 +126,7 @@ const ProjectsPage: React.FC = () => {
 
     const payload = {
       name: formData.name,
-      description: formData.description || undefined,
+      description: formData.description || (editingProject ? '' : undefined),
       clientId: formData.clientId ? parseInt(formData.clientId) : null,
       startDate: formData.startDate,
       status: formData.status,
