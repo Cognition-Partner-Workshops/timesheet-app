@@ -1,12 +1,14 @@
 import { test, expect } from '@playwright/test';
-import { login, resetBackend, apiCreateClient } from './helpers';
+import {
+  loginAndNavigate,
+  apiCreateClient,
+  openDialogAndFillForm,
+  clickRowAction,
+} from './helpers';
 
 test.describe('Client Management', () => {
   test.beforeEach(async ({ page }) => {
-    await resetBackend();
-    await login(page);
-    await page.goto('/clients');
-    await expect(page.getByRole('heading', { name: 'Clients' })).toBeVisible();
+    await loginAndNavigate(page, '/clients', 'Clients');
   });
 
   test('should show empty state when no clients exist', async ({ page }) => {
@@ -14,13 +16,12 @@ test.describe('Client Management', () => {
   });
 
   test('should create a new client', async ({ page }) => {
-    await page.getByRole('button', { name: 'Add Client' }).click();
-    await expect(page.getByText('Add New Client')).toBeVisible();
-
-    await page.getByLabel('Client Name').fill('Acme Corp');
-    await page.getByLabel('Department').fill('Engineering');
-    await page.getByLabel('Email').fill('acme@example.com');
-    await page.getByLabel('Description').fill('Main client');
+    await openDialogAndFillForm(page, 'Add Client', 'Add New Client', {
+      'Client Name': 'Acme Corp',
+      Department: 'Engineering',
+      Email: 'acme@example.com',
+      Description: 'Main client',
+    });
     await page.getByRole('button', { name: 'Create' }).click();
 
     await expect(page.getByRole('cell', { name: 'Acme Corp' })).toBeVisible({ timeout: 5000 });
@@ -33,9 +34,7 @@ test.describe('Client Management', () => {
     await page.reload();
     await expect(page.getByRole('cell', { name: 'Old Name' })).toBeVisible({ timeout: 5000 });
 
-    // Find the row and click its edit button
-    const row = page.getByRole('row').filter({ hasText: 'Old Name' });
-    await row.locator('[data-testid="EditIcon"]').click();
+    await clickRowAction(page, 'Old Name', 'EditIcon');
     await expect(page.getByText('Edit Client')).toBeVisible();
 
     await page.getByLabel('Client Name').clear();
@@ -52,8 +51,7 @@ test.describe('Client Management', () => {
     await expect(page.getByRole('cell', { name: 'To Delete' })).toBeVisible({ timeout: 5000 });
 
     page.on('dialog', (dialog) => dialog.accept());
-    const row = page.getByRole('row').filter({ hasText: 'To Delete' });
-    await row.locator('[data-testid="DeleteIcon"]').click();
+    await clickRowAction(page, 'To Delete', 'DeleteIcon');
 
     await expect(page.getByRole('cell', { name: 'To Delete' })).not.toBeVisible({ timeout: 5000 });
     await expect(page.getByText('No clients found')).toBeVisible();

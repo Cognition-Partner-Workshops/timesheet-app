@@ -1,16 +1,20 @@
 import { test, expect } from '@playwright/test';
-import { login, resetBackend, apiCreateClient, apiCreateWorkEntry } from './helpers';
+import {
+  loginAndNavigate,
+  apiCreateClient,
+  apiCreateWorkEntry,
+  selectMuiOption,
+  clickRowAction,
+} from './helpers';
 
 let clientId: number;
 
 test.describe('Work Entry Lifecycle', () => {
   test.beforeEach(async ({ page }) => {
-    await resetBackend();
+    await loginAndNavigate(page, '/work-entries', 'Work Entries');
     const data = await apiCreateClient('Test Client');
     clientId = data.client.id;
-    await login(page);
-    await page.goto('/work-entries');
-    await expect(page.getByRole('heading', { name: 'Work Entries' })).toBeVisible();
+    await page.reload();
   });
 
   test('should show empty state when no entries exist', async ({ page }) => {
@@ -21,10 +25,7 @@ test.describe('Work Entry Lifecycle', () => {
     await page.getByRole('button', { name: 'Add Work Entry' }).click();
     await expect(page.getByText('Add New Work Entry')).toBeVisible();
 
-    // Select client from MUI Select - click the combobox then the option
-    await page.locator('.MuiDialog-root .MuiSelect-select').click();
-    await page.getByRole('option', { name: 'Test Client' }).click();
-
+    await selectMuiOption(page, 'Test Client');
     await page.getByLabel('Hours').fill('4.5');
     await page.getByLabel('Description').fill('Implemented login feature');
     await page.getByRole('button', { name: 'Create' }).click();
@@ -39,8 +40,7 @@ test.describe('Work Entry Lifecycle', () => {
     await page.reload();
     await expect(page.getByText('3 hours')).toBeVisible({ timeout: 5000 });
 
-    const row = page.getByRole('row').filter({ hasText: '3 hours' });
-    await row.locator('[data-testid="EditIcon"]').click();
+    await clickRowAction(page, '3 hours', 'EditIcon');
     await expect(page.getByText('Edit Work Entry')).toBeVisible();
 
     await page.getByLabel('Hours').clear();
@@ -57,8 +57,7 @@ test.describe('Work Entry Lifecycle', () => {
     await expect(page.getByText('2 hours')).toBeVisible({ timeout: 5000 });
 
     page.on('dialog', (dialog) => dialog.accept());
-    const row = page.getByRole('row').filter({ hasText: '2 hours' });
-    await row.locator('[data-testid="DeleteIcon"]').click();
+    await clickRowAction(page, '2 hours', 'DeleteIcon');
 
     await expect(page.getByText('2 hours')).not.toBeVisible({ timeout: 5000 });
     await expect(page.getByText('No work entries found')).toBeVisible({ timeout: 5000 });

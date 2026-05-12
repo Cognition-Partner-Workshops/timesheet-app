@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { login, resetBackend, apiCreateClient, apiCreateWorkEntry } from './helpers';
+import {
+  login,
+  resetBackend,
+  apiCreateClient,
+  apiCreateWorkEntry,
+  selectMuiOption,
+} from './helpers';
 
 test.describe('Reporting', () => {
   test.beforeEach(async ({ page }) => {
@@ -15,15 +21,11 @@ test.describe('Reporting', () => {
   });
 
   test('should display correct totals after selecting a client', async ({ page }) => {
-    // Click the MUI Select dropdown
-    await page.locator('.MuiSelect-select').click();
-    await page.getByRole('option', { name: 'Report Client' }).click();
+    await selectMuiOption(page, 'Report Client', 'body');
 
-    // Verify totals: 5 + 3.5 = 8.50 total hours, 2 entries, 4.25 avg
+    // 5 + 3.5 = 8.50 total, 4.25 avg
     await expect(page.getByText('8.50')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('text=4.25')).toBeVisible();
-
-    // Verify entries appear in table
     await expect(page.getByText('Task A')).toBeVisible();
     await expect(page.getByText('Task B')).toBeVisible();
     await expect(page.getByText('5 hours', { exact: true })).toBeVisible();
@@ -40,8 +42,7 @@ test.describe('Reporting', () => {
     await apiCreateClient('Empty Client');
     await page.reload();
 
-    await page.locator('.MuiSelect-select').click();
-    await page.getByRole('option', { name: 'Empty Client' }).click();
+    await selectMuiOption(page, 'Empty Client', 'body');
 
     await expect(page.getByText('0.00').first()).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('No work entries found for this client')).toBeVisible();
