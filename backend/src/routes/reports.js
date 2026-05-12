@@ -1,10 +1,7 @@
 const express = require('express');
 const { getDatabase } = require('../database/init');
 const { authenticateUser } = require('../middleware/auth');
-const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 const PDFDocument = require('pdfkit');
-const path = require('path');
-const fs = require('fs');
 
 const router = express.Router();
 
@@ -100,46 +97,25 @@ router.get('/export/csv/:clientId', (req, res) => {
             return res.status(500).json({ error: 'Internal server error' });
           }
           
-          // Create temporary CSV file
-          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-          const filename = `${client.name.replace(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.csv`;
-          const tempPath = path.join(__dirname, '../../temp', filename);
-          
-          // Ensure temp directory exists
-          const tempDir = path.dirname(tempPath);
-          if (!fs.existsSync(tempDir)) {
-            fs.mkdirSync(tempDir, { recursive: true });
-          }
-          
-          const csvWriter = createCsvWriter({
-            path: tempPath,
-            header: [
-              { id: 'date', title: 'Date' },
-              { id: 'hours', title: 'Hours' },
-              { id: 'description', title: 'Description' },
-              { id: 'created_at', title: 'Created At' }
-            ]
+          // Build CSV content in memory
+          const headers = ['Date', 'Hours', 'Description', 'Created At'];
+          let csvContent = headers.join(',') + '\n';
+
+          workEntries.forEach(entry => {
+            const row = [
+              entry.date,
+              entry.hours,
+              `"${(entry.description || '').replace(/"/g, '""')}"`,
+              entry.created_at
+            ].join(',');
+            csvContent += row + '\n';
           });
-          
-          csvWriter.writeRecords(workEntries)
-            .then(() => {
-              // Send file and clean up
-              res.download(tempPath, filename, (err) => {
-                if (err) {
-                  console.error('Error sending file:', err);
-                }
-                // Clean up temp file
-                fs.unlink(tempPath, (unlinkErr) => {
-                  if (unlinkErr) {
-                    console.error('Error deleting temp file:', unlinkErr);
-                  }
-                });
-              });
-            })
-            .catch((error) => {
-              console.error('Error creating CSV:', error);
-              res.status(500).json({ error: 'Failed to generate CSV report' });
-            });
+
+          const filename = `${client.name.replace(/[^a-zA-Z0-9]/g, '_')}_report_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+
+          res.setHeader('Content-Type', 'text/csv');
+          res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+          res.send(csvContent);
         }
       );
     }

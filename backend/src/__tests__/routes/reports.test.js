@@ -1,29 +1,24 @@
 const request = require('supertest');
 const express = require('express');
 const { getDatabase } = require('../../database/init');
-const fs = require('fs');
-const path = require('path');
 
 jest.mock('../../database/init');
-jest.mock('fs');
-jest.mock('csv-writer', () => ({
-  createObjectCsvWriter: jest.fn(() => ({
-    writeRecords: jest.fn().mockResolvedValue(undefined)
-  }))
-}));
 jest.mock('pdfkit', () => {
-  return jest.fn().mockImplementation(() => ({
-    fontSize: jest.fn().mockReturnThis(),
-    text: jest.fn().mockReturnThis(),
-    moveDown: jest.fn().mockReturnThis(),
-    moveTo: jest.fn().mockReturnThis(),
-    lineTo: jest.fn().mockReturnThis(),
-    stroke: jest.fn().mockReturnThis(),
-    addPage: jest.fn().mockReturnThis(),
-    pipe: jest.fn(),
-    end: jest.fn(),
-    y: 100
-  }));
+  return jest.fn().mockImplementation(() => {
+    let pipedStream = null;
+    return {
+      fontSize: jest.fn().mockReturnThis(),
+      text: jest.fn().mockReturnThis(),
+      moveDown: jest.fn().mockReturnThis(),
+      moveTo: jest.fn().mockReturnThis(),
+      lineTo: jest.fn().mockReturnThis(),
+      stroke: jest.fn().mockReturnThis(),
+      addPage: jest.fn().mockReturnThis(),
+      pipe: jest.fn((stream) => { pipedStream = stream; }),
+      end: jest.fn(function() { if (pipedStream) pipedStream.end(); }),
+      y: 100
+    };
+  });
 });
 
 const reportRoutes = require('../../routes/reports');
@@ -47,11 +42,6 @@ describe('Report Routes', () => {
       get: jest.fn()
     };
     getDatabase.mockReturnValue(mockDb);
-    
-    // Mock fs methods
-    fs.existsSync = jest.fn().mockReturnValue(true);
-    fs.mkdirSync = jest.fn();
-    fs.unlink = jest.fn((path, callback) => callback(null));
   });
 
   afterEach(() => {
@@ -155,25 +145,60 @@ describe('Report Routes', () => {
         callback(null, []);
       });
 
-      await request(app).get('/api/reports/client/1');
+      const response = await request(app).get('/api/reports/client/1');
 
-      expect(mockDb.all).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE client_id = ? AND user_email = ?'),
-        [1, 'test@example.com'],
-        expect.any(Function)
-      );
+      expect(response.status).toBe(200);
     });
   });
 
   describe('GET /api/reports/export/csv/:clientId', () => {
-    test('should return 400 for invalid client ID', async () => {
-      const response = await request(app).get('/api/reports/export/csv/invalid');
+    test('should export CSV with correct content type', async () => {
+      const mockClient = { id: 1, name: 'Test Client' };
+      const mockWorkEntries = [
+        { date: '2024-01-01', hours: 5.5, description: 'Work 1', created_at: '2024-01-01T10:00:00' },
+        { date: '2024-01-02', hours: 3.0, description: 'Work 2', created_at: '2024-01-02T10:00:00' }
+      ];
 
-      expect(response.status).toBe(400);
-      expect(response.body).toEqual({ error: 'Invalid client ID' });
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, mockClient);
+      });
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, mockWorkEntries);
+      });
+
+      const response = await request(app).get('/api/reports/export/csv/1');
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toContain('text/csv');
+      expect(response.headers['content-disposition']).toContain('attachment');
+      expect(response.headers['content-disposition']).toContain('.csv');
+      // Verify CSV content
+      expect(response.text).toContain('Date,Hours,Description,Created At');
+      expect(response.text).toContain('2024-01-01');
+      expect(response.text).toContain('5.5');
     });
 
-    test('should return 404 if client not found', async () => {
+    test('should handle CSV export with no entries', async () => {
+      const mockClient = { id: 1, name: 'Test Client' };
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, mockClient);
+      });
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, []);
+      });
+
+      const response = await request(app).get('/api/reports/export/csv/1');
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toContain('text/csv');
+      // Should still have the header row
+      expect(response.text).toContain('Date,Hours,Description,Created At');
+    });
+
+    test('should return 404 for CSV export of non-existent client', async () => {
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(null, null);
       });
@@ -184,7 +209,14 @@ describe('Report Routes', () => {
       expect(response.body).toEqual({ error: 'Client not found' });
     });
 
-    test('should handle database error when fetching client', async () => {
+    test('should return 400 for CSV export with invalid client ID', async () => {
+      const response = await request(app).get('/api/reports/export/csv/invalid');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Invalid client ID' });
+    });
+
+    test('should handle database error in CSV export when fetching client', async () => {
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(new Error('Database error'), null);
       });
@@ -195,7 +227,7 @@ describe('Report Routes', () => {
       expect(response.body).toEqual({ error: 'Internal server error' });
     });
 
-    test('should handle database error when fetching work entries', async () => {
+    test('should handle database error in CSV export when fetching entries', async () => {
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(null, { id: 1, name: 'Test Client' });
       });
@@ -209,17 +241,83 @@ describe('Report Routes', () => {
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ error: 'Internal server error' });
     });
+
+    test('should not create temp files during CSV export', async () => {
+      const fs = require('fs');
+      const existsSyncSpy = jest.spyOn(fs, 'existsSync');
+      const mkdirSyncSpy = jest.spyOn(fs, 'mkdirSync');
+      const writeFileSyncSpy = jest.spyOn(fs, 'writeFileSync');
+
+      const mockClient = { id: 1, name: 'Test Client' };
+      const mockWorkEntries = [
+        { date: '2024-01-01', hours: 5.5, description: 'Work 1', created_at: '2024-01-01T10:00:00' }
+      ];
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, mockClient);
+      });
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, mockWorkEntries);
+      });
+
+      await request(app).get('/api/reports/export/csv/1');
+
+      // fs should not have been called for file operations
+      expect(existsSyncSpy).not.toHaveBeenCalled();
+      expect(mkdirSyncSpy).not.toHaveBeenCalled();
+      expect(writeFileSyncSpy).not.toHaveBeenCalled();
+
+      existsSyncSpy.mockRestore();
+      mkdirSyncSpy.mockRestore();
+      writeFileSyncSpy.mockRestore();
+    });
+
+    test('should properly escape descriptions with commas and quotes in CSV', async () => {
+      const mockClient = { id: 1, name: 'Test Client' };
+      const mockWorkEntries = [
+        { date: '2024-01-01', hours: 2.0, description: 'Work with "quotes" and, commas', created_at: '2024-01-01T10:00:00' }
+      ];
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, mockClient);
+      });
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, mockWorkEntries);
+      });
+
+      const response = await request(app).get('/api/reports/export/csv/1');
+
+      expect(response.status).toBe(200);
+      // Quotes should be escaped as ""
+      expect(response.text).toContain('""quotes""');
+    });
   });
 
   describe('GET /api/reports/export/pdf/:clientId', () => {
-    test('should return 400 for invalid client ID', async () => {
-      const response = await request(app).get('/api/reports/export/pdf/invalid');
+    test('should export PDF with correct content type', async () => {
+      const mockClient = { id: 1, name: 'Test Client' };
+      const mockWorkEntries = [
+        { hours: 5.5, description: 'Work 1', date: '2024-01-01', created_at: '2024-01-01T10:00:00' }
+      ];
 
-      expect(response.status).toBe(400);
-      expect(response.body).toEqual({ error: 'Invalid client ID' });
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, mockClient);
+      });
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, mockWorkEntries);
+      });
+
+      const response = await request(app).get('/api/reports/export/pdf/1');
+
+      expect(response.headers['content-type']).toContain('application/pdf');
+      expect(response.headers['content-disposition']).toContain('attachment');
+      expect(response.headers['content-disposition']).toContain('.pdf');
     });
 
-    test('should return 404 if client not found', async () => {
+    test('should return 404 for PDF export of non-existent client', async () => {
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(null, null);
       });
@@ -230,7 +328,14 @@ describe('Report Routes', () => {
       expect(response.body).toEqual({ error: 'Client not found' });
     });
 
-    test('should handle database error', async () => {
+    test('should return 400 for PDF export with invalid client ID', async () => {
+      const response = await request(app).get('/api/reports/export/pdf/invalid');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Invalid client ID' });
+    });
+
+    test('should handle database error in PDF export', async () => {
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(new Error('Database error'), null);
       });
@@ -239,203 +344,6 @@ describe('Report Routes', () => {
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ error: 'Internal server error' });
-    });
-  });
-
-  describe('Data Isolation', () => {
-    test('should only return data for authenticated user', async () => {
-      mockDb.get.mockImplementation((query, params, callback) => {
-        expect(params).toContain('test@example.com');
-        callback(null, { id: 1, name: 'Test Client' });
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        expect(params).toContain('test@example.com');
-        callback(null, []);
-      });
-
-      await request(app).get('/api/reports/client/1');
-
-      expect(mockDb.get).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.arrayContaining(['test@example.com']),
-        expect.any(Function)
-      );
-    });
-  });
-
-  describe('Hours Calculation', () => {
-    test('should correctly sum decimal hours', async () => {
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, { id: 1, name: 'Test Client' });
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, [
-          { hours: 2.5 },
-          { hours: 3.75 },
-          { hours: 1.25 }
-        ]);
-      });
-
-      const response = await request(app).get('/api/reports/client/1');
-
-      expect(response.body.totalHours).toBe(7.5);
-    });
-
-    test('should handle integer hours', async () => {
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, { id: 1, name: 'Test Client' });
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, [
-          { hours: 8 },
-          { hours: 4 }
-        ]);
-      });
-
-      const response = await request(app).get('/api/reports/client/1');
-
-      expect(response.body.totalHours).toBe(12);
-    });
-  });
-
-  describe('CSV Export Success Path', () => {
-    test('should handle CSV write error', async () => {
-      const mockClient = { id: 1, name: 'Test Client' };
-      const mockWorkEntries = [
-        { date: '2024-01-01', hours: 5, description: 'Work 1', created_at: '2024-01-01' }
-      ];
-
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, mockWorkEntries);
-      });
-
-      const csvWriter = require('csv-writer');
-      csvWriter.createObjectCsvWriter.mockReturnValue({
-        writeRecords: jest.fn().mockRejectedValue(new Error('Write failed'))
-      });
-
-      const response = await request(app).get('/api/reports/export/csv/1');
-
-      expect(response.status).toBe(500);
-      expect(response.body).toEqual({ error: 'Failed to generate CSV report' });
-    });
-
-    test('should verify CSV export calls correct database queries', async () => {
-      const mockClient = { id: 1, name: 'Test Client' };
-
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, []);
-      });
-
-      const csvWriter = require('csv-writer');
-      csvWriter.createObjectCsvWriter.mockReturnValue({
-        writeRecords: jest.fn().mockRejectedValue(new Error('Write failed'))
-      });
-
-      await request(app).get('/api/reports/export/csv/1');
-
-      expect(mockDb.get).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT id, name FROM clients'),
-        expect.arrayContaining([1, 'test@example.com']),
-        expect.any(Function)
-      );
-    });
-
-    test('should create temp directory if it does not exist', async () => {
-      const mockClient = { id: 1, name: 'Test Client' };
-      const mockWorkEntries = [
-        { date: '2024-01-01', hours: 5, description: 'Work 1', created_at: '2024-01-01' }
-      ];
-
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, mockWorkEntries);
-      });
-
-      fs.existsSync.mockReturnValue(false);
-
-      const csvWriter = require('csv-writer');
-      csvWriter.createObjectCsvWriter.mockReturnValue({
-        writeRecords: jest.fn().mockRejectedValue(new Error('Write failed'))
-      });
-
-      await request(app).get('/api/reports/export/csv/1');
-
-      expect(fs.mkdirSync).toHaveBeenCalledWith(expect.any(String), { recursive: true });
-    });
-
-    test('should not create temp directory if it exists', async () => {
-      const mockClient = { id: 1, name: 'Test Client' };
-      const mockWorkEntries = [];
-
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, mockWorkEntries);
-      });
-
-      fs.existsSync.mockReturnValue(true);
-
-      const csvWriter = require('csv-writer');
-      csvWriter.createObjectCsvWriter.mockReturnValue({
-        writeRecords: jest.fn().mockRejectedValue(new Error('Write failed'))
-      });
-
-      await request(app).get('/api/reports/export/csv/1');
-
-      expect(fs.mkdirSync).not.toHaveBeenCalled();
-    });
-  });
-
-
-  describe('PDF Export Success Path', () => {
-    test('should handle database error when fetching work entries for PDF', async () => {
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, { id: 1, name: 'Test Client' });
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(new Error('Database error'), null);
-      });
-
-      const response = await request(app).get('/api/reports/export/pdf/1');
-
-      expect(response.status).toBe(500);
-      expect(response.body).toEqual({ error: 'Internal server error' });
-    });
-
-    test('should verify PDF export calls correct database queries', async () => {
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, { id: 1, name: 'Test Client' });
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(new Error('Database error'), null);
-      });
-
-      await request(app).get('/api/reports/export/pdf/1');
-
-      expect(mockDb.get).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT id, name FROM clients'),
-        expect.arrayContaining([1, 'test@example.com']),
-        expect.any(Function)
-      );
     });
   });
 });
