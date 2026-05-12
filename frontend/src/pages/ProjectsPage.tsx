@@ -29,9 +29,10 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
 } from '@mui/icons-material';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
-import { type Project, type Client } from '../types/api';
+import { type Project, type Client, type CreateProjectRequest, type UpdateProjectRequest } from '../types/api';
+import { useCrudMutations } from '../hooks/useCrudMutations';
 
 const statusColors: Record<string, 'success' | 'default' | 'warning'> = {
   active: 'success',
@@ -39,19 +40,14 @@ const statusColors: Record<string, 'success' | 'default' | 'warning'> = {
   'on-hold': 'warning',
 };
 
+type ProjectStatus = 'active' | 'completed' | 'on-hold';
+const EMPTY_FORM = { name: '', description: '', clientId: '' as string | number, startDate: '', status: 'active' as ProjectStatus };
+
 const ProjectsPage: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    clientId: '' as string | number,
-    startDate: '',
-    status: 'active' as string,
-  });
+  const [formData, setFormData] = useState({ ...EMPTY_FORM });
   const [error, setError] = useState('');
-
-  const queryClient = useQueryClient();
 
   const { data: projectsData, isLoading } = useQuery({
     queryKey: ['projects'],
@@ -63,41 +59,20 @@ const ProjectsPage: React.FC = () => {
     queryFn: () => apiClient.getClients(),
   });
 
-  const createMutation = useMutation({
-    mutationFn: (projectData: { name: string; description?: string; clientId?: number | null; startDate?: string | null; status?: string }) =>
-      apiClient.createProject(projectData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      handleClose();
-    },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to create project');
-    },
-  });
+  const handleClose = () => {
+    setOpen(false);
+    setEditingProject(null);
+    setFormData({ ...EMPTY_FORM });
+    setError('');
+  };
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { name?: string; description?: string; clientId?: number | null; startDate?: string | null; status?: string } }) =>
-      apiClient.updateProject(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      handleClose();
-    },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to update project');
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiClient.deleteProject(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-    },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to delete project');
-    },
+  const { createMutation, updateMutation, deleteMutation, isSaving } = useCrudMutations<CreateProjectRequest, UpdateProjectRequest>({
+    queryKey: 'projects',
+    createFn: (data) => apiClient.createProject(data),
+    updateFn: (id, data) => apiClient.updateProject(id, data),
+    deleteFn: (id) => apiClient.deleteProject(id),
+    onSuccess: handleClose,
+    onError: setError,
   });
 
   const projects = projectsData?.projects || [];
@@ -115,17 +90,10 @@ const ProjectsPage: React.FC = () => {
       });
     } else {
       setEditingProject(null);
-      setFormData({ name: '', description: '', clientId: '', startDate: '', status: 'active' });
+      setFormData({ ...EMPTY_FORM });
     }
     setError('');
     setOpen(true);
-  };
-
-  const handleClose = () => {
-    setOpen(false);
-    setEditingProject(null);
-    setFormData({ name: '', description: '', clientId: '', startDate: '', status: 'active' });
-    setError('');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -137,7 +105,7 @@ const ProjectsPage: React.FC = () => {
       return;
     }
 
-    const payload = {
+    const payload: CreateProjectRequest = {
       name: formData.name,
       description: formData.description || undefined,
       clientId: formData.clientId ? Number(formData.clientId) : null,
@@ -244,18 +212,10 @@ const ProjectsPage: React.FC = () => {
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
-                      <IconButton
-                        onClick={() => handleOpen(project)}
-                        color="primary"
-                        size="small"
-                      >
+                      <IconButton onClick={() => handleOpen(project)} color="primary" size="small">
                         <EditIcon />
                       </IconButton>
-                      <IconButton
-                        onClick={() => handleDelete(project)}
-                        color="error"
-                        size="small"
-                      >
+                      <IconButton onClick={() => handleDelete(project)} color="error" size="small">
                         <DeleteIcon />
                       </IconButton>
                     </TableCell>
@@ -289,7 +249,7 @@ const ProjectsPage: React.FC = () => {
               required
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={isSaving}
             />
             <FormControl fullWidth margin="dense">
               <InputLabel id="client-select-label">Client</InputLabel>
@@ -298,7 +258,7 @@ const ProjectsPage: React.FC = () => {
                 value={formData.clientId}
                 label="Client"
                 onChange={(e) => setFormData({ ...formData, clientId: e.target.value })}
-                disabled={createMutation.isPending || updateMutation.isPending}
+                disabled={isSaving}
               >
                 <MenuItem value="">
                   <em>None</em>
@@ -317,7 +277,7 @@ const ProjectsPage: React.FC = () => {
               type="date"
               value={formData.startDate}
               onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={isSaving}
               slotProps={{ inputLabel: { shrink: true } }}
             />
             <FormControl fullWidth margin="dense">
@@ -326,8 +286,8 @@ const ProjectsPage: React.FC = () => {
                 labelId="status-select-label"
                 value={formData.status}
                 label="Status"
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                disabled={createMutation.isPending || updateMutation.isPending}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value as ProjectStatus })}
+                disabled={isSaving}
               >
                 <MenuItem value="active">Active</MenuItem>
                 <MenuItem value="completed">Completed</MenuItem>
@@ -342,23 +302,15 @@ const ProjectsPage: React.FC = () => {
               rows={3}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={isSaving}
             />
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
+            <Button onClick={handleClose} disabled={isSaving}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              variant="contained"
-              disabled={createMutation.isPending || updateMutation.isPending}
-            >
-              {createMutation.isPending || updateMutation.isPending ? (
-                <CircularProgress size={24} />
-              ) : (
-                editingProject ? 'Update' : 'Create'
-              )}
+            <Button type="submit" variant="contained" disabled={isSaving}>
+              {isSaving ? <CircularProgress size={24} /> : (editingProject ? 'Update' : 'Create')}
             </Button>
           </DialogActions>
         </form>
