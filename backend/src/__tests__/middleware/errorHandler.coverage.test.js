@@ -5,52 +5,29 @@ describe('Error Handler Middleware - Coverage Improvement', () => {
 
   beforeEach(() => {
     req = {};
-    res = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn()
-    };
+    res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
     next = jest.fn();
     jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
-  afterEach(() => {
-    jest.restoreAllMocks();
-  });
+  afterEach(() => { jest.restoreAllMocks(); });
 
   describe('SQLite Error Variants', () => {
-    test('should handle SQLITE_BUSY error', () => {
-      const error = { code: 'SQLITE_BUSY', message: 'Database is locked' };
-      errorHandler(error, req, res, next);
-
+    test.each([
+      ['SQLITE_BUSY', 'Database is locked'],
+      ['SQLITE_READONLY', 'Read-only database'],
+      ['SQLITE_CORRUPT', 'Database disk image is malformed']
+    ])('should handle %s error as database error', (code, message) => {
+      errorHandler({ code, message }, req, res, next);
       expect(res.status).toHaveBeenCalledWith(500);
       expect(res.json).toHaveBeenCalledWith({
         error: 'Database error',
         message: 'An error occurred while processing your request'
       });
-    });
-
-    test('should handle SQLITE_READONLY error', () => {
-      const error = { code: 'SQLITE_READONLY', message: 'Read-only database' };
-      errorHandler(error, req, res, next);
-
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({
-        error: 'Database error',
-        message: 'An error occurred while processing your request'
-      });
-    });
-
-    test('should handle SQLITE_CORRUPT error', () => {
-      const error = { code: 'SQLITE_CORRUPT', message: 'Database disk image is malformed' };
-      errorHandler(error, req, res, next);
-
-      expect(res.status).toHaveBeenCalledWith(500);
     });
 
     test('should not treat non-SQLITE_ code as database error', () => {
-      const error = { code: 'ECONNREFUSED', message: 'Connection refused' };
-      errorHandler(error, req, res, next);
-
+      errorHandler({ code: 'ECONNREFUSED', message: 'Connection refused' }, req, res, next);
       expect(res.status).toHaveBeenCalledWith(500);
       expect(res.json).toHaveBeenCalledWith({ error: 'Connection refused' });
     });
@@ -58,17 +35,8 @@ describe('Error Handler Middleware - Coverage Improvement', () => {
 
   describe('Joi Error Edge Cases', () => {
     test('should handle Joi error with multiple detail messages', () => {
-      const error = {
-        isJoi: true,
-        details: [
-          { message: 'Name is required' },
-          { message: 'Email must be valid' },
-          { message: 'Hours must be positive' }
-        ]
-      };
-
-      errorHandler(error, req, res, next);
-
+      const details = [{ message: 'Name is required' }, { message: 'Email must be valid' }, { message: 'Hours must be positive' }];
+      errorHandler({ isJoi: true, details }, req, res, next);
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.json).toHaveBeenCalledWith({
         error: 'Validation error',
@@ -77,74 +45,42 @@ describe('Error Handler Middleware - Coverage Improvement', () => {
     });
 
     test('should handle Joi error with empty details array', () => {
-      const error = {
-        isJoi: true,
-        details: []
-      };
-
-      errorHandler(error, req, res, next);
-
+      errorHandler({ isJoi: true, details: [] }, req, res, next);
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({
-        error: 'Validation error',
-        details: []
-      });
+      expect(res.json).toHaveBeenCalledWith({ error: 'Validation error', details: [] });
     });
   });
 
   describe('Generic Error Edge Cases', () => {
-    test('should handle error with status 400', () => {
-      const error = { status: 400, message: 'Bad request' };
-      errorHandler(error, req, res, next);
-
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Bad request' });
-    });
-
-    test('should handle error with status 404', () => {
-      const error = { status: 404, message: 'Not found' };
-      errorHandler(error, req, res, next);
-
-      expect(res.status).toHaveBeenCalledWith(404);
-    });
-
-    test('should handle error with status 422', () => {
-      const error = { status: 422, message: 'Unprocessable entity' };
-      errorHandler(error, req, res, next);
-
-      expect(res.status).toHaveBeenCalledWith(422);
+    test.each([
+      [400, 'Bad request'],
+      [404, 'Not found'],
+      [422, 'Unprocessable entity']
+    ])('should handle error with status %i', (status, message) => {
+      errorHandler({ status, message }, req, res, next);
+      expect(res.status).toHaveBeenCalledWith(status);
+      expect(res.json).toHaveBeenCalledWith({ error: message });
     });
 
     test('should handle Error instance with stack trace', () => {
       const error = new Error('Runtime failure');
       errorHandler(error, req, res, next);
-
       expect(res.status).toHaveBeenCalledWith(500);
       expect(res.json).toHaveBeenCalledWith({ error: 'Runtime failure' });
       expect(console.error).toHaveBeenCalledWith('Error:', error);
     });
 
-    test('should handle error with null message', () => {
-      const error = { message: null };
+    test.each([
+      ['null message', { message: null }],
+      ['undefined message', { message: undefined }]
+    ])('should default to Internal server error for %s', (_, error) => {
       errorHandler(error, req, res, next);
-
       expect(res.status).toHaveBeenCalledWith(500);
       expect(res.json).toHaveBeenCalledWith({ error: 'Internal server error' });
     });
 
-    test('should handle error with undefined message', () => {
-      const error = { message: undefined };
-      errorHandler(error, req, res, next);
-
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Internal server error' });
-    });
-
-    test('should handle error with status 0', () => {
-      const error = { status: 0, message: 'Zero status' };
-      errorHandler(error, req, res, next);
-
-      // 0 is falsy, so it should default to 500
+    test('should default to 500 for falsy status (0)', () => {
+      errorHandler({ status: 0, message: 'Zero status' }, req, res, next);
       expect(res.status).toHaveBeenCalledWith(500);
     });
   });

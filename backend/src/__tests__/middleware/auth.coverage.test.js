@@ -1,3 +1,4 @@
+const { createMockDb } = require('../helpers/testSetup');
 const { authenticateUser } = require('../../middleware/auth');
 const { getDatabase } = require('../../database/init');
 
@@ -8,31 +9,21 @@ describe('Authentication Middleware - Coverage Improvement', () => {
 
   beforeEach(() => {
     req = { headers: {} };
-    res = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn()
-    };
+    res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
     next = jest.fn();
-    mockDb = {
-      get: jest.fn(),
-      run: jest.fn()
-    };
+    mockDb = createMockDb();
     getDatabase.mockReturnValue(mockDb);
   });
 
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
+  afterEach(() => { jest.clearAllMocks(); });
 
   describe('Email Format Edge Cases', () => {
-    test('should reject email with spaces before @', () => {
-      req.headers['x-user-email'] = 'test user@example.com';
-      authenticateUser(req, res, next);
-      expect(res.status).toHaveBeenCalledWith(400);
-    });
-
-    test('should reject email with spaces after @', () => {
-      req.headers['x-user-email'] = 'test@exam ple.com';
+    test.each([
+      ['spaces before @', 'test user@example.com'],
+      ['spaces after @', 'test@exam ple.com'],
+      ['starting with @', '@example.com']
+    ])('should reject email with %s', (_, email) => {
+      req.headers['x-user-email'] = email;
       authenticateUser(req, res, next);
       expect(res.status).toHaveBeenCalledWith(400);
     });
@@ -42,56 +33,22 @@ describe('Authentication Middleware - Coverage Improvement', () => {
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(null, { email: 'test@example..com' });
       });
-
       authenticateUser(req, res, next);
-      // The simple regex /^[^\s@]+@[^\s@]+\.[^\s@]+$/ allows double dots
       expect(mockDb.get).toHaveBeenCalled();
     });
 
-    test('should accept valid email with numbers', () => {
-      req.headers['x-user-email'] = 'user123@example456.com';
+    test.each([
+      ['numbers', 'user123@example456.com'],
+      ['hyphens in domain', 'user@my-example.com'],
+      ['dots in local part', 'first.last@example.com'],
+      ['plus sign', 'user+tag@example.com']
+    ])('should accept valid email with %s', (_, email) => {
+      req.headers['x-user-email'] = email;
       mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, { email: 'user123@example456.com' });
+        callback(null, { email });
       });
-
       authenticateUser(req, res, next);
       expect(mockDb.get).toHaveBeenCalled();
-    });
-
-    test('should accept email with hyphens in domain', () => {
-      req.headers['x-user-email'] = 'user@my-example.com';
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, { email: 'user@my-example.com' });
-      });
-
-      authenticateUser(req, res, next);
-      expect(mockDb.get).toHaveBeenCalled();
-    });
-
-    test('should accept email with dots in local part', () => {
-      req.headers['x-user-email'] = 'first.last@example.com';
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, { email: 'first.last@example.com' });
-      });
-
-      authenticateUser(req, res, next);
-      expect(mockDb.get).toHaveBeenCalled();
-    });
-
-    test('should accept email with plus sign', () => {
-      req.headers['x-user-email'] = 'user+tag@example.com';
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, { email: 'user+tag@example.com' });
-      });
-
-      authenticateUser(req, res, next);
-      expect(mockDb.get).toHaveBeenCalled();
-    });
-
-    test('should reject email starting with @', () => {
-      req.headers['x-user-email'] = '@example.com';
-      authenticateUser(req, res, next);
-      expect(res.status).toHaveBeenCalledWith(400);
     });
   });
 
@@ -101,9 +58,7 @@ describe('Authentication Middleware - Coverage Improvement', () => {
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(null, { email: 'existing@test.com' });
       });
-
       authenticateUser(req, res, next);
-
       setImmediate(() => {
         expect(req.userEmail).toBe('existing@test.com');
         expect(next).toHaveBeenCalled();
@@ -113,15 +68,9 @@ describe('Authentication Middleware - Coverage Improvement', () => {
 
     test('should set req.userEmail for newly created user', (done) => {
       req.headers['x-user-email'] = 'new-user@test.com';
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, null);
-      });
-      mockDb.run.mockImplementation((query, params, callback) => {
-        callback(null);
-      });
-
+      mockDb.get.mockImplementation((query, params, callback) => callback(null, null));
+      mockDb.run.mockImplementation((query, params, callback) => callback(null));
       authenticateUser(req, res, next);
-
       setImmediate(() => {
         expect(req.userEmail).toBe('new-user@test.com');
         expect(next).toHaveBeenCalled();
@@ -132,12 +81,9 @@ describe('Authentication Middleware - Coverage Improvement', () => {
     test('should pass correct email to database query', (done) => {
       req.headers['x-user-email'] = 'specific@test.com';
       mockDb.get.mockImplementation((query, params, callback) => {
-        expect(params).toEqual(['specific@test.com']);
         callback(null, { email: 'specific@test.com' });
       });
-
       authenticateUser(req, res, next);
-
       setImmediate(() => {
         expect(mockDb.get).toHaveBeenCalledWith(
           'SELECT email FROM users WHERE email = ?',
@@ -150,17 +96,13 @@ describe('Authentication Middleware - Coverage Improvement', () => {
 
     test('should pass correct email to INSERT for new user', (done) => {
       req.headers['x-user-email'] = 'insert-test@test.com';
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, null);
-      });
+      mockDb.get.mockImplementation((query, params, callback) => callback(null, null));
       mockDb.run.mockImplementation((query, params, callback) => {
         expect(query).toBe('INSERT INTO users (email) VALUES (?)');
         expect(params).toEqual(['insert-test@test.com']);
         callback(null);
       });
-
       authenticateUser(req, res, next);
-
       setImmediate(() => {
         expect(next).toHaveBeenCalled();
         done();
@@ -169,28 +111,21 @@ describe('Authentication Middleware - Coverage Improvement', () => {
   });
 
   describe('Error Response Format', () => {
-    test('should return proper JSON error for missing header', () => {
+    test('should return 401 JSON error for missing header', () => {
       authenticateUser(req, res, next);
-
       expect(res.status).toHaveBeenCalledWith(401);
-      expect(res.json).toHaveBeenCalledWith({
-        error: 'User email required in x-user-email header'
-      });
+      expect(res.json).toHaveBeenCalledWith({ error: 'User email required in x-user-email header' });
     });
 
-    test('should return proper JSON error for invalid email', () => {
+    test('should return 400 JSON error for invalid email', () => {
       req.headers['x-user-email'] = 'invalid';
       authenticateUser(req, res, next);
-
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({
-        error: 'Invalid email format'
-      });
+      expect(res.json).toHaveBeenCalledWith({ error: 'Invalid email format' });
     });
 
     test('should not call next() on authentication failure', () => {
       authenticateUser(req, res, next);
-
       expect(next).not.toHaveBeenCalled();
     });
   });
