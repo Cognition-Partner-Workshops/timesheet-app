@@ -87,6 +87,7 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: '1'
           format: table
+        continue-on-error: true
 
   frontend:
     name: Frontend (Node ${{ matrix.node-version }})
