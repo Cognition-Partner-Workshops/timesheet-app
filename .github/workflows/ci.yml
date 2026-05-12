@@ -33,6 +33,10 @@ jobs:
         working-directory: backend
         run: cp .env.example .env
 
+      - name: Run ESLint
+        working-directory: backend
+        run: npm run lint
+
       - name: Run unit tests with coverage
         working-directory: backend
         run: npm run test:ci
