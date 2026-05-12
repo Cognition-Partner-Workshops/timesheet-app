@@ -19,7 +19,7 @@ function dbGet(db, sql, params) {
 
 function dbAll(db, sql, params) {
   return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => (err ? reject(rows) : resolve(rows)));
+    db.all(sql, params, (err, rows) => (err ? reject(err) : resolve(rows)));
   });
 }
 
