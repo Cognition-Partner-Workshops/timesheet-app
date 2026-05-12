@@ -50,7 +50,7 @@ const ProjectsPage: React.FC = () => {
     createFn: (data: ProjectFormData) => {
       const payload = {
         name: data.name,
-        description: data.description || undefined,
+        description: data.description || null,
         clientId: data.clientId ? Number(data.clientId) : null,
         startDate: data.startDate || null,
         status: data.status,
@@ -60,7 +60,7 @@ const ProjectsPage: React.FC = () => {
     updateFn: ({ id, data }: { id: number; data: Partial<ProjectFormData> }) => {
       const payload = {
         name: data.name,
-        description: data.description || undefined,
+        description: data.description || null,
         clientId: data.clientId ? Number(data.clientId) : null,
         startDate: data.startDate || null,
         status: data.status,
