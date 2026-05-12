@@ -62,7 +62,7 @@ export function createClient(email, name) {
 export function createWorkEntry(email, clientId) {
   const payload = JSON.stringify({
     clientId: clientId,
-    hours: Math.round(Math.random() * 8 * 100) / 100 + 0.5,
+    hours: ((Date.now() % 800) / 100) + 0.5,
     description: `Work entry from load test - ${Date.now()}`,
     date: new Date().toISOString().split('T')[0],
   });
