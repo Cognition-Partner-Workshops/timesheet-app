@@ -1,4 +1,5 @@
-const { parseResourceId, handleDbError, buildDynamicUpdate } = require('../../routes/helpers');
+const { parseResourceId, handleDbError, verifyClientOwnership, buildDynamicUpdate } = require('../../routes/helpers');
+const { getDatabase } = require('../../database/init');
 
 jest.mock('../../database/init');
 
@@ -58,6 +59,44 @@ describe('Route Helpers', () => {
     test('should keep non-nullable value as-is', () => {
       const result = buildDynamicUpdate('tbl', fieldMap, { name: 'Hello' });
       expect(result.values).toEqual(['Hello']);
+    });
+  });
+
+  describe('verifyClientOwnership', () => {
+    test('should call callback immediately when clientId is falsy', (done) => {
+      const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+      verifyClientOwnership(null, 'user@test.com', res, () => {
+        expect(res.status).not.toHaveBeenCalled();
+        done();
+      });
+    });
+
+    test('should call callback when client belongs to user', (done) => {
+      const mockDb = { get: jest.fn((q, p, cb) => cb(null, { id: 5 })) };
+      getDatabase.mockReturnValue(mockDb);
+      const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+      verifyClientOwnership(5, 'user@test.com', res, () => {
+        expect(mockDb.get).toHaveBeenCalledWith(
+          expect.stringContaining('SELECT id FROM clients'),
+          [5, 'user@test.com'],
+          expect.any(Function)
+        );
+        done();
+      });
+    });
+
+    test('should return 400 when client does not belong to user', () => {
+      const mockDb = { get: jest.fn((q, p, cb) => cb(null, null)) };
+      getDatabase.mockReturnValue(mockDb);
+      const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+      const callback = jest.fn();
+
+      verifyClientOwnership(99, 'user@test.com', res, callback);
+
+      expect(callback).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Client not found or does not belong to user' });
     });
   });
 });

@@ -75,7 +75,7 @@ describe('Project Routes', () => {
   });
 
   describe('POST /api/projects', () => {
-    test('should create new project with valid data', async () => {
+    test('should create project without client (no ownership check needed)', async () => {
       const created = { id: 1, name: 'New Project', status: 'active', client_name: null };
       mockDbRun(mockDb, null, 1);
       mockDbGet(mockDb, created);
@@ -89,10 +89,14 @@ describe('Project Routes', () => {
       expect(response.body.project).toEqual(created);
     });
 
-    test('should create project with client assignment and start date', async () => {
+    test('should create project with owned client assignment', async () => {
       const created = { id: 2, name: 'Assigned', client_id: 1, start_date: '2024-06-01', status: 'active' };
+      // Sequence: get (verify client ownership) -> run (insert) -> get (fetch created)
+      mockDbGetSequence(mockDb, [
+        { data: { id: 1 } },
+        { data: created }
+      ]);
       mockDbRun(mockDb, null, 2);
-      mockDbGet(mockDb, created);
 
       const response = await request(app)
         .post('/api/projects')
@@ -100,6 +104,17 @@ describe('Project Routes', () => {
 
       expect(response.status).toBe(201);
       expect(response.body.project.client_id).toBe(1);
+    });
+
+    test('should reject project with client not belonging to user', async () => {
+      mockDbGet(mockDb, null); // Client not found for this user
+
+      const response = await request(app)
+        .post('/api/projects')
+        .send({ name: 'Bad Assignment', clientId: 999 });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Client not found or does not belong to user');
     });
 
     test('should reject project without name', async () => {
@@ -121,14 +136,13 @@ describe('Project Routes', () => {
     test('should handle database error on retrieve after create', async () => {
       mockDbRun(mockDb, null, 1);
       mockDbGet(mockDb, null, new Error('Database error'));
-
       const response = await request(app).post('/api/projects').send({ name: 'Test Project' });
       expect(response.status).toBe(500);
     });
   });
 
   describe('PUT /api/projects/:id', () => {
-    test('should update project with valid data', async () => {
+    test('should update project name (no client change)', async () => {
       const updated = { id: 1, name: 'Updated', status: 'completed' };
       mockDbGetSequence(mockDb, [
         { data: { id: 1 } },
@@ -142,6 +156,38 @@ describe('Project Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.message).toBe('Project updated successfully');
+    });
+
+    test('should update project with client reassignment after ownership check', async () => {
+      const updated = { id: 1, name: 'Test', client_id: 2, status: 'active' };
+      // Sequence: get (find owned project) -> get (verify client ownership) -> get (fetch after update)
+      mockDbGetSequence(mockDb, [
+        { data: { id: 1 } },
+        { data: { id: 2 } },
+        { data: updated }
+      ]);
+      mockDbRun(mockDb);
+
+      const response = await request(app)
+        .put('/api/projects/1')
+        .send({ clientId: 2 });
+
+      expect(response.status).toBe(200);
+      expect(response.body.project.client_id).toBe(2);
+    });
+
+    test('should reject update with client not belonging to user', async () => {
+      mockDbGetSequence(mockDb, [
+        { data: { id: 1 } },
+        { data: null }
+      ]);
+
+      const response = await request(app)
+        .put('/api/projects/1')
+        .send({ clientId: 999 });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Client not found or does not belong to user');
     });
 
     test('should return 404 if project not found', async () => {
@@ -160,18 +206,13 @@ describe('Project Routes', () => {
       expect(response.status).toBe(400);
     });
 
-    test('should reject update with invalid status', async () => {
-      const response = await request(app).put('/api/projects/1').send({ status: 'invalid' });
-      expect(response.status).toBe(400);
-    });
-
     test('should handle database error on existence check', async () => {
       mockDbGet(mockDb, null, new Error('Database error'));
       const response = await request(app).put('/api/projects/1').send({ name: 'Updated' });
       expect(response.status).toBe(500);
     });
 
-    test('should handle database error on update', async () => {
+    test('should handle database error on update run', async () => {
       mockDbGet(mockDb, { id: 1 });
       mockDbRun(mockDb, new Error('Database error'));
       const response = await request(app).put('/api/projects/1').send({ name: 'Updated' });

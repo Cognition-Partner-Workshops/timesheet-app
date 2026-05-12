@@ -2,7 +2,7 @@ const express = require('express');
 const { getDatabase } = require('../database/init');
 const { authenticateUser } = require('../middleware/auth');
 const { projectSchema, updateProjectSchema } = require('../validation/schemas');
-const { parseResourceId, handleDbError, findOwnedResource, buildDynamicUpdate } = require('./helpers');
+const { parseResourceId, handleDbError, findOwnedResource, verifyClientOwnership, buildDynamicUpdate } = require('./helpers');
 
 const router = express.Router();
 
@@ -60,19 +60,21 @@ router.post('/', (req, res, next) => {
     if (error) return next(error);
 
     const { name, description, clientId, startDate, status } = value;
-    const db = getDatabase();
 
-    db.run(
-      'INSERT INTO projects (name, description, client_id, start_date, status, user_email) VALUES (?, ?, ?, ?, ?, ?)',
-      [name, description || null, clientId || null, startDate || null, status || 'active', req.userEmail],
-      function(err) {
-        if (err) return handleDbError(res, err, 'Failed to create project');
-        fetchProjectById(db, this.lastID, (err, row) => {
-          if (err) return handleDbError(res, err, 'Project created but failed to retrieve');
-          res.status(201).json({ message: 'Project created successfully', project: row });
-        });
-      }
-    );
+    verifyClientOwnership(clientId, req.userEmail, res, () => {
+      const db = getDatabase();
+      db.run(
+        'INSERT INTO projects (name, description, client_id, start_date, status, user_email) VALUES (?, ?, ?, ?, ?, ?)',
+        [name, description || null, clientId || null, startDate || null, status || 'active', req.userEmail],
+        function(err) {
+          if (err) return handleDbError(res, err, 'Failed to create project');
+          fetchProjectById(db, this.lastID, (err, row) => {
+            if (err) return handleDbError(res, err, 'Project created but failed to retrieve');
+            res.status(201).json({ message: 'Project created successfully', project: row });
+          });
+        }
+      );
+    });
   } catch (error) {
     next(error);
   }
@@ -90,21 +92,23 @@ router.put('/:id', (req, res, next) => {
       if (err) return handleDbError(res, err);
       if (!row) return res.status(404).json({ error: 'Project not found' });
 
-      const { updates, values } = buildDynamicUpdate('projects', PROJECT_FIELD_MAP, value);
-      values.push(projectId, req.userEmail);
+      verifyClientOwnership(value.clientId, req.userEmail, res, () => {
+        const { updates, values } = buildDynamicUpdate('projects', PROJECT_FIELD_MAP, value);
+        values.push(projectId, req.userEmail);
 
-      const db = getDatabase();
-      db.run(
-        `UPDATE projects SET ${updates.join(', ')} WHERE id = ? AND user_email = ?`,
-        values,
-        function(err) {
-          if (err) return handleDbError(res, err, 'Failed to update project');
-          fetchProjectById(db, projectId, (err, row) => {
-            if (err) return handleDbError(res, err, 'Project updated but failed to retrieve');
-            res.json({ message: 'Project updated successfully', project: row });
-          });
-        }
-      );
+        const db = getDatabase();
+        db.run(
+          `UPDATE projects SET ${updates.join(', ')} WHERE id = ? AND user_email = ?`,
+          values,
+          function(err) {
+            if (err) return handleDbError(res, err, 'Failed to update project');
+            fetchProjectById(db, projectId, (err, row) => {
+              if (err) return handleDbError(res, err, 'Project updated but failed to retrieve');
+              res.json({ message: 'Project updated successfully', project: row });
+            });
+          }
+        );
+      });
     });
   } catch (error) {
     next(error);
