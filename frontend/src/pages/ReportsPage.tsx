@@ -1,3 +1,14 @@
+/**
+ * @fileoverview Client time-report page with export functionality.
+ *
+ * Lets the user select a client from a dropdown, view aggregated KPIs
+ * (total hours, entry count, average hours/entry), and browse the detailed
+ * work-entry table. Reports can be exported as CSV or PDF via browser blob
+ * downloads.
+ *
+ * @module pages/ReportsPage
+ */
+
 import React, { useState } from 'react';
 import {
   Box,
@@ -31,6 +42,12 @@ import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
 import { type ClientReport } from '../types/api';
 
+/**
+ * Report viewer with client selector and CSV/PDF export.
+ *
+ * The report query is only enabled once a client is selected
+ * (`selectedClientId > 0`), avoiding unnecessary network calls.
+ */
 const ReportsPage: React.FC = () => {
   const [selectedClientId, setSelectedClientId] = useState<number>(0);
   const [error, setError] = useState('');
@@ -40,6 +57,7 @@ const ReportsPage: React.FC = () => {
     queryFn: () => apiClient.getClients(),
   });
 
+  // Only fetch the report when a client is selected.
   const { data: reportData, isLoading: reportLoading } = useQuery({
     queryKey: ['clientReport', selectedClientId],
     queryFn: () => apiClient.getClientReport(selectedClientId),
@@ -49,6 +67,11 @@ const ReportsPage: React.FC = () => {
   const clients = clientsData?.clients || [];
   const report = reportData as ClientReport | undefined;
 
+  /**
+   * Download the selected client's report as a CSV file.
+   * Creates a temporary object URL, triggers a click-based download, then
+   * revokes the URL to free memory.
+   */
   const handleExportCsv = async () => {
     if (!selectedClientId) return;
     
@@ -69,6 +92,10 @@ const ReportsPage: React.FC = () => {
     }
   };
 
+  /**
+   * Download the selected client's report as a PDF file.
+   * Uses the same blob-download pattern as {@link handleExportCsv}.
+   */
   const handleExportPdf = async () => {
     if (!selectedClientId) return;
 

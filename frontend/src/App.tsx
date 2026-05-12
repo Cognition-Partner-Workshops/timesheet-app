@@ -1,3 +1,12 @@
+/**
+ * @fileoverview Root React component and application provider tree.
+ *
+ * Sets up the global providers (React Query, MUI Theme, Auth) and defines
+ * the top-level route structure with authentication-guarded routes.
+ *
+ * @module App
+ */
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -12,6 +21,10 @@ import ClientsPage from './pages/ClientsPage';
 import WorkEntriesPage from './pages/WorkEntriesPage';
 import ReportsPage from './pages/ReportsPage';
 
+/**
+ * Application-wide MUI theme.
+ * Customizes the primary (blue) and secondary (pink) palette colors.
+ */
 const theme = createTheme({
   palette: {
     primary: {
@@ -23,6 +36,11 @@ const theme = createTheme({
   },
 });
 
+/**
+ * TanStack Query client with conservative defaults:
+ * - Single retry on failed queries
+ * - No automatic refetch on window focus (avoids unexpected data reloads)
+ */
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -32,6 +50,13 @@ const queryClient = new QueryClient({
   },
 });
 
+/**
+ * Inner component that reads auth state and renders either the authenticated
+ * layout (with sidebar navigation) or redirects to the login page.
+ *
+ * Separated from {@link App} so that it can call `useAuth` inside the
+ * provider boundary.
+ */
 const AppContent: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
   
@@ -67,6 +92,15 @@ const AppContent: React.FC = () => {
   );
 };
 
+/**
+ * Root component that assembles the global provider tree.
+ *
+ * Provider order (outermost → innermost):
+ * 1. **QueryClientProvider** – server-state caching (TanStack Query)
+ * 2. **ThemeProvider** + CssBaseline – MUI theming and CSS reset
+ * 3. **AuthProvider** – authentication context
+ * 4. **AppContent** – routing and page rendering
+ */
 const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>

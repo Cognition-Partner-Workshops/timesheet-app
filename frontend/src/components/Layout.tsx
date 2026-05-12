@@ -1,3 +1,13 @@
+/**
+ * @fileoverview Application shell layout with responsive navigation drawer.
+ *
+ * Renders a persistent sidebar on desktop (≥ 600 px) and a temporary drawer
+ * on mobile. The top AppBar displays the current page title, user avatar, and
+ * a logout button.
+ *
+ * @module components/Layout
+ */
+
 import React, { type ReactNode } from 'react';
 import {
   AppBar,
@@ -26,22 +36,31 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
+/** Fixed width (px) of the sidebar navigation drawer. */
 const drawerWidth = 240;
 
 interface LayoutProps {
   children: ReactNode;
 }
 
+/**
+ * Top-level layout wrapper that provides:
+ * - A responsive MUI Drawer for primary navigation
+ * - An AppBar with the current page title and user controls
+ * - A main content area that renders child routes
+ */
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = React.useState(false);
 
+  /** Toggle the temporary (mobile) drawer open/closed. */
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
 
+  /** Navigation items rendered inside both the permanent and temporary drawers. */
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
     { text: 'Clients', icon: <BusinessIcon />, path: '/clients' },

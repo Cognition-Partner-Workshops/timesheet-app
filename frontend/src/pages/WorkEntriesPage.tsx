@@ -1,3 +1,14 @@
+/**
+ * @fileoverview Work entry (time-log) management page.
+ *
+ * Lists all work entries in a table with client name, date, hours, and
+ * description columns. Provides a dialog form for creating/editing entries
+ * with a date picker (MUI X) and a client dropdown. Requires at least one
+ * client to exist before entries can be added.
+ *
+ * @module pages/WorkEntriesPage
+ */
+
 import React, { useState } from 'react';
 import {
   Box,
@@ -36,6 +47,15 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import apiClient from '../api/client';
 import { type WorkEntry } from '../types/api';
 
+/**
+ * CRUD page for time-tracking work entries.
+ *
+ * State overview:
+ * - `open` — controls the create/edit dialog visibility
+ * - `editingEntry` — when set, the dialog operates in edit mode
+ * - `formData` — mirrors the dialog fields (clientId, hours, description, date)
+ * - `error` — inline error message shown on validation or mutation failure
+ */
 const WorkEntriesPage: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<WorkEntry | null>(null);
@@ -59,6 +79,7 @@ const WorkEntriesPage: React.FC = () => {
     queryFn: () => apiClient.getClients(),
   });
 
+  /** Create a new work entry and close the dialog on success. */
   const createMutation = useMutation({
     mutationFn: (entryData: { clientId: number; hours: number; description?: string; date: string }) =>
       apiClient.createWorkEntry(entryData),
@@ -72,6 +93,7 @@ const WorkEntriesPage: React.FC = () => {
     },
   });
 
+  /** Update an existing work entry and close the dialog on success. */
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: { clientId?: number; hours?: number; description?: string; date?: string } }) =>
       apiClient.updateWorkEntry(id, data),
@@ -85,6 +107,7 @@ const WorkEntriesPage: React.FC = () => {
     },
   });
 
+  /** Delete a work entry by ID. */
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiClient.deleteWorkEntry(id),
     onSuccess: () => {
@@ -99,6 +122,10 @@ const WorkEntriesPage: React.FC = () => {
   const workEntries = workEntriesData?.workEntries || [];
   const clients = clientsData?.clients || [];
 
+  /**
+   * Open the create/edit dialog.
+   * @param entry - When provided the dialog is pre-populated for editing.
+   */
   const handleOpen = (entry?: WorkEntry) => {
     if (entry) {
       setEditingEntry(entry);
@@ -121,6 +148,7 @@ const WorkEntriesPage: React.FC = () => {
     setOpen(true);
   };
 
+  /** Reset form state and close the dialog. */
   const handleClose = () => {
     setOpen(false);
     setEditingEntry(null);
@@ -133,6 +161,10 @@ const WorkEntriesPage: React.FC = () => {
     setError('');
   };
 
+  /**
+   * Validate form input (client selection, hours range, date) and trigger
+   * either the create or update mutation.
+   */
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -170,6 +202,7 @@ const WorkEntriesPage: React.FC = () => {
     }
   };
 
+  /** Prompt for confirmation then delete a single work entry. */
   const handleDelete = (entry: WorkEntry) => {
     if (window.confirm(`Are you sure you want to delete this ${entry.hours} hour entry for ${entry.client_name}?`)) {
       deleteMutation.mutate(entry.id);

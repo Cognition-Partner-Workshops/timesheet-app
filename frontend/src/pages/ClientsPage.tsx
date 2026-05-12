@@ -1,3 +1,14 @@
+/**
+ * @fileoverview Client management page.
+ *
+ * Provides a data table of all clients with inline edit/delete actions, a
+ * "Clear All" bulk-delete button, and a dialog form for creating or updating
+ * individual client records. All mutations invalidate the `['clients']` query
+ * key so the table stays in sync with the server.
+ *
+ * @module pages/ClientsPage
+ */
+
 import React, { useState } from 'react';
 import {
   Box,
@@ -30,6 +41,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
 import { type Client } from '../types/api';
 
+/**
+ * CRUD page for managing client records.
+ *
+ * State overview:
+ * - `open` — controls the create/edit dialog visibility
+ * - `editingClient` — when set, the dialog operates in edit mode
+ * - `formData` — mirrors the dialog fields (name, description, department, email)
+ * - `error` — inline error message shown on mutation failure
+ */
 const ClientsPage: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -43,6 +63,7 @@ const ClientsPage: React.FC = () => {
     queryFn: () => apiClient.getClients(),
   });
 
+  /** Create a new client and close the dialog on success. */
   const createMutation = useMutation({
     mutationFn: (clientData: { name: string; description?: string; department?: string; email?: string }) =>
       apiClient.createClient(clientData),
@@ -56,6 +77,7 @@ const ClientsPage: React.FC = () => {
     },
   });
 
+  /** Update an existing client and close the dialog on success. */
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: { name?: string; description?: string; department?: string; email?: string } }) =>
       apiClient.updateClient(id, data),
@@ -69,6 +91,7 @@ const ClientsPage: React.FC = () => {
     },
   });
 
+  /** Delete a single client (cascade-deletes associated work entries). */
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiClient.deleteClient(id),
     onSuccess: () => {
@@ -80,6 +103,7 @@ const ClientsPage: React.FC = () => {
     },
   });
 
+  /** Bulk-delete all clients for the authenticated user. */
   const deleteAllMutation = useMutation({
     mutationFn: () => apiClient.deleteAllClients(),
     onSuccess: () => {
@@ -93,6 +117,10 @@ const ClientsPage: React.FC = () => {
 
   const clients = clientsData?.clients || [];
 
+  /**
+   * Open the create/edit dialog.
+   * @param client - When provided the dialog is pre-populated for editing.
+   */
   const handleOpen = (client?: Client) => {
     if (client) {
       setEditingClient(client);
@@ -110,6 +138,7 @@ const ClientsPage: React.FC = () => {
     setOpen(true);
   };
 
+  /** Reset form state and close the dialog. */
   const handleClose = () => {
     setOpen(false);
     setEditingClient(null);
@@ -117,6 +146,7 @@ const ClientsPage: React.FC = () => {
     setError('');
   };
 
+  /** Validate form input and trigger either the create or update mutation. */
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -146,12 +176,14 @@ const ClientsPage: React.FC = () => {
     }
   };
 
+  /** Prompt for confirmation then delete a single client. */
   const handleDelete = (client: Client) => {
     if (window.confirm(`Are you sure you want to delete "${client.name}"?`)) {
       deleteMutation.mutate(client.id);
     }
   };
 
+  /** Prompt for confirmation then delete all clients. */
   const handleDeleteAll = () => {
     if (window.confirm('Are you sure you want to delete ALL clients? This action cannot be undone.')) {
       deleteAllMutation.mutate();
