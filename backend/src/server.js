@@ -22,11 +22,14 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
-});
+// Rate limiting — configurable via RATE_LIMIT_MAX (default: 100 per 15-min window)
+const rateLimitMax = process.env.RATE_LIMIT_MAX !== undefined
+  ? parseInt(process.env.RATE_LIMIT_MAX, 10)
+  : 100;
+const rateLimitWindowMs = process.env.RATE_LIMIT_WINDOW_MS !== undefined
+  ? parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10)
+  : 15 * 60 * 1000;
+const limiter = rateLimit({ windowMs: rateLimitWindowMs, max: rateLimitMax });
 app.use(limiter);
 
 // Logging
