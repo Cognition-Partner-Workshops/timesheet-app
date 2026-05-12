@@ -1,5 +1,6 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const { createProjectsTable, createProjectsIndexes } = require('./schema');
 
 let db = null;
 let isClosing = false;
@@ -27,7 +28,6 @@ async function initializeDatabase() {
   
   return new Promise((resolve, reject) => {
     database.serialize(() => {
-      // Create users table
       database.run(`
         CREATE TABLE IF NOT EXISTS users (
           email TEXT PRIMARY KEY,
@@ -35,7 +35,6 @@ async function initializeDatabase() {
         )
       `);
 
-      // Create clients table
       database.run(`
         CREATE TABLE IF NOT EXISTS clients (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,7 +49,6 @@ async function initializeDatabase() {
         )
       `);
 
-      // Create work_entries table
       database.run(`
         CREATE TABLE IF NOT EXISTS work_entries (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -66,31 +64,13 @@ async function initializeDatabase() {
         )
       `);
 
-      // Create projects table
-      database.run(`
-        CREATE TABLE IF NOT EXISTS projects (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          description TEXT,
-          client_id INTEGER,
-          start_date DATE,
-          status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'completed', 'on-hold')),
-          user_email TEXT NOT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE SET NULL,
-          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
-        )
-      `);
+      createProjectsTable(database);
 
-      // Create indexes for better performance
       database.run(`CREATE INDEX IF NOT EXISTS idx_clients_user_email ON clients (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_client_id ON work_entries (client_id)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_user_email ON work_entries (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_date ON work_entries (date)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_projects_user_email ON projects (user_email)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_projects_client_id ON projects (client_id)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_projects_status ON projects (status)`);
+      createProjectsIndexes(database);
 
       console.log('Database tables created successfully');
       resolve();
