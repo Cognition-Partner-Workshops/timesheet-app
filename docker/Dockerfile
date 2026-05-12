@@ -49,13 +49,12 @@ COPY docker/overrides/server.js ./src/server.js
 # Copy built frontend to be served by backend
 COPY --from=frontend-builder /app/frontend/dist ./public
 
-# Set environment variables
+# Set environment variables (DB_PASSWORD must be provided at runtime)
 ENV NODE_ENV=production
 ENV PORT=3001
 ENV DB_HOST=mysql
 ENV DB_PORT=3306
 ENV DB_USER=timesheet
-ENV DB_PASSWORD=timesheet
 ENV DB_NAME=timesheet
 
 # Switch to non-root user
