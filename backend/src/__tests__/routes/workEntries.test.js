@@ -619,102 +619,52 @@ describe('Work Entry Routes', () => {
   });
 
   describe('POST /api/work-entries - Boundary Conditions', () => {
-    test('should accept exactly 24 hours', async () => {
+    function setupSuccessfulCreate(entryOverrides = {}) {
+      const entry = { id: 1, client_name: 'Client A', ...entryOverrides };
       mockDb.get.mockImplementation((query, params, callback) => {
-        if (query.includes('clients')) {
-          callback(null, { id: 1 });
-        } else {
-          callback(null, { id: 1, hours: 24, client_name: 'Client A' });
-        }
+        callback(null, query.includes('clients') ? { id: 1 } : entry);
       });
-
       mockDb.run.mockImplementation(function(query, params, callback) {
         this.lastID = 1;
         callback.call(this, null);
       });
+    }
 
+    test('should accept exactly 24 hours', async () => {
+      setupSuccessfulCreate({ hours: 24 });
       const response = await request(app)
         .post('/api/work-entries')
-        .send({
-          clientId: 1,
-          hours: 24,
-          date: '2024-01-15'
-        });
-
+        .send({ clientId: 1, hours: 24, date: '2024-01-15' });
       expect(response.status).toBe(201);
     });
 
     test('should accept minimum positive hours (0.01)', async () => {
-      mockDb.get.mockImplementation((query, params, callback) => {
-        if (query.includes('clients')) {
-          callback(null, { id: 1 });
-        } else {
-          callback(null, { id: 1, hours: 0.01, client_name: 'Client A' });
-        }
-      });
-
-      mockDb.run.mockImplementation(function(query, params, callback) {
-        this.lastID = 1;
-        callback.call(this, null);
-      });
-
+      setupSuccessfulCreate({ hours: 0.01 });
       const response = await request(app)
         .post('/api/work-entries')
-        .send({
-          clientId: 1,
-          hours: 0.01,
-          date: '2024-01-15'
-        });
-
+        .send({ clientId: 1, hours: 0.01, date: '2024-01-15' });
       expect(response.status).toBe(201);
     });
 
     test('should reject zero hours', async () => {
       const response = await request(app)
         .post('/api/work-entries')
-        .send({
-          clientId: 1,
-          hours: 0,
-          date: '2024-01-15'
-        });
-
+        .send({ clientId: 1, hours: 0, date: '2024-01-15' });
       expect(response.status).toBe(400);
     });
 
     test('should create work entry without description', async () => {
-      mockDb.get.mockImplementation((query, params, callback) => {
-        if (query.includes('clients')) {
-          callback(null, { id: 1 });
-        } else {
-          callback(null, { id: 1, description: null, client_name: 'Client A' });
-        }
-      });
-
-      mockDb.run.mockImplementation(function(query, params, callback) {
-        this.lastID = 1;
-        callback.call(this, null);
-      });
-
+      setupSuccessfulCreate({ description: null });
       const response = await request(app)
         .post('/api/work-entries')
-        .send({
-          clientId: 1,
-          hours: 5,
-          date: '2024-01-15'
-        });
-
+        .send({ clientId: 1, hours: 5, date: '2024-01-15' });
       expect(response.status).toBe(201);
     });
 
     test('should reject invalid date format', async () => {
       const response = await request(app)
         .post('/api/work-entries')
-        .send({
-          clientId: 1,
-          hours: 5,
-          date: '15-01-2024'
-        });
-
+        .send({ clientId: 1, hours: 5, date: '15-01-2024' });
       expect(response.status).toBe(400);
     });
   });

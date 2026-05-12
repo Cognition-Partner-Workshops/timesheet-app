@@ -454,20 +454,21 @@ describe('Client Routes', () => {
       expect(response.status).toBe(200);
     });
 
-    test('should update client department field', async () => {
-      const updatedClient = { id: 1, name: 'Client', department: 'Engineering' };
-
+    function setupSuccessfulUpdate(updatedClient) {
       mockDb.get.mockImplementationOnce((query, params, callback) => {
         callback(null, { id: 1 });
       });
-
       mockDb.run.mockImplementation((query, params, callback) => {
         callback(null);
       });
-
       mockDb.get.mockImplementationOnce((query, params, callback) => {
         callback(null, updatedClient);
       });
+    }
+
+    test('should update client department field', async () => {
+      const updatedClient = { id: 1, name: 'Client', department: 'Engineering' };
+      setupSuccessfulUpdate(updatedClient);
 
       const response = await request(app)
         .put('/api/clients/1')
@@ -479,18 +480,7 @@ describe('Client Routes', () => {
 
     test('should update client email field', async () => {
       const updatedClient = { id: 1, name: 'Client', email: 'client@example.com' };
-
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1 });
-      });
-
-      mockDb.run.mockImplementation((query, params, callback) => {
-        callback(null);
-      });
-
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, updatedClient);
-      });
+      setupSuccessfulUpdate(updatedClient);
 
       const response = await request(app)
         .put('/api/clients/1')
@@ -502,24 +492,10 @@ describe('Client Routes', () => {
 
     test('should update all client fields at once', async () => {
       const updatedClient = {
-        id: 1,
-        name: 'New Name',
-        description: 'New Desc',
-        department: 'Sales',
-        email: 'new@example.com'
+        id: 1, name: 'New Name', description: 'New Desc',
+        department: 'Sales', email: 'new@example.com'
       };
-
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1 });
-      });
-
-      mockDb.run.mockImplementation((query, params, callback) => {
-        callback(null);
-      });
-
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, updatedClient);
-      });
+      setupSuccessfulUpdate(updatedClient);
 
       const response = await request(app)
         .put('/api/clients/1')

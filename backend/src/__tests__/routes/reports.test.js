@@ -438,7 +438,7 @@ describe('Report Routes', () => {
       );
     });
 
-    test('should generate PDF with work entries and pipe to response', async () => {
+    function setupStreamablePdfMock(yPosition = 100) {
       const PDFDocument = require('pdfkit');
       PDFDocument.mockImplementation(() => {
         let writable = null;
@@ -452,23 +452,27 @@ describe('Report Routes', () => {
           addPage: jest.fn().mockReturnThis(),
           pipe: jest.fn((stream) => { writable = stream; }),
           end: jest.fn(() => { if (writable && writable.end) writable.end(); }),
-          y: 100
+          y: yPosition
         };
       });
+      return PDFDocument;
+    }
 
-      const mockClient = { id: 1, name: 'Test Client' };
-      const mockWorkEntries = [
+    function setupPdfDbMocks(client, workEntries) {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, client);
+      });
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, workEntries);
+      });
+    }
+
+    test('should generate PDF with work entries and pipe to response', async () => {
+      const PDFDocument = setupStreamablePdfMock();
+      setupPdfDbMocks({ id: 1, name: 'Test Client' }, [
         { date: '2024-01-01', hours: 5, description: 'Development work', created_at: '2024-01-01' },
         { date: '2024-01-02', hours: 3.5, description: 'Testing', created_at: '2024-01-02' }
-      ];
-
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, mockWorkEntries);
-      });
+      ]);
 
       const response = await request(app).get('/api/reports/export/pdf/1');
 
@@ -481,32 +485,8 @@ describe('Report Routes', () => {
     });
 
     test('should generate PDF with empty work entries', async () => {
-      const PDFDocument = require('pdfkit');
-      PDFDocument.mockImplementation(() => {
-        let writable = null;
-        return {
-          fontSize: jest.fn().mockReturnThis(),
-          text: jest.fn().mockReturnThis(),
-          moveDown: jest.fn().mockReturnThis(),
-          moveTo: jest.fn().mockReturnThis(),
-          lineTo: jest.fn().mockReturnThis(),
-          stroke: jest.fn().mockReturnThis(),
-          addPage: jest.fn().mockReturnThis(),
-          pipe: jest.fn((stream) => { writable = stream; }),
-          end: jest.fn(() => { if (writable && writable.end) writable.end(); }),
-          y: 100
-        };
-      });
-
-      const mockClient = { id: 1, name: 'Empty Client' };
-
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, []);
-      });
+      const PDFDocument = setupStreamablePdfMock();
+      setupPdfDbMocks({ id: 1, name: 'Empty Client' }, []);
 
       const response = await request(app).get('/api/reports/export/pdf/1');
 
@@ -517,35 +497,10 @@ describe('Report Routes', () => {
     });
 
     test('should handle work entry without description in PDF', async () => {
-      const PDFDocument = require('pdfkit');
-      PDFDocument.mockImplementation(() => {
-        let writable = null;
-        return {
-          fontSize: jest.fn().mockReturnThis(),
-          text: jest.fn().mockReturnThis(),
-          moveDown: jest.fn().mockReturnThis(),
-          moveTo: jest.fn().mockReturnThis(),
-          lineTo: jest.fn().mockReturnThis(),
-          stroke: jest.fn().mockReturnThis(),
-          addPage: jest.fn().mockReturnThis(),
-          pipe: jest.fn((stream) => { writable = stream; }),
-          end: jest.fn(() => { if (writable && writable.end) writable.end(); }),
-          y: 100
-        };
-      });
-
-      const mockClient = { id: 1, name: 'Test Client' };
-      const mockWorkEntries = [
+      const PDFDocument = setupStreamablePdfMock();
+      setupPdfDbMocks({ id: 1, name: 'Test Client' }, [
         { date: '2024-01-01', hours: 4, description: null, created_at: '2024-01-01' }
-      ];
-
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, mockWorkEntries);
-      });
+      ]);
 
       const response = await request(app).get('/api/reports/export/pdf/1');
 
@@ -554,38 +509,10 @@ describe('Report Routes', () => {
     });
 
     test('should add separator line every 5 entries in PDF', async () => {
-      const PDFDocument = require('pdfkit');
-      PDFDocument.mockImplementation(() => {
-        let writable = null;
-        return {
-          fontSize: jest.fn().mockReturnThis(),
-          text: jest.fn().mockReturnThis(),
-          moveDown: jest.fn().mockReturnThis(),
-          moveTo: jest.fn().mockReturnThis(),
-          lineTo: jest.fn().mockReturnThis(),
-          stroke: jest.fn().mockReturnThis(),
-          addPage: jest.fn().mockReturnThis(),
-          pipe: jest.fn((stream) => { writable = stream; }),
-          end: jest.fn(() => { if (writable && writable.end) writable.end(); }),
-          y: 100
-        };
-      });
-
-      const mockClient = { id: 1, name: 'Test Client' };
-      const mockWorkEntries = Array.from({ length: 6 }, (_, i) => ({
-        date: `2024-01-0${i + 1}`,
-        hours: 2,
-        description: `Work ${i + 1}`,
-        created_at: `2024-01-0${i + 1}`
-      }));
-
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, mockWorkEntries);
-      });
+      const PDFDocument = setupStreamablePdfMock();
+      setupPdfDbMocks({ id: 1, name: 'Test Client' }, Array.from({ length: 6 }, (_, i) => ({
+        date: `2024-01-0${i + 1}`, hours: 2, description: `Work ${i + 1}`, created_at: `2024-01-0${i + 1}`
+      })));
 
       const response = await request(app).get('/api/reports/export/pdf/1');
 
@@ -595,35 +522,10 @@ describe('Report Routes', () => {
     });
 
     test('should add new page when y exceeds 700 in PDF', async () => {
-      const PDFDocument = require('pdfkit');
-      PDFDocument.mockImplementation(() => {
-        let writable = null;
-        return {
-          fontSize: jest.fn().mockReturnThis(),
-          text: jest.fn().mockReturnThis(),
-          moveDown: jest.fn().mockReturnThis(),
-          moveTo: jest.fn().mockReturnThis(),
-          lineTo: jest.fn().mockReturnThis(),
-          stroke: jest.fn().mockReturnThis(),
-          addPage: jest.fn().mockReturnThis(),
-          pipe: jest.fn((stream) => { writable = stream; }),
-          end: jest.fn(() => { if (writable && writable.end) writable.end(); }),
-          y: 750
-        };
-      });
-
-      const mockClient = { id: 1, name: 'Test Client' };
-      const mockWorkEntries = [
+      const PDFDocument = setupStreamablePdfMock(750);
+      setupPdfDbMocks({ id: 1, name: 'Test Client' }, [
         { date: '2024-01-01', hours: 5, description: 'Work', created_at: '2024-01-01' }
-      ];
-
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, mockWorkEntries);
-      });
+      ]);
 
       const response = await request(app).get('/api/reports/export/pdf/1');
 
@@ -632,32 +534,8 @@ describe('Report Routes', () => {
     });
 
     test('should set correct response headers for PDF download', async () => {
-      const PDFDocument = require('pdfkit');
-      PDFDocument.mockImplementation(() => {
-        let writable = null;
-        return {
-          fontSize: jest.fn().mockReturnThis(),
-          text: jest.fn().mockReturnThis(),
-          moveDown: jest.fn().mockReturnThis(),
-          moveTo: jest.fn().mockReturnThis(),
-          lineTo: jest.fn().mockReturnThis(),
-          stroke: jest.fn().mockReturnThis(),
-          addPage: jest.fn().mockReturnThis(),
-          pipe: jest.fn((stream) => { writable = stream; }),
-          end: jest.fn(() => { if (writable && writable.end) writable.end(); }),
-          y: 100
-        };
-      });
-
-      const mockClient = { id: 1, name: 'Test Client' };
-
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, []);
-      });
+      setupStreamablePdfMock();
+      setupPdfDbMocks({ id: 1, name: 'Test Client' }, []);
 
       const response = await request(app).get('/api/reports/export/pdf/1');
 
@@ -666,26 +544,25 @@ describe('Report Routes', () => {
   });
 
   describe('CSV Export Success Path - Download', () => {
-    test('should configure CSV writer with correct headers and call writeRecords', async () => {
-      const mockClient = { id: 1, name: 'Test Client' };
-      const mockWorkEntries = [
-        { date: '2024-01-01', hours: 5, description: 'Work 1', created_at: '2024-01-01' }
-      ];
-
+    function setupCsvTest(client, workEntries = []) {
       mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
+        callback(null, client);
       });
-
       mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, mockWorkEntries);
+        callback(null, workEntries);
       });
-
       const csvWriter = require('csv-writer');
-      csvWriter.createObjectCsvWriter.mockReturnValue({
-        writeRecords: jest.fn().mockRejectedValue(new Error('Write failed'))
-      });
+      const mockWriteRecords = jest.fn().mockRejectedValue(new Error('Write failed'));
+      csvWriter.createObjectCsvWriter.mockReturnValue({ writeRecords: mockWriteRecords });
+      return { csvWriter, mockWriteRecords };
+    }
 
-      const response = await request(app).get('/api/reports/export/csv/1');
+    test('should configure CSV writer with correct headers and call writeRecords', async () => {
+      const { csvWriter } = setupCsvTest({ id: 1, name: 'Test Client' }, [
+        { date: '2024-01-01', hours: 5, description: 'Work 1', created_at: '2024-01-01' }
+      ]);
+
+      await request(app).get('/api/reports/export/csv/1');
 
       expect(csvWriter.createObjectCsvWriter).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -700,21 +577,7 @@ describe('Report Routes', () => {
     });
 
     test('should pass correct records to CSV writeRecords', async () => {
-      const mockClient = { id: 1, name: 'Empty Client' };
-
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, []);
-      });
-
-      const csvWriter = require('csv-writer');
-      const mockWriteRecords = jest.fn().mockRejectedValue(new Error('Write failed'));
-      csvWriter.createObjectCsvWriter.mockReturnValue({
-        writeRecords: mockWriteRecords
-      });
+      const { mockWriteRecords } = setupCsvTest({ id: 1, name: 'Empty Client' });
 
       await request(app).get('/api/reports/export/csv/1');
 
@@ -722,20 +585,7 @@ describe('Report Routes', () => {
     });
 
     test('should sanitize special characters in client name for CSV filename', async () => {
-      const mockClient = { id: 1, name: 'Client @#$% Special' };
-
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, []);
-      });
-
-      const csvWriter = require('csv-writer');
-      csvWriter.createObjectCsvWriter.mockReturnValue({
-        writeRecords: jest.fn().mockRejectedValue(new Error('Write failed'))
-      });
+      const { csvWriter } = setupCsvTest({ id: 1, name: 'Client @#$% Special' });
 
       await request(app).get('/api/reports/export/csv/1');
 
@@ -744,20 +594,7 @@ describe('Report Routes', () => {
     });
 
     test('should use correct temp directory path for CSV', async () => {
-      const mockClient = { id: 1, name: 'Test Client' };
-
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, []);
-      });
-
-      const csvWriter = require('csv-writer');
-      csvWriter.createObjectCsvWriter.mockReturnValue({
-        writeRecords: jest.fn().mockRejectedValue(new Error('Write failed'))
-      });
+      const { csvWriter } = setupCsvTest({ id: 1, name: 'Test Client' });
 
       await request(app).get('/api/reports/export/csv/1');
 
