@@ -110,7 +110,7 @@ const ProjectsPage: React.FC = () => {
         name: project.name,
         description: project.description || '',
         clientId: String(project.client_id),
-        startDate: project.start_date,
+        startDate: new Date(project.start_date).toISOString().split('T')[0],
         status: project.status,
       });
     } else {
