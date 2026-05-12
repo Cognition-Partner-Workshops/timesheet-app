@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import axios from 'axios';
 import apiClient from '../api/client';
 import { type ChatMessage } from '../components/ChatMessageList';
 
@@ -13,7 +14,7 @@ export function useChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const checkBotStatus = async () => {
+  const checkBotStatus = useCallback(async () => {
     try {
       const status = await apiClient.getChatStatus();
       setBotAvailable(status.available);
@@ -22,7 +23,7 @@ export function useChat() {
       setBotAvailable(false);
       return { available: false, features: [] };
     }
-  };
+  }, []);
 
   const sendMessage = async (messageText?: string) => {
     const text = messageText || input.trim();
@@ -50,10 +51,22 @@ export function useChat() {
 
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (error: unknown) {
-      const errMsg = error instanceof Error ? error.message : 'Failed to get response';
+      let content = 'Sorry, something went wrong. Please try again.';
+
+      if (axios.isAxiosError(error) && error.response?.data) {
+        const data = error.response.data;
+        if (data.fallback && data.response) {
+          content = data.response;
+        } else if (data.details) {
+          content = data.details;
+        }
+      } else if (error instanceof Error) {
+        content = `Sorry, I encountered an error: ${error.message}. Please try again.`;
+      }
+
       const errorMessage: ChatMessage = {
         role: 'assistant',
-        content: `Sorry, I encountered an error: ${errMsg}. Please try again.`,
+        content,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);

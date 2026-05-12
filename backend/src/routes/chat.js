@@ -200,7 +200,7 @@ router.get('/status', (req, res) => {
 function getFallbackResponse(message) {
   const lower = (message || '').toLowerCase();
 
-  if (lower.includes('data') && (lower.includes('lost') || lower.includes('gone') || lower.includes('disappeared'))) {
+  if (lower.includes('data') && (lower.includes('lost') || lower.includes('gone') || lower.includes('disappear'))) {
     return 'This application uses an in-memory SQLite database. All data is lost when the backend server restarts. To fix this, modify `backend/src/database/init.js` to use a file-based SQLite database instead of `:memory:`. Change the Database constructor call to use a file path like `./data/timesheet.db`.';
   }
 
