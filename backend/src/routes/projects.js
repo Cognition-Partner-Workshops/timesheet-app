@@ -5,26 +5,45 @@ const { projectSchema, updateProjectSchema } = require('../validation/schemas');
 
 const router = express.Router();
 
-// All routes require authentication
 router.use(authenticateUser);
+
+const PROJECT_SELECT = `SELECT p.id, p.name, p.description, p.client_id, p.start_date, p.status,
+       p.created_at, p.updated_at, c.name as client_name
+FROM projects p
+LEFT JOIN clients c ON p.client_id = c.id`;
+
+function parseId(raw) {
+  const id = parseInt(raw);
+  return isNaN(id) ? null : id;
+}
+
+function dbError(res, message) {
+  return (err) => {
+    console.error('Database error:', err);
+    res.status(500).json({ error: message || 'Internal server error' });
+  };
+}
+
+function verifyClientOwnership(db, clientId, userEmail, callback) {
+  db.get(
+    'SELECT id FROM clients WHERE id = ? AND user_email = ?',
+    [clientId, userEmail],
+    (err, row) => {
+      if (err) return callback(err);
+      if (!row) return callback(null, false);
+      callback(null, true);
+    }
+  );
+}
 
 // Get all projects for authenticated user
 router.get('/', (req, res) => {
   const db = getDatabase();
-  
   db.all(
-    `SELECT p.id, p.name, p.description, p.client_id, p.start_date, p.status,
-            p.created_at, p.updated_at, c.name as client_name
-     FROM projects p
-     LEFT JOIN clients c ON p.client_id = c.id
-     WHERE p.user_email = ? ORDER BY p.name`,
+    `${PROJECT_SELECT} WHERE p.user_email = ? ORDER BY p.name`,
     [req.userEmail],
     (err, rows) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ error: 'Internal server error' });
-      }
-      
+      if (err) return dbError(res)(err);
       res.json({ projects: rows });
     }
   );
@@ -32,31 +51,16 @@ router.get('/', (req, res) => {
 
 // Get specific project
 router.get('/:id', (req, res) => {
-  const projectId = parseInt(req.params.id);
-  
-  if (isNaN(projectId)) {
-    return res.status(400).json({ error: 'Invalid project ID' });
-  }
-  
+  const projectId = parseId(req.params.id);
+  if (!projectId) return res.status(400).json({ error: 'Invalid project ID' });
+
   const db = getDatabase();
-  
   db.get(
-    `SELECT p.id, p.name, p.description, p.client_id, p.start_date, p.status,
-            p.created_at, p.updated_at, c.name as client_name
-     FROM projects p
-     LEFT JOIN clients c ON p.client_id = c.id
-     WHERE p.id = ? AND p.user_email = ?`,
+    `${PROJECT_SELECT} WHERE p.id = ? AND p.user_email = ?`,
     [projectId, req.userEmail],
     (err, row) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ error: 'Internal server error' });
-      }
-      
-      if (!row) {
-        return res.status(404).json({ error: 'Project not found' });
-      }
-      
+      if (err) return dbError(res)(err);
+      if (!row) return res.status(404).json({ error: 'Project not found' });
       res.json({ project: row });
     }
   );
@@ -66,232 +70,115 @@ router.get('/:id', (req, res) => {
 router.post('/', (req, res, next) => {
   try {
     const { error, value } = projectSchema.validate(req.body);
-    if (error) {
-      return next(error);
-    }
+    if (error) return next(error);
 
     const { name, description, clientId, startDate, status } = value;
     const db = getDatabase();
 
-    // If clientId is provided, verify it belongs to user
-    if (clientId) {
-      db.get(
-        'SELECT id FROM clients WHERE id = ? AND user_email = ?',
-        [clientId, req.userEmail],
-        (err, row) => {
-          if (err) {
-            console.error('Database error:', err);
-            return res.status(500).json({ error: 'Internal server error' });
-          }
-
-          if (!row) {
-            return res.status(400).json({ error: 'Client not found or does not belong to user' });
-          }
-
-          insertProject();
-        }
-      );
-    } else {
-      insertProject();
-    }
-
-    function insertProject() {
+    const doInsert = () => {
       db.run(
         'INSERT INTO projects (name, description, client_id, start_date, status, user_email) VALUES (?, ?, ?, ?, ?, ?)',
         [name, description || null, clientId || null, startDate || null, status || 'active', req.userEmail],
         function(err) {
-          if (err) {
-            console.error('Database error:', err);
-            return res.status(500).json({ error: 'Failed to create project' });
-          }
-
-          // Return the created project with client name
-          db.get(
-            `SELECT p.id, p.name, p.description, p.client_id, p.start_date, p.status,
-                    p.created_at, p.updated_at, c.name as client_name
-             FROM projects p
-             LEFT JOIN clients c ON p.client_id = c.id
-             WHERE p.id = ?`,
-            [this.lastID],
-            (err, row) => {
-              if (err) {
-                console.error('Database error:', err);
-                return res.status(500).json({ error: 'Project created but failed to retrieve' });
-              }
-
-              res.status(201).json({
-                message: 'Project created successfully',
-                project: row
-              });
-            }
-          );
+          if (err) return dbError(res, 'Failed to create project')(err);
+          db.get(`${PROJECT_SELECT} WHERE p.id = ?`, [this.lastID], (err, row) => {
+            if (err) return dbError(res, 'Project created but failed to retrieve')(err);
+            res.status(201).json({ message: 'Project created successfully', project: row });
+          });
         }
       );
+    };
+
+    if (clientId) {
+      verifyClientOwnership(db, clientId, req.userEmail, (err, valid) => {
+        if (err) return dbError(res)(err);
+        if (!valid) return res.status(400).json({ error: 'Client not found or does not belong to user' });
+        doInsert();
+      });
+    } else {
+      doInsert();
     }
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    next(err);
   }
 });
 
 // Update project
 router.put('/:id', (req, res, next) => {
   try {
-    const projectId = parseInt(req.params.id);
-    
-    if (isNaN(projectId)) {
-      return res.status(400).json({ error: 'Invalid project ID' });
-    }
+    const projectId = parseId(req.params.id);
+    if (!projectId) return res.status(400).json({ error: 'Invalid project ID' });
 
     const { error, value } = updateProjectSchema.validate(req.body);
-    if (error) {
-      return next(error);
-    }
+    if (error) return next(error);
 
     const db = getDatabase();
+    const fieldMap = {
+      name: 'name', description: 'description', clientId: 'client_id',
+      startDate: 'start_date', status: 'status'
+    };
 
-    // Check if project exists and belongs to user
     db.get(
       'SELECT id FROM projects WHERE id = ? AND user_email = ?',
       [projectId, req.userEmail],
       (err, row) => {
-        if (err) {
-          console.error('Database error:', err);
-          return res.status(500).json({ error: 'Internal server error' });
-        }
+        if (err) return dbError(res)(err);
+        if (!row) return res.status(404).json({ error: 'Project not found' });
 
-        if (!row) {
-          return res.status(404).json({ error: 'Project not found' });
-        }
-
-        // If clientId is being updated, verify it belongs to user
-        if (value.clientId) {
-          db.get(
-            'SELECT id FROM clients WHERE id = ? AND user_email = ?',
-            [value.clientId, req.userEmail],
-            (err, clientRow) => {
-              if (err) {
-                console.error('Database error:', err);
-                return res.status(500).json({ error: 'Internal server error' });
-              }
-
-              if (!clientRow) {
-                return res.status(400).json({ error: 'Client not found or does not belong to user' });
-              }
-
-              performUpdate();
-            }
-          );
-        } else {
-          performUpdate();
-        }
-
-        function performUpdate() {
-          // Build update query dynamically
+        const doUpdate = () => {
           const updates = [];
           const values = [];
-
-          if (value.name !== undefined) {
-            updates.push('name = ?');
-            values.push(value.name);
+          for (const [key, col] of Object.entries(fieldMap)) {
+            if (value[key] !== undefined) {
+              updates.push(`${col} = ?`);
+              values.push(key === 'status' ? value[key] : (value[key] || null));
+            }
           }
-
-          if (value.description !== undefined) {
-            updates.push('description = ?');
-            values.push(value.description || null);
-          }
-
-          if (value.clientId !== undefined) {
-            updates.push('client_id = ?');
-            values.push(value.clientId || null);
-          }
-
-          if (value.startDate !== undefined) {
-            updates.push('start_date = ?');
-            values.push(value.startDate || null);
-          }
-
-          if (value.status !== undefined) {
-            updates.push('status = ?');
-            values.push(value.status);
-          }
-
           updates.push('updated_at = CURRENT_TIMESTAMP');
           values.push(projectId, req.userEmail);
 
-          const query = `UPDATE projects SET ${updates.join(', ')} WHERE id = ? AND user_email = ?`;
-
-          db.run(query, values, function(err) {
-            if (err) {
-              console.error('Database error:', err);
-              return res.status(500).json({ error: 'Failed to update project' });
-            }
-
-            // Return updated project with client name
-            db.get(
-              `SELECT p.id, p.name, p.description, p.client_id, p.start_date, p.status,
-                      p.created_at, p.updated_at, c.name as client_name
-               FROM projects p
-               LEFT JOIN clients c ON p.client_id = c.id
-               WHERE p.id = ?`,
-              [projectId],
-              (err, row) => {
-                if (err) {
-                  console.error('Database error:', err);
-                  return res.status(500).json({ error: 'Project updated but failed to retrieve' });
-                }
-
-                res.json({
-                  message: 'Project updated successfully',
-                  project: row
-                });
-              }
-            );
+          db.run(`UPDATE projects SET ${updates.join(', ')} WHERE id = ? AND user_email = ?`, values, function(err) {
+            if (err) return dbError(res, 'Failed to update project')(err);
+            db.get(`${PROJECT_SELECT} WHERE p.id = ?`, [projectId], (err, row) => {
+              if (err) return dbError(res, 'Project updated but failed to retrieve')(err);
+              res.json({ message: 'Project updated successfully', project: row });
+            });
           });
+        };
+
+        if (value.clientId) {
+          verifyClientOwnership(db, value.clientId, req.userEmail, (err, valid) => {
+            if (err) return dbError(res)(err);
+            if (!valid) return res.status(400).json({ error: 'Client not found or does not belong to user' });
+            doUpdate();
+          });
+        } else {
+          doUpdate();
         }
       }
     );
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    next(err);
   }
 });
 
 // Delete project
 router.delete('/:id', (req, res) => {
-  const projectId = parseInt(req.params.id);
-  
-  if (isNaN(projectId)) {
-    return res.status(400).json({ error: 'Invalid project ID' });
-  }
-  
+  const projectId = parseId(req.params.id);
+  if (!projectId) return res.status(400).json({ error: 'Invalid project ID' });
+
   const db = getDatabase();
-  
-  // Check if project exists and belongs to user
   db.get(
     'SELECT id FROM projects WHERE id = ? AND user_email = ?',
     [projectId, req.userEmail],
     (err, row) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ error: 'Internal server error' });
-      }
-      
-      if (!row) {
-        return res.status(404).json({ error: 'Project not found' });
-      }
-      
-      // Delete project
-      db.run(
-        'DELETE FROM projects WHERE id = ? AND user_email = ?',
-        [projectId, req.userEmail],
-        function(err) {
-          if (err) {
-            console.error('Database error:', err);
-            return res.status(500).json({ error: 'Failed to delete project' });
-          }
-          
-          res.json({ message: 'Project deleted successfully' });
-        }
-      );
+      if (err) return dbError(res)(err);
+      if (!row) return res.status(404).json({ error: 'Project not found' });
+
+      db.run('DELETE FROM projects WHERE id = ? AND user_email = ?', [projectId, req.userEmail], function(err) {
+        if (err) return dbError(res, 'Failed to delete project')(err);
+        res.json({ message: 'Project deleted successfully' });
+      });
     }
   );
 });
