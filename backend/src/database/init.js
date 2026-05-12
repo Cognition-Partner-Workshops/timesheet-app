@@ -83,14 +83,19 @@ async function initializeDatabase() {
         )
       `);
 
-      // Create indexes for better performance
-      database.run(`CREATE INDEX IF NOT EXISTS idx_clients_user_email ON clients (user_email)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_client_id ON work_entries (client_id)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_user_email ON work_entries (user_email)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_date ON work_entries (date)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_projects_user_email ON projects (user_email)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_projects_client_id ON projects (client_id)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_projects_status ON projects (status)`);
+      // Create indexes for better query performance
+      const indexes = [
+        ['idx_clients_user_email', 'clients', 'user_email'],
+        ['idx_work_entries_client_id', 'work_entries', 'client_id'],
+        ['idx_work_entries_user_email', 'work_entries', 'user_email'],
+        ['idx_work_entries_date', 'work_entries', 'date'],
+        ['idx_projects_user_email', 'projects', 'user_email'],
+        ['idx_projects_client_id', 'projects', 'client_id'],
+        ['idx_projects_status', 'projects', 'status'],
+      ];
+      for (const [name, table, column] of indexes) {
+        database.run(`CREATE INDEX IF NOT EXISTS ${name} ON ${table} (${column})`);
+      }
 
       console.log('Database tables created successfully');
       resolve();
