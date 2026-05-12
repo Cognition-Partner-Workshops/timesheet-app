@@ -1,0 +1,108 @@
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import ReportsPage from '../ReportsPage';
+import { renderWithProviders } from '../../test/test-utils';
+import apiClient from '../../api/client';
+
+vi.mock('../../api/client');
+
+const mockClients = {
+  clients: [
+    { id: 1, name: 'Acme Corp', description: null, department: null, email: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+    { id: 2, name: 'Globex Inc', description: null, department: null, email: null, created_at: '2024-01-02', updated_at: '2024-01-02' },
+  ],
+};
+
+const mockReport = {
+  client: mockClients.clients[0],
+  workEntries: [
+    { id: 1, client_id: 1, hours: 5, date: '2024-03-10', description: 'Dev work', created_at: '2024-03-10', updated_at: '2024-03-10' },
+    { id: 2, client_id: 1, hours: 3, date: '2024-03-11', description: 'Testing', created_at: '2024-03-11', updated_at: '2024-03-11' },
+  ],
+  totalHours: 8,
+  entryCount: 2,
+};
+
+describe('ReportsPage', () => {
+  beforeEach(() => {
+    vi.mocked(apiClient.getClients).mockResolvedValue(mockClients);
+    vi.mocked(apiClient.getClientReport).mockResolvedValue(mockReport);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('renders "Reports" heading', async () => {
+    renderWithProviders(<ReportsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /reports/i })).toBeInTheDocument();
+    });
+  });
+
+  it('when no clients exist, shows prompt to create a client with "Create Client" button', async () => {
+    vi.mocked(apiClient.getClients).mockResolvedValue({ clients: [] });
+    renderWithProviders(<ReportsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/you need to create at least one client/i)).toBeInTheDocument();
+    });
+    expect(screen.getByRole('link', { name: /create client/i })).toBeInTheDocument();
+  });
+
+  it('when clients exist, shows the client selector dropdown', async () => {
+    renderWithProviders(<ReportsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox')).toBeInTheDocument();
+    });
+    expect(screen.getAllByText('Select Client').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('export buttons are disabled when no client is selected', async () => {
+    renderWithProviders(<ReportsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox')).toBeInTheDocument();
+    });
+
+    const csvButton = screen.getByLabelText(/export as csv/i);
+    const pdfButton = screen.getByLabelText(/export as pdf/i);
+    expect(csvButton.closest('button')).toBeDisabled();
+    expect(pdfButton.closest('button')).toBeDisabled();
+  });
+
+  it('shows "Select a client to view their time report" when no client selected', async () => {
+    renderWithProviders(<ReportsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/select a client to view their time report/i)).toBeInTheDocument();
+    });
+  });
+
+  it('after selecting a client, displays report cards and work entries table', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ReportsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox')).toBeInTheDocument();
+    });
+
+    // Open dropdown and select client
+    const select = screen.getByRole('combobox');
+    await user.click(select);
+
+    const listbox = within(await screen.findByRole('listbox'));
+    await user.click(listbox.getByText('Acme Corp'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Total Hours')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Total Entries')).toBeInTheDocument();
+    expect(screen.getByText('Average Hours per Entry')).toBeInTheDocument();
+    expect(screen.getByText('8.00')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getByText('4.00')).toBeInTheDocument();
+  });
+});
