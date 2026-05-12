@@ -32,7 +32,11 @@ public class BaseTest {
             options.setBinary(chromeBinary);
         }
 
-        options.addArguments("--headless=new");
+        // Run headless unless -Dbrowser.visible=true is set
+        String visible = System.getProperty("browser.visible", "false");
+        if (!visible.equalsIgnoreCase("true")) {
+            options.addArguments("--headless=new");
+        }
         options.addArguments("--no-sandbox");
         options.addArguments("--disable-dev-shm-usage");
         options.addArguments("--disable-gpu");
