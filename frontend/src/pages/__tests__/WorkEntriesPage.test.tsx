@@ -2,23 +2,10 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import WorkEntriesPage from '../WorkEntriesPage';
 import { renderWithProviders } from '../../test/test-utils';
+import { mockClients, mockWorkEntries } from '../../test/mock-data';
 import apiClient from '../../api/client';
 
 vi.mock('../../api/client');
-
-const mockClients = {
-  clients: [
-    { id: 1, name: 'Acme Corp', description: null, department: null, email: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
-    { id: 2, name: 'Globex Inc', description: null, department: null, email: null, created_at: '2024-01-02', updated_at: '2024-01-02' },
-  ],
-};
-
-const mockWorkEntries = {
-  workEntries: [
-    { id: 1, client_id: 1, client_name: 'Acme Corp', hours: 4, date: '2024-03-10', description: 'Development work', created_at: '2024-03-10', updated_at: '2024-03-10' },
-    { id: 2, client_id: 2, client_name: 'Globex Inc', hours: 2.5, date: '2024-03-11', description: null, created_at: '2024-03-11', updated_at: '2024-03-11' },
-  ],
-};
 
 describe('WorkEntriesPage', () => {
   beforeEach(() => {
@@ -43,7 +30,6 @@ describe('WorkEntriesPage', () => {
     vi.mocked(apiClient.getWorkEntries).mockReturnValue(new Promise(() => {}));
     vi.mocked(apiClient.getClients).mockReturnValue(new Promise(() => {}));
     renderWithProviders(<WorkEntriesPage />);
-
     expect(screen.getByRole('progressbar')).toBeInTheDocument();
   });
 
@@ -70,12 +56,12 @@ describe('WorkEntriesPage', () => {
     renderWithProviders(<WorkEntriesPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Acme Corp')).toBeInTheDocument();
+      expect(screen.getAllByText('Acme Corp').length).toBeGreaterThanOrEqual(1);
     });
-    expect(screen.getByText('4 hours')).toBeInTheDocument();
+    expect(screen.getByText('8.5 hours')).toBeInTheDocument();
     expect(screen.getByText('Development work')).toBeInTheDocument();
-    expect(screen.getByText('Globex Inc')).toBeInTheDocument();
-    expect(screen.getByText('2.5 hours')).toBeInTheDocument();
+    expect(screen.getAllByText('Globex Inc').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('10 hours')).toBeInTheDocument();
   });
 
   it('clicking "Add Work Entry" opens dialog with title "Add New Work Entry"', async () => {
@@ -85,7 +71,6 @@ describe('WorkEntriesPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /add work entry/i })).toBeInTheDocument();
     });
-
     await user.click(screen.getByRole('button', { name: /add work entry/i }));
 
     await waitFor(() => {
@@ -100,7 +85,6 @@ describe('WorkEntriesPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /add work entry/i })).toBeInTheDocument();
     });
-
     await user.click(screen.getByRole('button', { name: /add work entry/i }));
 
     await waitFor(() => {

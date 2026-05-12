@@ -2,32 +2,10 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ClientsPage from '../ClientsPage';
 import { renderWithProviders } from '../../test/test-utils';
+import { mockClients } from '../../test/mock-data';
 import apiClient from '../../api/client';
 
 vi.mock('../../api/client');
-
-const mockClients = {
-  clients: [
-    {
-      id: 1,
-      name: 'Acme Corp',
-      department: 'Engineering',
-      email: 'contact@acme.com',
-      description: 'Main client',
-      created_at: '2024-01-15T00:00:00.000Z',
-      updated_at: '2024-01-15T00:00:00.000Z',
-    },
-    {
-      id: 2,
-      name: 'Globex Inc',
-      department: null,
-      email: null,
-      description: null,
-      created_at: '2024-02-01T00:00:00.000Z',
-      updated_at: '2024-02-01T00:00:00.000Z',
-    },
-  ],
-};
 
 describe('ClientsPage', () => {
   beforeEach(() => {
@@ -50,7 +28,6 @@ describe('ClientsPage', () => {
   it('shows loading spinner while data fetches', () => {
     vi.mocked(apiClient.getClients).mockReturnValue(new Promise(() => {}));
     renderWithProviders(<ClientsPage />);
-
     expect(screen.getByRole('progressbar')).toBeInTheDocument();
   });
 
@@ -82,7 +59,6 @@ describe('ClientsPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /add client/i })).toBeInTheDocument();
     });
-
     await user.click(screen.getByRole('button', { name: /add client/i }));
 
     await waitFor(() => {
@@ -132,14 +108,13 @@ describe('ClientsPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /add client/i })).toBeInTheDocument();
     });
-
     await user.click(screen.getByRole('button', { name: /add client/i }));
 
     await waitFor(() => {
       expect(screen.getByText('Add New Client')).toBeInTheDocument();
     });
 
-    // Type a space so the HTML required attribute is satisfied, but trim() check fails
+    // Type a space so HTML required is satisfied but trim() check fails
     const nameInput = screen.getByLabelText(/client name/i);
     await user.type(nameInput, ' ');
 

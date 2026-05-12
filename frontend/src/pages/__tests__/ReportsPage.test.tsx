@@ -2,31 +2,15 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ReportsPage from '../ReportsPage';
 import { renderWithProviders } from '../../test/test-utils';
+import { mockClients, mockClientReport } from '../../test/mock-data';
 import apiClient from '../../api/client';
 
 vi.mock('../../api/client');
 
-const mockClients = {
-  clients: [
-    { id: 1, name: 'Acme Corp', description: null, department: null, email: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
-    { id: 2, name: 'Globex Inc', description: null, department: null, email: null, created_at: '2024-01-02', updated_at: '2024-01-02' },
-  ],
-};
-
-const mockReport = {
-  client: mockClients.clients[0],
-  workEntries: [
-    { id: 1, client_id: 1, hours: 5, date: '2024-03-10', description: 'Dev work', created_at: '2024-03-10', updated_at: '2024-03-10' },
-    { id: 2, client_id: 1, hours: 3, date: '2024-03-11', description: 'Testing', created_at: '2024-03-11', updated_at: '2024-03-11' },
-  ],
-  totalHours: 8,
-  entryCount: 2,
-};
-
 describe('ReportsPage', () => {
   beforeEach(() => {
     vi.mocked(apiClient.getClients).mockResolvedValue(mockClients);
-    vi.mocked(apiClient.getClientReport).mockResolvedValue(mockReport);
+    vi.mocked(apiClient.getClientReport).mockResolvedValue(mockClientReport);
   });
 
   afterEach(() => {
@@ -89,7 +73,6 @@ describe('ReportsPage', () => {
       expect(screen.getByRole('combobox')).toBeInTheDocument();
     });
 
-    // Open dropdown and select client
     const select = screen.getByRole('combobox');
     await user.click(select);
 

@@ -1,27 +1,10 @@
 import { screen, waitFor } from '@testing-library/react';
 import DashboardPage from '../DashboardPage';
 import { renderWithProviders } from '../../test/test-utils';
+import { mockClients, mockWorkEntries } from '../../test/mock-data';
 import apiClient from '../../api/client';
 
 vi.mock('../../api/client');
-
-const mockClients = {
-  clients: [
-    { id: 1, name: 'Client A', description: null, department: null, email: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
-    { id: 2, name: 'Client B', description: null, department: null, email: null, created_at: '2024-01-02', updated_at: '2024-01-02' },
-    { id: 3, name: 'Client C', description: null, department: null, email: null, created_at: '2024-01-03', updated_at: '2024-01-03' },
-  ],
-};
-
-const mockWorkEntries = {
-  workEntries: [
-    { id: 1, client_id: 1, client_name: 'Client A', hours: 8.5, date: '2024-01-10', description: 'Task 1', created_at: '2024-01-10', updated_at: '2024-01-10' },
-    { id: 2, client_id: 2, client_name: 'Client B', hours: 10, date: '2024-01-11', description: 'Task 2', created_at: '2024-01-11', updated_at: '2024-01-11' },
-    { id: 3, client_id: 1, client_name: 'Client A', hours: 6, date: '2024-01-12', description: 'Task 3', created_at: '2024-01-12', updated_at: '2024-01-12' },
-    { id: 4, client_id: 3, client_name: 'Client C', hours: 12, date: '2024-01-13', description: 'Task 4', created_at: '2024-01-13', updated_at: '2024-01-13' },
-    { id: 5, client_id: 2, client_name: 'Client B', hours: 6, date: '2024-01-14', description: 'Task 5', created_at: '2024-01-14', updated_at: '2024-01-14' },
-  ],
-};
 
 describe('DashboardPage', () => {
   beforeEach(() => {
@@ -33,9 +16,8 @@ describe('DashboardPage', () => {
     vi.restoreAllMocks();
   });
 
-  it('shows "Dashboard" heading', async () => {
+  it('shows "Dashboard" heading', () => {
     renderWithProviders(<DashboardPage />);
-
     expect(screen.getByRole('heading', { name: /dashboard/i })).toBeInTheDocument();
   });
 
@@ -61,7 +43,6 @@ describe('DashboardPage', () => {
 
   it('shows "No work entries yet" when work entries list is empty', async () => {
     vi.mocked(apiClient.getWorkEntries).mockResolvedValue({ workEntries: [] });
-
     renderWithProviders(<DashboardPage />);
 
     await waitFor(() => {
@@ -73,7 +54,7 @@ describe('DashboardPage', () => {
     renderWithProviders(<DashboardPage />);
 
     await waitFor(() => {
-      expect(screen.getAllByText('Client A').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('Acme Corp').length).toBeGreaterThanOrEqual(1);
     });
     expect(screen.getByText(/8\.5 hours/)).toBeInTheDocument();
   });
