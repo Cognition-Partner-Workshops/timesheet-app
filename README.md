@@ -1,6 +1,6 @@
 # Employee Time Tracking Application
 
-A full-stack web application for tracking and reporting employee hourly work across different clients.
+A full-stack web application for tracking and reporting employee hourly work across different clients. Built with React, Node.js, Express, and SQLite.
 
 ## ⚠️ Important Notes
 
@@ -87,8 +87,8 @@ A full-stack web application for tracking and reporting employee hourly work acr
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18+ installed
-- npm or yarn package manager
+- Node.js 18 or later
+- npm (included with Node.js)
 
 ### Backend Setup
 
@@ -288,10 +288,10 @@ See `backend/DEPLOYMENT.md` for detailed production deployment instructions.
 - Mobile app
 - Integration with calendar systems
 
+## Contributing
+
+Contributions are welcome. Please open an issue or submit a pull request for any improvements.
+
 ## License
 
 MIT
-
-## Support
-
-For issues or questions, please contact your system administrator.
