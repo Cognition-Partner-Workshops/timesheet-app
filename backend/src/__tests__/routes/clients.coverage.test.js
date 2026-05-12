@@ -1,4 +1,4 @@
-const { request, createTestApp, setupMockDb, mockRunWithChanges, mockRunWithLastID, mockDbError, mockDbRow, mockDbRows } = require('../helpers/testSetup');
+const { request, createTestApp, setupMockDb, mockRunWithChanges, mockRunWithLastID, mockDbError, mockDbRow, mockDbRows, mockGetDatabaseThrow } = require('../helpers/testSetup');
 const { getDatabase } = require('../../database/init');
 const clientRoutes = require('../../routes/clients');
 
@@ -119,15 +119,12 @@ describe('Client Routes - Coverage Improvement', () => {
       expect(response.status).toBe(201);
     });
 
-    test('should handle unexpected error thrown in POST handler', async () => {
-      getDatabase.mockImplementation(() => { throw new Error('Unexpected error'); });
-      const response = await request(app).post('/api/clients').send({ name: 'Test Client' });
-      expect(response.status).toBe(500);
-    });
-
-    test('should handle unexpected error thrown in PUT handler', async () => {
-      getDatabase.mockImplementation(() => { throw new Error('Unexpected error'); });
-      const response = await request(app).put('/api/clients/1').send({ name: 'Updated' });
+    test.each([
+      ['POST', () => request(app).post('/api/clients').send({ name: 'Test' })],
+      ['PUT', () => request(app).put('/api/clients/1').send({ name: 'Updated' })]
+    ])('should handle unexpected error in %s handler', async (_, makeRequest) => {
+      mockGetDatabaseThrow();
+      const response = await makeRequest();
       expect(response.status).toBe(500);
     });
   });
@@ -143,12 +140,9 @@ describe('Client Routes - Coverage Improvement', () => {
   });
 
   describe('DELETE /api/clients/:id - Edge Cases', () => {
-    test.each([
-      ['ID 0', '/api/clients/0'],
-      ['large ID', '/api/clients/999999999']
-    ])('should return 404 for %s', async (_, url) => {
-      mockDb.get.mockImplementation(mockDbRow(null));
-      const response = await request(app).delete(url);
+    beforeEach(() => { mockDb.get.mockImplementation(mockDbRow(null)); });
+    test.each([['ID 0', '0'], ['large ID', '999999999']])('should return 404 for %s', async (_, id) => {
+      const response = await request(app).delete(`/api/clients/${id}`);
       expect(response.status).toBe(404);
     });
   });

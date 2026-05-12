@@ -1,4 +1,4 @@
-const { request, createTestApp, setupMockDb, mockRunWithLastID, mockDbRow, mockDbRows } = require('../helpers/testSetup');
+const { request, createTestApp, setupMockDb, mockRunWithLastID, mockDbRow, mockDbRows, mockGetDatabaseThrow } = require('../helpers/testSetup');
 const { getDatabase } = require('../../database/init');
 const workEntryRoutes = require('../../routes/workEntries');
 
@@ -18,18 +18,13 @@ describe('Work Entry Routes - Coverage Improvement', () => {
   beforeEach(() => { mockDb = setupMockDb(); });
   afterEach(() => { jest.clearAllMocks(); });
 
-  describe('POST /api/work-entries - Catch Block (line 139)', () => {
-    test('should handle unexpected error thrown during POST processing', async () => {
-      getDatabase.mockImplementation(() => { throw new Error('Unexpected runtime error'); });
-      const response = await request(app).post('/api/work-entries').send({ clientId: 1, hours: 5, date: '2024-01-15' });
-      expect(response.status).toBe(500);
-    });
-  });
-
-  describe('PUT /api/work-entries/:id - Catch Block (line 256)', () => {
-    test('should handle unexpected error thrown during PUT processing', async () => {
-      getDatabase.mockImplementation(() => { throw new Error('Unexpected runtime error'); });
-      const response = await request(app).put('/api/work-entries/1').send({ hours: 8 });
+  describe('POST/PUT Catch Blocks', () => {
+    test.each([
+      ['POST', () => request(app).post('/api/work-entries').send({ clientId: 1, hours: 5, date: '2024-01-15' })],
+      ['PUT', () => request(app).put('/api/work-entries/1').send({ hours: 8 })]
+    ])('should handle unexpected error in %s handler', async (_, makeRequest) => {
+      mockGetDatabaseThrow('Unexpected runtime error');
+      const response = await makeRequest();
       expect(response.status).toBe(500);
     });
   });
@@ -121,12 +116,9 @@ describe('Work Entry Routes - Coverage Improvement', () => {
   });
 
   describe('DELETE /api/work-entries/:id - Edge Cases', () => {
-    test.each([
-      ['ID 0', '/api/work-entries/0'],
-      ['negative ID', '/api/work-entries/-1']
-    ])('should return 404 for %s', async (_, url) => {
-      mockDb.get.mockImplementation(mockDbRow(null));
-      const response = await request(app).delete(url);
+    beforeEach(() => { mockDb.get.mockImplementation(mockDbRow(null)); });
+    test.each([['ID 0', '0'], ['negative ID', '-1']])('should return 404 for %s', async (_, id) => {
+      const response = await request(app).delete(`/api/work-entries/${id}`);
       expect(response.status).toBe(404);
     });
   });

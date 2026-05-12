@@ -13,147 +13,67 @@ describe('Database Initialization - Coverage Improvement', () => {
     jest.clearAllMocks();
   });
 
+  function createMockDatabase(closeOverride) {
+    return {
+      serialize: jest.fn((cb) => cb()),
+      run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
+      close: closeOverride || jest.fn((cb) => cb(null))
+    };
+  }
+
+  function mockSqlite3(mockDatabase) {
+    jest.doMock('sqlite3', () => ({
+      verbose: jest.fn(() => ({
+        Database: jest.fn((path, callback) => {
+          callback(null);
+          return mockDatabase;
+        })
+      }))
+    }));
+  }
+
+  function setupDbModule(mockDatabase) {
+    mockSqlite3(mockDatabase);
+    return require('../../database/init');
+  }
+
   describe('closeDatabase - edge cases', () => {
     test('should resolve immediately when db is null', async () => {
-      jest.doMock('sqlite3', () => {
-        return {
-          verbose: jest.fn(() => ({
-            Database: jest.fn((path, callback) => {
-              callback(null);
-              return {
-                serialize: jest.fn((cb) => cb()),
-                run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
-                close: jest.fn((cb) => cb(null))
-              };
-            })
-          }))
-        };
-      });
-
-      const { closeDatabase } = require('../../database/init');
-
-      // closeDatabase without ever calling getDatabase: db is null
+      const { closeDatabase } = setupDbModule(createMockDatabase());
       await expect(closeDatabase()).resolves.toBeUndefined();
     });
 
     test('should handle concurrent close calls (isClosing branch)', async () => {
       let closeCallback = null;
-      const mockDatabase = {
-        serialize: jest.fn((cb) => cb()),
-        run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
-        close: jest.fn((cb) => {
-          // Don't call callback immediately to simulate slow close
-          closeCallback = cb;
-        })
-      };
+      const mockDb = createMockDatabase(jest.fn((cb) => { closeCallback = cb; }));
+      const { getDatabase, closeDatabase } = setupDbModule(mockDb);
 
-      jest.doMock('sqlite3', () => {
-        return {
-          verbose: jest.fn(() => ({
-            Database: jest.fn((path, callback) => {
-              callback(null);
-              return mockDatabase;
-            })
-          }))
-        };
-      });
-
-      const { getDatabase, closeDatabase } = require('../../database/init');
-
-      // Initialize the database
       getDatabase();
-
-      // Start first close - this will set isClosing = true
       const firstClose = closeDatabase();
-
-      // Start second close while first is still in progress (isClosing = true)
       const secondClose = closeDatabase();
 
-      // Now complete the first close
-      if (closeCallback) {
-        closeCallback(null);
-      }
-
+      if (closeCallback) closeCallback(null);
       await firstClose;
       await secondClose;
     });
 
     test('should handle calling closeDatabase after already closed (isClosed branch)', async () => {
-      const mockDatabase = {
-        serialize: jest.fn((cb) => cb()),
-        run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
-        close: jest.fn((cb) => cb(null))
-      };
-
-      jest.doMock('sqlite3', () => {
-        return {
-          verbose: jest.fn(() => ({
-            Database: jest.fn((path, callback) => {
-              callback(null);
-              return mockDatabase;
-            })
-          }))
-        };
-      });
-
-      const { getDatabase, closeDatabase } = require('../../database/init');
-
-      // Initialize and close
+      const { getDatabase, closeDatabase } = setupDbModule(createMockDatabase());
       getDatabase();
       await closeDatabase();
-
-      // Call close again when isClosed is true
       await expect(closeDatabase()).resolves.toBeUndefined();
     });
 
     test('should reset state and allow new connection after close', async () => {
-      const mockDatabase = {
-        serialize: jest.fn((cb) => cb()),
-        run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
-        close: jest.fn((cb) => cb(null))
-      };
-
-      jest.doMock('sqlite3', () => {
-        return {
-          verbose: jest.fn(() => ({
-            Database: jest.fn((path, callback) => {
-              callback(null);
-              return mockDatabase;
-            })
-          }))
-        };
-      });
-
-      const { getDatabase, closeDatabase } = require('../../database/init');
-
-      const db1 = getDatabase();
+      const { getDatabase, closeDatabase } = setupDbModule(createMockDatabase());
+      getDatabase();
       await closeDatabase();
-
-      // After close, getting database should create a new connection
-      const db2 = getDatabase();
-      expect(db2).toBeDefined();
+      expect(getDatabase()).toBeDefined();
     });
 
     test('should handle close error without rejecting the promise', async () => {
-      const mockDatabase = {
-        serialize: jest.fn((cb) => cb()),
-        run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
-        close: jest.fn((cb) => cb(new Error('Close failed')))
-      };
-
-      jest.doMock('sqlite3', () => {
-        return {
-          verbose: jest.fn(() => ({
-            Database: jest.fn((path, callback) => {
-              callback(null);
-              return mockDatabase;
-            })
-          }))
-        };
-      });
-
-      const { getDatabase, closeDatabase } = require('../../database/init');
-
+      const mockDb = createMockDatabase(jest.fn((cb) => cb(new Error('Close failed'))));
+      const { getDatabase, closeDatabase } = setupDbModule(mockDb);
       getDatabase();
       await expect(closeDatabase()).resolves.toBeUndefined();
       expect(consoleErrorSpy).toHaveBeenCalledWith('Error closing database:', expect.any(Error));
@@ -162,29 +82,17 @@ describe('Database Initialization - Coverage Improvement', () => {
 
   describe('initializeDatabase - edge cases', () => {
     test('should use in-memory database path', () => {
-      jest.doMock('sqlite3', () => {
-        const DatabaseConstructor = jest.fn((path, callback) => {
-          callback(null);
-          return {
-            serialize: jest.fn((cb) => cb()),
-            run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
-            close: jest.fn((cb) => cb(null))
-          };
-        });
-
-        return {
-          verbose: jest.fn(() => ({
-            Database: DatabaseConstructor
-          }))
-        };
+      const mockDb = createMockDatabase();
+      const DatabaseConstructor = jest.fn((path, callback) => {
+        callback(null);
+        return mockDb;
       });
-
+      jest.doMock('sqlite3', () => ({
+        verbose: jest.fn(() => ({ Database: DatabaseConstructor }))
+      }));
       const { getDatabase } = require('../../database/init');
       getDatabase();
-
-      const sqlite3 = require('sqlite3');
-      const Database = sqlite3.verbose().Database;
-      expect(Database).toHaveBeenCalledWith(':memory:', expect.any(Function));
+      expect(DatabaseConstructor).toHaveBeenCalledWith(':memory:', expect.any(Function));
     });
   });
 });

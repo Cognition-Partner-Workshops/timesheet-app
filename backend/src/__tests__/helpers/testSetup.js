@@ -108,6 +108,27 @@ function mockDbRows(rows) {
   };
 }
 
+/**
+ * Makes getDatabase throw an error, simulating unexpected runtime failures.
+ */
+function mockGetDatabaseThrow(message = 'Unexpected error') {
+  getDatabase.mockImplementation(() => { throw new Error(message); });
+}
+
+/**
+ * Creates parameterized test cases for DELETE returning 404 on edge-case IDs.
+ *
+ * @param {object} testApp - The Express app under test
+ * @param {string} basePath - The base path (e.g. '/api/clients')
+ * @param {Array<[string, string]>} cases - Array of [label, id] pairs
+ */
+function testDelete404Cases(testApp, basePath, cases) {
+  test.each(cases)('should return 404 for %s', async (_, id) => {
+    const response = await request(testApp).delete(`${basePath}/${id}`);
+    expect(response.status).toBe(404);
+  });
+}
+
 module.exports = {
   request,
   createMockDb,
@@ -117,5 +138,7 @@ module.exports = {
   mockRunWithLastID,
   mockDbError,
   mockDbRow,
-  mockDbRows
+  mockDbRows,
+  mockGetDatabaseThrow,
+  testDelete404Cases
 };
