@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { uniqueEmail, login, createClient, createWorkEntry, clickEditButton, clickDeleteButton } from './helpers';
+import { uniqueEmail, login, createClient, createWorkEntry, editFieldAndSave, deleteRowAndVerify } from './helpers';
 
 test.describe('Work Entry Lifecycle', () => {
   test('should create a work entry for a client', async ({ page }) => {
@@ -18,18 +18,11 @@ test.describe('Work Entry Lifecycle', () => {
     await createWorkEntry(page, 'WE Lifecycle Client', '3', 'Lifecycle entry');
     await expect(page.getByText('3 hours')).toBeVisible();
 
-    // Edit hours
-    await clickEditButton(page, 'Lifecycle entry');
-    await page.getByLabel('Hours').clear();
-    await page.getByLabel('Hours').fill('6');
-    await page.getByRole('button', { name: 'Update' }).click();
-    await expect(page.getByRole('dialog')).not.toBeVisible();
+    await editFieldAndSave(page, 'Lifecycle entry', 'Hours', '6');
     await expect(page.getByText('6 hours')).toBeVisible();
     await expect(page.getByText('3 hours')).not.toBeVisible();
 
-    // Delete the entry
-    await clickDeleteButton(page, 'Lifecycle entry');
-    await expect(page.getByText('Lifecycle entry')).not.toBeVisible();
+    await deleteRowAndVerify(page, 'Lifecycle entry');
   });
 
   test('should show empty state when no entries exist', async ({ page }) => {

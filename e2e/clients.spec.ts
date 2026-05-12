@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { uniqueEmail, login, createClient, openClientDialog, clickEditButton, clickDeleteButton } from './helpers';
+import { uniqueEmail, login, createClient, editFieldAndSave, deleteRowAndVerify } from './helpers';
 
 test.describe('Client Management', () => {
   test('should create a new client with all fields', async ({ page }) => {
@@ -25,18 +25,11 @@ test.describe('Client Management', () => {
     await login(page, uniqueEmail('client'));
     await createClient(page, 'Lifecycle Corp');
 
-    // Edit
-    await clickEditButton(page, 'Lifecycle Corp');
-    await page.getByLabel('Client Name').clear();
-    await page.getByLabel('Client Name').fill('Renamed Corp');
-    await page.getByRole('button', { name: 'Update' }).click();
-    await expect(page.getByRole('dialog')).not.toBeVisible();
+    await editFieldAndSave(page, 'Lifecycle Corp', 'Client Name', 'Renamed Corp');
     await expect(page.getByText('Renamed Corp')).toBeVisible();
     await expect(page.getByText('Lifecycle Corp')).not.toBeVisible();
 
-    // Delete the renamed client
-    await clickDeleteButton(page, 'Renamed Corp');
-    await expect(page.getByText('Renamed Corp')).not.toBeVisible();
+    await deleteRowAndVerify(page, 'Renamed Corp');
   });
 
   test('should show empty state when no clients exist', async ({ page }) => {

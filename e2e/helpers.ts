@@ -71,3 +71,21 @@ export async function selectReportClient(page: Page, clientName: string): Promis
   await page.getByRole('combobox', { name: 'Select Client' }).click();
   await page.getByRole('option', { name: clientName }).click();
 }
+
+export async function editFieldAndSave(
+  page: Page,
+  rowText: string,
+  fieldLabel: string,
+  newValue: string,
+): Promise<void> {
+  await clickEditButton(page, rowText);
+  await page.getByLabel(fieldLabel).clear();
+  await page.getByLabel(fieldLabel).fill(newValue);
+  await page.getByRole('button', { name: 'Update' }).click();
+  await expect(page.getByRole('dialog')).not.toBeVisible();
+}
+
+export async function deleteRowAndVerify(page: Page, rowText: string): Promise<void> {
+  await clickDeleteButton(page, rowText);
+  await expect(page.getByText(rowText)).not.toBeVisible();
+}
