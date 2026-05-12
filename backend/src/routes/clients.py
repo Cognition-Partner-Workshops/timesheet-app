@@ -81,23 +81,25 @@ def update_client(
             if not data:
                 raise HTTPException(status_code=400, detail="No fields to update")
 
-            allowed_columns = {"name": "name", "description": "description",
-                               "department": "department", "email": "email"}
-            updates = []
-            values = []
-            for field, column in allowed_columns.items():
-                if field in data:
-                    updates.append(column + " = %s")
-                    val = data[field]
-                    values.append(val if val else None)
-
-            updates.append("updated_at = CURRENT_TIMESTAMP")
-            values.extend([client_id, user_email])
-
-            set_clause = ", ".join(updates)
             cur.execute(
-                "UPDATE clients SET " + set_clause + " WHERE id = %s AND user_email = %s",
-                values,
+                "SELECT id, name, description, department, email FROM clients "
+                "WHERE id = %s AND user_email = %s",
+                (client_id, user_email),
+            )
+            current = cur.fetchone()
+
+            cur.execute(
+                "UPDATE clients SET name = %s, description = %s, department = %s, "
+                "email = %s, updated_at = CURRENT_TIMESTAMP "
+                "WHERE id = %s AND user_email = %s",
+                (
+                    data.get("name", current["name"]),
+                    data["description"] if "description" in data else current["description"],
+                    data["department"] if "department" in data else current["department"],
+                    data["email"] if "email" in data else current["email"],
+                    client_id,
+                    user_email,
+                ),
             )
             cur.execute(
                 "SELECT id, name, description, department, email, created_at, updated_at "

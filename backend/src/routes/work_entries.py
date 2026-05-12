@@ -123,23 +123,25 @@ def update_work_entry(
                         status_code=400, detail="Client not found or does not belong to user"
                     )
 
-            allowed_columns = {"clientId": "client_id", "hours": "hours",
-                               "description": "description", "date": "date"}
-            updates = []
-            values = []
-            for py_field, db_column in allowed_columns.items():
-                if py_field in data:
-                    updates.append(db_column + " = %s")
-                    val = data[py_field]
-                    values.append(val if val else None)
-
-            updates.append("updated_at = CURRENT_TIMESTAMP")
-            values.extend([entry_id, user_email])
-
-            set_clause = ", ".join(updates)
             cur.execute(
-                "UPDATE work_entries SET " + set_clause + " WHERE id = %s AND user_email = %s",
-                values,
+                "SELECT client_id, hours, description, date FROM work_entries "
+                "WHERE id = %s AND user_email = %s",
+                (entry_id, user_email),
+            )
+            current = cur.fetchone()
+
+            cur.execute(
+                "UPDATE work_entries SET client_id = %s, hours = %s, description = %s, "
+                "date = %s, updated_at = CURRENT_TIMESTAMP "
+                "WHERE id = %s AND user_email = %s",
+                (
+                    data.get("clientId", current["client_id"]),
+                    data.get("hours", current["hours"]),
+                    data["description"] if "description" in data else current["description"],
+                    data.get("date", current["date"]),
+                    entry_id,
+                    user_email,
+                ),
             )
             row = _fetch_entry_with_client(cur, entry_id)
             return {"message": "Work entry updated successfully", "workEntry": row}
