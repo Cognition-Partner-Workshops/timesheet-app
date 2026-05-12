@@ -42,26 +42,28 @@ interface ProjectFormData {
   status: string;
 }
 
-const defaultFormData: ProjectFormData = {
-  name: '',
-  description: '',
-  clientId: '',
-  startDate: '',
-  status: 'active',
+const EMPTY_FORM: ProjectFormData = { name: '', description: '', clientId: '', startDate: '', status: 'active' };
+
+const STATUS_COLORS: Record<string, 'success' | 'default' | 'warning'> = {
+  active: 'success', completed: 'default', 'on-hold': 'warning',
 };
 
-const statusColors: Record<string, 'success' | 'default' | 'warning'> = {
-  active: 'success',
-  completed: 'default',
-  'on-hold': 'warning',
-};
+function extractApiError(err: unknown, fallback: string): string {
+  const typed = err as { response?: { data?: { error?: string } } };
+  return typed.response?.data?.error || fallback;
+}
+
+function OptionalCell({ value, fallback = '-' }: { value: string | null; fallback?: string }) {
+  return value
+    ? <Typography variant="body2" color="text.secondary">{value}</Typography>
+    : <Chip label={fallback} size="small" variant="outlined" />;
+}
 
 const ProjectsPage: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [formData, setFormData] = useState<ProjectFormData>(defaultFormData);
+  const [formData, setFormData] = useState<ProjectFormData>(EMPTY_FORM);
   const [error, setError] = useState('');
-
   const queryClient = useQueryClient();
 
   const { data: projectsData, isLoading } = useQuery({
@@ -74,45 +76,38 @@ const ProjectsPage: React.FC = () => {
     queryFn: () => apiClient.getClients(),
   });
 
+  const handleClose = () => {
+    setOpen(false);
+    setEditingProject(null);
+    setFormData(EMPTY_FORM);
+    setError('');
+  };
+
+  const invalidateAndClose = () => { queryClient.invalidateQueries({ queryKey: ['projects'] }); handleClose(); };
+
   const createMutation = useMutation({
-    mutationFn: (projectData: { name: string; description?: string; clientId?: number | null; startDate?: string; status?: string }) =>
-      apiClient.createProject(projectData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      handleClose();
-    },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to create project');
-    },
+    mutationFn: (data: { name: string; description?: string; clientId?: number | null; startDate?: string; status?: string }) =>
+      apiClient.createProject(data),
+    onSuccess: invalidateAndClose,
+    onError: (err: unknown) => setError(extractApiError(err, 'Failed to create project')),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: { name?: string; description?: string; clientId?: number | null; startDate?: string; status?: string } }) =>
       apiClient.updateProject(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      handleClose();
-    },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to update project');
-    },
+    onSuccess: invalidateAndClose,
+    onError: (err: unknown) => setError(extractApiError(err, 'Failed to update project')),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiClient.deleteProject(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-    },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to delete project');
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
+    onError: (err: unknown) => setError(extractApiError(err, 'Failed to delete project')),
   });
 
-  const projects = projectsData?.projects || [];
+  const projects: Project[] = projectsData?.projects || [];
   const clients: Client[] = clientsData?.clients || [];
+  const saving = createMutation.isPending || updateMutation.isPending;
 
   const handleOpen = (project?: Project) => {
     if (project) {
@@ -126,27 +121,16 @@ const ProjectsPage: React.FC = () => {
       });
     } else {
       setEditingProject(null);
-      setFormData(defaultFormData);
+      setFormData(EMPTY_FORM);
     }
     setError('');
     setOpen(true);
   };
 
-  const handleClose = () => {
-    setOpen(false);
-    setEditingProject(null);
-    setFormData(defaultFormData);
-    setError('');
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
-    if (!formData.name.trim()) {
-      setError('Project name is required');
-      return;
-    }
+    if (!formData.name.trim()) { setError('Project name is required'); return; }
 
     const payload = {
       name: formData.name,
@@ -173,6 +157,9 @@ const ProjectsPage: React.FC = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const setField = (field: keyof ProjectFormData) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setFormData({ ...formData, [field]: e.target.value });
+
   if (isLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -191,9 +178,7 @@ const ProjectsPage: React.FC = () => {
       </Box>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-          {error}
-        </Alert>
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>
       )}
 
       <Paper>
@@ -211,72 +196,30 @@ const ProjectsPage: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {projects.length > 0 ? (
-                projects.map((project: Project) => (
-                  <TableRow key={project.id}>
-                    <TableCell>
-                      <Typography variant="subtitle1" fontWeight="medium">
-                        {project.name}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      {project.client_name ? (
-                        <Typography variant="body2" color="text.secondary">
-                          {project.client_name}
-                        </Typography>
-                      ) : (
-                        <Chip label="-" size="small" variant="outlined" />
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {project.start_date ? (
-                        <Typography variant="body2" color="text.secondary">
-                          {new Date(project.start_date).toLocaleDateString()}
-                        </Typography>
-                      ) : (
-                        <Chip label="-" size="small" variant="outlined" />
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={project.status}
-                        size="small"
-                        color={statusColors[project.status] || 'default'}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {project.description ? (
-                        <Typography variant="body2" color="text.secondary">
-                          {project.description}
-                        </Typography>
-                      ) : (
-                        <Chip label="No description" size="small" variant="outlined" />
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" color="text.secondary">
-                        {new Date(project.created_at).toLocaleDateString()}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="right">
-                      <IconButton
-                        onClick={() => handleOpen(project)}
-                        color="primary"
-                        size="small"
-                      >
-                        <EditIcon />
-                      </IconButton>
-                      <IconButton
-                        onClick={() => handleDelete(project)}
-                        color="error"
-                        size="small"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
+              {projects.length > 0 ? projects.map((project) => (
+                <TableRow key={project.id}>
+                  <TableCell>
+                    <Typography variant="subtitle1" fontWeight="medium">{project.name}</Typography>
+                  </TableCell>
+                  <TableCell><OptionalCell value={project.client_name} /></TableCell>
+                  <TableCell>
+                    <OptionalCell value={project.start_date ? new Date(project.start_date).toLocaleDateString() : null} />
+                  </TableCell>
+                  <TableCell>
+                    <Chip label={project.status} size="small" color={STATUS_COLORS[project.status] || 'default'} />
+                  </TableCell>
+                  <TableCell><OptionalCell value={project.description} fallback="No description" /></TableCell>
+                  <TableCell>
+                    <Typography variant="body2" color="text.secondary">
+                      {new Date(project.created_at).toLocaleDateString()}
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    <IconButton onClick={() => handleOpen(project)} color="primary" size="small"><EditIcon /></IconButton>
+                    <IconButton onClick={() => handleDelete(project)} color="error" size="small"><DeleteIcon /></IconButton>
+                  </TableCell>
+                </TableRow>
+              )) : (
                 <TableRow>
                   <TableCell colSpan={7} align="center">
                     <Typography color="text.secondary" sx={{ py: 3 }}>
@@ -291,91 +234,38 @@ const ProjectsPage: React.FC = () => {
       </Paper>
 
       <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {editingProject ? 'Edit Project' : 'Add New Project'}
-        </DialogTitle>
+        <DialogTitle>{editingProject ? 'Edit Project' : 'Add New Project'}</DialogTitle>
         <form onSubmit={handleSubmit}>
           <DialogContent>
-            <TextField
-              autoFocus
-              margin="dense"
-              label="Project Name"
-              fullWidth
-              required
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              disabled={createMutation.isPending || updateMutation.isPending}
-            />
+            <TextField autoFocus margin="dense" label="Project Name" fullWidth required
+              value={formData.name} onChange={setField('name')} disabled={saving} />
             <FormControl fullWidth margin="dense">
               <InputLabel id="client-select-label">Client</InputLabel>
-              <Select
-                labelId="client-select-label"
-                name="clientId"
-                value={formData.clientId}
-                label="Client"
-                onChange={handleSelectChange}
-                disabled={createMutation.isPending || updateMutation.isPending}
-              >
-                <MenuItem value="">
-                  <em>None</em>
-                </MenuItem>
-                {clients.map((client: Client) => (
-                  <MenuItem key={client.id} value={String(client.id)}>
-                    {client.name}
-                  </MenuItem>
-                ))}
+              <Select labelId="client-select-label" name="clientId" value={formData.clientId}
+                label="Client" onChange={handleSelectChange} disabled={saving}>
+                <MenuItem value=""><em>None</em></MenuItem>
+                {clients.map((c) => <MenuItem key={c.id} value={String(c.id)}>{c.name}</MenuItem>)}
               </Select>
             </FormControl>
-            <TextField
-              margin="dense"
-              label="Start Date"
-              fullWidth
-              type="date"
-              value={formData.startDate}
-              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-              disabled={createMutation.isPending || updateMutation.isPending}
-              slotProps={{ inputLabel: { shrink: true } }}
-            />
+            <TextField margin="dense" label="Start Date" fullWidth type="date"
+              value={formData.startDate} onChange={setField('startDate')} disabled={saving}
+              slotProps={{ inputLabel: { shrink: true } }} />
             <FormControl fullWidth margin="dense">
               <InputLabel id="status-select-label">Status</InputLabel>
-              <Select
-                labelId="status-select-label"
-                name="status"
-                value={formData.status}
-                label="Status"
-                onChange={handleSelectChange}
-                disabled={createMutation.isPending || updateMutation.isPending}
-              >
+              <Select labelId="status-select-label" name="status" value={formData.status}
+                label="Status" onChange={handleSelectChange} disabled={saving}>
                 <MenuItem value="active">Active</MenuItem>
                 <MenuItem value="completed">Completed</MenuItem>
                 <MenuItem value="on-hold">On Hold</MenuItem>
               </Select>
             </FormControl>
-            <TextField
-              margin="dense"
-              label="Description"
-              fullWidth
-              multiline
-              rows={3}
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              disabled={createMutation.isPending || updateMutation.isPending}
-            />
+            <TextField margin="dense" label="Description" fullWidth multiline rows={3}
+              value={formData.description} onChange={setField('description')} disabled={saving} />
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="contained"
-              disabled={createMutation.isPending || updateMutation.isPending}
-            >
-              {createMutation.isPending || updateMutation.isPending ? (
-                <CircularProgress size={24} />
-              ) : (
-                editingProject ? 'Update' : 'Create'
-              )}
+            <Button onClick={handleClose} disabled={saving}>Cancel</Button>
+            <Button type="submit" variant="contained" disabled={saving}>
+              {saving ? <CircularProgress size={24} /> : (editingProject ? 'Update' : 'Create')}
             </Button>
           </DialogActions>
         </form>
