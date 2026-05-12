@@ -42,6 +42,14 @@ function fetchProject(db, projectId, callback) {
   db.get(`${PROJECT_SELECT} WHERE p.id = ?`, [projectId], callback);
 }
 
+function verifyClientOwnership(db, clientId, userEmail, callback) {
+  if (!clientId) return callback(null, true);
+  db.get('SELECT id FROM clients WHERE id = ? AND user_email = ?', [clientId, userEmail], (err, row) => {
+    if (err) return callback(err);
+    callback(null, !!row);
+  });
+}
+
 router.get('/', (req, res) => {
   getDatabase().all(
     `${PROJECT_SELECT} WHERE p.user_email = ? ORDER BY p.name`,
@@ -76,17 +84,22 @@ router.post('/', (req, res, next) => {
     const { name, description, clientId, startDate, status } = value;
 
     const db = getDatabase();
-    db.run(
-      'INSERT INTO projects (name, description, client_id, start_date, status, user_email) VALUES (?, ?, ?, ?, ?, ?)',
-      [name, description || null, clientId || null, startDate || null, status || 'active', req.userEmail],
-      function(err) {
-        if (err) return dbError(res, 'Failed to create project')(err);
-        fetchProject(db, this.lastID, (err, row) => {
-          if (err) return dbError(res, 'Project created but failed to retrieve')(err);
-          res.status(201).json({ message: 'Project created successfully', project: row });
-        });
-      }
-    );
+    verifyClientOwnership(db, clientId, req.userEmail, (err, valid) => {
+      if (err) return dbError(res, 'Internal server error')(err);
+      if (!valid) return res.status(400).json({ error: 'Client not found or does not belong to user' });
+
+      db.run(
+        'INSERT INTO projects (name, description, client_id, start_date, status, user_email) VALUES (?, ?, ?, ?, ?, ?)',
+        [name, description || null, clientId || null, startDate || null, status || 'active', req.userEmail],
+        function(err) {
+          if (err) return dbError(res, 'Failed to create project')(err);
+          fetchProject(db, this.lastID, (err, row) => {
+            if (err) return dbError(res, 'Project created but failed to retrieve')(err);
+            res.status(201).json({ message: 'Project created successfully', project: row });
+          });
+        }
+      );
+    });
   } catch (error) {
     next(error);
   }
@@ -126,14 +139,19 @@ router.put('/:id', (req, res, next) => {
       if (err) return dbError(res, 'Internal server error')(err);
       if (!row) return res.status(404).json({ error: 'Project not found' });
 
-      const { updates, values } = buildUpdateSets(value);
-      values.push(projectId, req.userEmail);
+      verifyClientOwnership(db, value.clientId, req.userEmail, (err, valid) => {
+        if (err) return dbError(res, 'Internal server error')(err);
+        if (!valid) return res.status(400).json({ error: 'Client not found or does not belong to user' });
 
-      db.run(`UPDATE projects SET ${updates.join(', ')} WHERE id = ? AND user_email = ?`, values, function(err) {
-        if (err) return dbError(res, 'Failed to update project')(err);
-        fetchProject(db, projectId, (err, row) => {
-          if (err) return dbError(res, 'Project updated but failed to retrieve')(err);
-          res.json({ message: 'Project updated successfully', project: row });
+        const { updates, values } = buildUpdateSets(value);
+        values.push(projectId, req.userEmail);
+
+        db.run(`UPDATE projects SET ${updates.join(', ')} WHERE id = ? AND user_email = ?`, values, function(err) {
+          if (err) return dbError(res, 'Failed to update project')(err);
+          fetchProject(db, projectId, (err, row) => {
+            if (err) return dbError(res, 'Project updated but failed to retrieve')(err);
+            res.json({ message: 'Project updated successfully', project: row });
+          });
         });
       });
     });
