@@ -15,7 +15,6 @@ test.describe('Login Flow', () => {
   test('should login with valid email and navigate to dashboard', async ({ page }) => {
     await page.getByLabel('Email Address').fill('login-valid@example.com');
     await page.getByRole('button', { name: 'Log In' }).click();
-
     await expect(page).toHaveURL(/\/dashboard/);
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
   });
@@ -23,20 +22,17 @@ test.describe('Login Flow', () => {
   test('should show error for invalid email format', async ({ page }) => {
     await page.getByLabel('Email Address').fill('not-an-email');
     await page.getByRole('button', { name: 'Log In' }).click();
-
     await expect(page.getByRole('alert').filter({ hasText: /fail|error|invalid/i })).toBeVisible();
   });
 
   test('should disable login button when email is empty', async ({ page }) => {
-    const loginButton = page.getByRole('button', { name: 'Log In' });
-    await expect(loginButton).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Log In' })).toBeDisabled();
   });
 
   test('should persist session after login', async ({ page }) => {
     await page.getByLabel('Email Address').fill('login-persist@example.com');
     await page.getByRole('button', { name: 'Log In' }).click();
     await expect(page).toHaveURL(/\/dashboard/);
-
     await page.reload();
     await expect(page).toHaveURL(/\/dashboard/);
   });
