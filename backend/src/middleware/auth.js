@@ -1,6 +1,5 @@
 const jwt = require('jsonwebtoken');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'change-this-in-production-min-32-chars';
+const { getJwtSecret } = require('../config/jwt');
 
 function authenticateUser(req, res, next) {
   const authHeader = req.headers['authorization'];
@@ -9,7 +8,7 @@ function authenticateUser(req, res, next) {
   }
   const token = authHeader.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, getJwtSecret());
     req.userEmail = decoded.email;
     next();
   } catch (err) {

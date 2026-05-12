@@ -8,214 +8,159 @@ const router = express.Router();
 // All routes require authentication
 router.use(authenticateUser);
 
-// Get hourly report for specific client
-router.get('/client/:clientId', (req, res) => {
-  const clientId = parseInt(req.params.clientId);
-  
-  if (isNaN(clientId)) {
-    return res.status(400).json({ error: 'Invalid client ID' });
-  }
-  
+function getClientWithEntries(clientId, userEmail, fields, callback) {
   const db = getDatabase();
-  
-  // Verify client belongs to user
   db.get(
     'SELECT id, name FROM clients WHERE id = ? AND user_email = ?',
-    [clientId, req.userEmail],
+    [clientId, userEmail],
     (err, client) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ error: 'Internal server error' });
-      }
-      
-      if (!client) {
-        return res.status(404).json({ error: 'Client not found' });
-      }
-      
-      // Get work entries for this client
+      if (err) return callback(err, null, null);
+      if (!client) return callback(null, null, null);
       db.all(
-        `SELECT id, hours, description, date, created_at, updated_at
-         FROM work_entries 
-         WHERE client_id = ? AND user_email = ? 
-         ORDER BY date DESC`,
-        [clientId, req.userEmail],
-        (err, workEntries) => {
-          if (err) {
-            console.error('Database error:', err);
-            return res.status(500).json({ error: 'Internal server error' });
-          }
-          
-          // Calculate total hours
-          const totalHours = workEntries.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
-          
-          res.json({
-            client: client,
-            workEntries: workEntries,
-            totalHours: totalHours,
-            entryCount: workEntries.length
-          });
+        `SELECT ${fields} FROM work_entries WHERE client_id = ? AND user_email = ? ORDER BY date DESC`,
+        [clientId, userEmail],
+        (err, entries) => {
+          if (err) return callback(err, client, null);
+          callback(null, client, entries);
         }
       );
+    }
+  );
+}
+
+function parseClientId(req, res) {
+  const clientId = parseInt(req.params.clientId);
+  if (isNaN(clientId)) {
+    res.status(400).json({ error: 'Invalid client ID' });
+    return null;
+  }
+  return clientId;
+}
+
+function handleDbResult(res, err, client, entries) {
+  if (err) {
+    console.error('Database error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+    return false;
+  }
+  if (!client) {
+    res.status(404).json({ error: 'Client not found' });
+    return false;
+  }
+  if (entries === null) {
+    console.error('Database error: entries null');
+    res.status(500).json({ error: 'Internal server error' });
+    return false;
+  }
+  return true;
+}
+
+// Get hourly report for specific client
+router.get('/client/:clientId', (req, res) => {
+  const clientId = parseClientId(req, res);
+  if (clientId === null) return;
+
+  getClientWithEntries(
+    clientId, req.userEmail,
+    'id, hours, description, date, created_at, updated_at',
+    (err, client, workEntries) => {
+      if (!handleDbResult(res, err, client, workEntries)) return;
+      const totalHours = workEntries.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
+      res.json({
+        client,
+        workEntries,
+        totalHours,
+        entryCount: workEntries.length
+      });
     }
   );
 });
 
 // Export client report as CSV
 router.get('/export/csv/:clientId', (req, res) => {
-  const clientId = parseInt(req.params.clientId);
-  
-  if (isNaN(clientId)) {
-    return res.status(400).json({ error: 'Invalid client ID' });
-  }
-  
-  const db = getDatabase();
-  
-  // Verify client belongs to user and get data
-  db.get(
-    'SELECT id, name FROM clients WHERE id = ? AND user_email = ?',
-    [clientId, req.userEmail],
-    (err, client) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ error: 'Internal server error' });
-      }
-      
-      if (!client) {
-        return res.status(404).json({ error: 'Client not found' });
-      }
-      
-      // Get work entries
-      db.all(
-        `SELECT hours, description, date, created_at
-         FROM work_entries 
-         WHERE client_id = ? AND user_email = ? 
-         ORDER BY date DESC`,
-        [clientId, req.userEmail],
-        (err, workEntries) => {
-          if (err) {
-            console.error('Database error:', err);
-            return res.status(500).json({ error: 'Internal server error' });
-          }
-          
-          // Build CSV content in memory
-          const headers = ['Date', 'Hours', 'Description', 'Created At'];
-          let csvContent = headers.join(',') + '\n';
+  const clientId = parseClientId(req, res);
+  if (clientId === null) return;
 
-          workEntries.forEach(entry => {
-            const row = [
-              entry.date,
-              entry.hours,
-              `"${(entry.description || '').replace(/"/g, '""')}"`,
-              entry.created_at
-            ].join(',');
-            csvContent += row + '\n';
-          });
+  getClientWithEntries(
+    clientId, req.userEmail,
+    'hours, description, date, created_at',
+    (err, client, workEntries) => {
+      if (!handleDbResult(res, err, client, workEntries)) return;
 
-          const filename = `${client.name.replace(/[^a-zA-Z0-9]/g, '_')}_report_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+      const headers = ['Date', 'Hours', 'Description', 'Created At'];
+      let csvContent = headers.join(',') + '\n';
 
-          res.setHeader('Content-Type', 'text/csv');
-          res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-          res.send(csvContent);
-        }
-      );
+      workEntries.forEach(entry => {
+        const row = [
+          entry.date,
+          entry.hours,
+          `"${(entry.description || '').replace(/"/g, '""')}"`,
+          entry.created_at
+        ].join(',');
+        csvContent += row + '\n';
+      });
+
+      const filename = `${client.name.replace(/[^a-zA-Z0-9]/g, '_')}_report_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(csvContent);
     }
   );
 });
 
 // Export client report as PDF
 router.get('/export/pdf/:clientId', (req, res) => {
-  const clientId = parseInt(req.params.clientId);
-  
-  if (isNaN(clientId)) {
-    return res.status(400).json({ error: 'Invalid client ID' });
-  }
-  
-  const db = getDatabase();
-  
-  // Verify client belongs to user and get data
-  db.get(
-    'SELECT id, name FROM clients WHERE id = ? AND user_email = ?',
-    [clientId, req.userEmail],
-    (err, client) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ error: 'Internal server error' });
-      }
-      
-      if (!client) {
-        return res.status(404).json({ error: 'Client not found' });
-      }
-      
-      // Get work entries
-      db.all(
-        `SELECT hours, description, date, created_at
-         FROM work_entries 
-         WHERE client_id = ? AND user_email = ? 
-         ORDER BY date DESC`,
-        [clientId, req.userEmail],
-        (err, workEntries) => {
-          if (err) {
-            console.error('Database error:', err);
-            return res.status(500).json({ error: 'Internal server error' });
-          }
-          
-          // Create PDF
-          const doc = new PDFDocument();
-          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-          const filename = `${client.name.replace(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.pdf`;
-          
-          // Set response headers
-          res.setHeader('Content-Type', 'application/pdf');
-          res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-          
-          // Pipe PDF to response
-          doc.pipe(res);
-          
-          // Add content to PDF
-          doc.fontSize(20).text(`Time Report for ${client.name}`, { align: 'center' });
-          doc.moveDown();
-          
-          const totalHours = workEntries.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
-          doc.fontSize(14).text(`Total Hours: ${totalHours.toFixed(2)}`);
-          doc.text(`Total Entries: ${workEntries.length}`);
-          doc.text(`Generated: ${new Date().toLocaleString()}`);
-          doc.moveDown();
-          
-          // Add table header
-          doc.fontSize(12).text('Date', 50, doc.y, { width: 100 });
-          doc.text('Hours', 150, doc.y - 15, { width: 80 });
-          doc.text('Description', 230, doc.y - 15, { width: 300 });
-          doc.moveDown();
-          
-          // Add horizontal line
+  const clientId = parseClientId(req, res);
+  if (clientId === null) return;
+
+  getClientWithEntries(
+    clientId, req.userEmail,
+    'hours, description, date, created_at',
+    (err, client, workEntries) => {
+      if (!handleDbResult(res, err, client, workEntries)) return;
+
+      const doc = new PDFDocument();
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `${client.name.replace(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.pdf`;
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      doc.pipe(res);
+
+      doc.fontSize(20).text(`Time Report for ${client.name}`, { align: 'center' });
+      doc.moveDown();
+
+      const totalHours = workEntries.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
+      doc.fontSize(14).text(`Total Hours: ${totalHours.toFixed(2)}`);
+      doc.text(`Total Entries: ${workEntries.length}`);
+      doc.text(`Generated: ${new Date().toLocaleString()}`);
+      doc.moveDown();
+
+      doc.fontSize(12).text('Date', 50, doc.y, { width: 100 });
+      doc.text('Hours', 150, doc.y - 15, { width: 80 });
+      doc.text('Description', 230, doc.y - 15, { width: 300 });
+      doc.moveDown();
+
+      doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+      doc.moveDown(0.5);
+
+      workEntries.forEach((entry, index) => {
+        const y = doc.y;
+        if (y > 700) {
+          doc.addPage();
+        }
+        doc.text(entry.date, 50, doc.y, { width: 100 });
+        doc.text(entry.hours.toString(), 150, y, { width: 80 });
+        doc.text(entry.description || 'No description', 230, y, { width: 300 });
+        doc.moveDown();
+        if ((index + 1) % 5 === 0) {
           doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
           doc.moveDown(0.5);
-          
-          // Add work entries
-          workEntries.forEach((entry, index) => {
-            const y = doc.y;
-            
-            // Check if we need a new page
-            if (y > 700) {
-              doc.addPage();
-            }
-            
-            doc.text(entry.date, 50, doc.y, { width: 100 });
-            doc.text(entry.hours.toString(), 150, y, { width: 80 });
-            doc.text(entry.description || 'No description', 230, y, { width: 300 });
-            doc.moveDown();
-            
-            // Add separator line every 5 entries
-            if ((index + 1) % 5 === 0) {
-              doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-              doc.moveDown(0.5);
-            }
-          });
-          
-          // Finalize PDF
-          doc.end();
         }
-      );
+      });
+
+      doc.end();
     }
   );
 });

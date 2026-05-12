@@ -3,9 +3,7 @@ const jwt = require('jsonwebtoken');
 const { getDatabase } = require('../database/init');
 const { emailSchema } = require('../validation/schemas');
 const { authenticateUser } = require('../middleware/auth');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'change-this-in-production-min-32-chars';
-const JWT_EXPIRY = '24h';
+const { getJwtSecret, JWT_EXPIRY } = require('../config/jwt');
 
 const router = express.Router();
 
@@ -29,7 +27,7 @@ router.post('/login', async (req, res, next) => {
 
       if (row) {
         // User exists
-        const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
+        const token = jwt.sign({ email }, getJwtSecret(), { expiresIn: JWT_EXPIRY });
         return res.json({
           message: 'Login successful',
           user: {
@@ -46,7 +44,7 @@ router.post('/login', async (req, res, next) => {
             return res.status(500).json({ error: 'Failed to create user' });
           }
 
-          const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
+          const token = jwt.sign({ email }, getJwtSecret(), { expiresIn: JWT_EXPIRY });
           res.status(201).json({
             message: 'User created and logged in successfully',
             user: {

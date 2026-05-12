@@ -1,7 +1,11 @@
 const jwt = require('jsonwebtoken');
+
+const TEST_SECRET = 'test-jwt-secret-for-unit-tests';
+process.env.JWT_SECRET = TEST_SECRET;
+
 const { authenticateUser } = require('../../middleware/auth');
 
-const JWT_SECRET = 'change-this-in-production-min-32-chars';
+const JWT_SECRET = TEST_SECRET;
 
 describe('Authentication Middleware', () => {
   let req, res, next;
