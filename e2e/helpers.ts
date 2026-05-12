@@ -101,6 +101,13 @@ export async function createWorkEntry(
   await submitDialog(page);
 }
 
+export async function selectReportClient(page: Page, clientName: string) {
+  await page.goto('/reports');
+  await page.waitForLoadState('networkidle');
+  await page.getByRole('combobox').click();
+  await page.getByRole('option', { name: clientName }).click();
+}
+
 export async function clickRowAction(page: Page, rowText: string, iconTestId: string) {
   const row = page.getByRole('row').filter({ hasText: rowText });
   await row.getByRole('button').filter({ has: page.locator(`[data-testid="${iconTestId}"]`) }).click();

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import {
-  resetTestState, openClientDialog, fillClientForm,
+  resetTestState, createClient, openClientDialog, fillClientForm,
   submitDialog, clickRowAction,
 } from './helpers';
 
@@ -24,10 +24,7 @@ test.describe('Client Management', () => {
   });
 
   test('should edit an existing client', async ({ page }) => {
-    await openClientDialog(page);
-    await fillClientForm(page, 'Old Name');
-    await submitDialog(page);
-    await expect(page.getByText('Old Name')).toBeVisible();
+    await createClient(page, 'Old Name');
 
     await clickRowAction(page, 'Old Name', 'EditIcon');
     await expect(page.getByRole('dialog')).toBeVisible();
@@ -43,10 +40,7 @@ test.describe('Client Management', () => {
   });
 
   test('should delete a client', async ({ page }) => {
-    await openClientDialog(page);
-    await fillClientForm(page, 'To Be Deleted');
-    await submitDialog(page);
-    await expect(page.getByText('To Be Deleted')).toBeVisible();
+    await createClient(page, 'To Be Deleted');
 
     await clickRowAction(page, 'To Be Deleted', 'DeleteIcon');
     await expect(page.getByText('To Be Deleted')).toBeHidden({ timeout: 5000 });

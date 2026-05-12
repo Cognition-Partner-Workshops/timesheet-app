@@ -41,23 +41,19 @@ test.describe('Edge Cases', () => {
     expect(dialogStillOpen || errorVisible).toBeTruthy();
   });
 
-  test('should reject work entry with zero hours', async ({ page }) => {
-    await createClient(page, 'Hours Edge Client');
-    await navigateToWorkEntries(page);
-    await openWorkEntryDialog(page);
-    await fillWorkEntry(page, 'Hours Edge Client', '0', 'Zero hours test');
-    await page.getByRole('button', { name: 'Create' }).click();
-    await expect(page.getByRole('dialog')).toBeVisible();
-  });
-
-  test('should reject work entry with hours exceeding 24', async ({ page }) => {
-    await createClient(page, 'Max Hours Client');
-    await navigateToWorkEntries(page);
-    await openWorkEntryDialog(page);
-    await fillWorkEntry(page, 'Max Hours Client', '25', 'Over 24 hours test');
-    await page.getByRole('button', { name: 'Create' }).click();
-    await expect(page.getByRole('dialog')).toBeVisible();
-  });
+  for (const { hours, label } of [
+    { hours: '0', label: 'zero hours' },
+    { hours: '25', label: 'hours exceeding 24' },
+  ]) {
+    test(`should reject work entry with ${label}`, async ({ page }) => {
+      await createClient(page, 'Hours Validation Client');
+      await navigateToWorkEntries(page);
+      await openWorkEntryDialog(page);
+      await fillWorkEntry(page, 'Hours Validation Client', hours, `Test ${label}`);
+      await page.getByRole('button', { name: 'Create' }).click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+    });
+  }
 
   test('should handle special characters in work entry description', async ({ page }) => {
     await createClient(page, 'Special Char Client');
