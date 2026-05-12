@@ -22,12 +22,14 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
-});
-app.use(limiter);
+// Rate limiting (disabled in development for testing)
+if (process.env.NODE_ENV !== 'development') {
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100
+  });
+  app.use(limiter);
+}
 
 // Logging
 app.use(morgan('combined'));
@@ -40,6 +42,20 @@ app.use(express.urlencoded({ extended: true }));
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
+
+// Test reset endpoint (development only)
+if (process.env.NODE_ENV === 'development') {
+  app.post('/api/test/reset', async (req, res) => {
+    const { getDatabase } = require('./database/init');
+    const db = getDatabase();
+    db.serialize(() => {
+      db.run('DELETE FROM work_entries');
+      db.run('DELETE FROM clients');
+      db.run('DELETE FROM users');
+    });
+    res.json({ message: 'Database reset' });
+  });
+}
 
 // Routes
 app.use('/api/auth', authRoutes);
