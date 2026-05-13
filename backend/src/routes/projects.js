@@ -88,7 +88,7 @@ router.get('/', (req, res) => {
 
 router.get('/:id', (req, res) => {
   const projectId = parseIdParam(req, res, 'project');
-  if (!projectId) return;
+  if (projectId === null) return;
 
   fetchProject(getDatabase(), 'p.id = ? AND p.user_email = ?', [projectId, req.userEmail], (err, row) => {
     if (handleDbError(res, 'Internal server error')(err)) return;
@@ -129,7 +129,7 @@ router.post('/', (req, res, next) => {
 router.put('/:id', (req, res, next) => {
   try {
     const projectId = parseIdParam(req, res, 'project');
-    if (!projectId) return;
+    if (projectId === null) return;
 
     const { error, value } = updateProjectSchema.validate(req.body);
     if (error) return next(error);
@@ -170,7 +170,7 @@ router.put('/:id', (req, res, next) => {
 
 router.delete('/:id', (req, res) => {
   const projectId = parseIdParam(req, res, 'project');
-  if (!projectId) return;
+  if (projectId === null) return;
 
   const db = getDatabase();
 
