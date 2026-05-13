@@ -454,9 +454,10 @@ describe('Client Routes', () => {
       expect(response.status).toBe(200);
     });
 
-    test('should update department field', async () => {
-      const updatedClient = { id: 1, name: 'Client', department: 'Engineering' };
-
+    test.each([
+      ['department', 'Engineering', { id: 1, name: 'Client', department: 'Engineering' }],
+      ['email', 'client@test.com', { id: 1, name: 'Client', email: 'client@test.com' }]
+    ])('should update %s field', async (field, value, updatedClient) => {
       mockDb.get.mockImplementationOnce((query, params, callback) => {
         callback(null, { id: 1 });
       });
@@ -471,33 +472,10 @@ describe('Client Routes', () => {
 
       const response = await request(app)
         .put('/api/clients/1')
-        .send({ department: 'Engineering' });
+        .send({ [field]: value });
 
       expect(response.status).toBe(200);
-      expect(response.body.client.department).toBe('Engineering');
-    });
-
-    test('should update email field', async () => {
-      const updatedClient = { id: 1, name: 'Client', email: 'client@test.com' };
-
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1 });
-      });
-
-      mockDb.run.mockImplementation((query, params, callback) => {
-        callback(null);
-      });
-
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, updatedClient);
-      });
-
-      const response = await request(app)
-        .put('/api/clients/1')
-        .send({ email: 'client@test.com' });
-
-      expect(response.status).toBe(200);
-      expect(response.body.client.email).toBe('client@test.com');
+      expect(response.body.client[field]).toBe(value);
     });
   });
 
