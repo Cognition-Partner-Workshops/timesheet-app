@@ -49,6 +49,13 @@ function extractApiError(err: unknown, fallback: string): string {
   return typed.response?.data?.error || fallback;
 }
 
+function formatLocalDate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 const INITIAL_FORM = { name: '', description: '', clientId: 0, startDate: new Date(), status: 'active' };
 
 const ProjectsPage: React.FC = () => {
@@ -92,6 +99,7 @@ const ProjectsPage: React.FC = () => {
     onError: (err: unknown) => setError(extractApiError(err, 'Failed to delete project')),
   });
 
+  const isSaving = createMutation.isPending || updateMutation.isPending;
   const projects = projectsData?.projects || [];
   const clients = clientsData?.clients || [];
 
@@ -143,7 +151,7 @@ const ProjectsPage: React.FC = () => {
       name: formData.name,
       description: formData.description,
       clientId: formData.clientId,
-      startDate: `${formData.startDate.getFullYear()}-${String(formData.startDate.getMonth() + 1).padStart(2, '0')}-${String(formData.startDate.getDate()).padStart(2, '0')}`,
+      startDate: formatLocalDate(formData.startDate),
       status: formData.status,
     };
 
@@ -292,14 +300,14 @@ const ProjectsPage: React.FC = () => {
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                disabled={createMutation.isPending || updateMutation.isPending}
+                disabled={isSaving}
               />
               <FormControl fullWidth margin="dense" required>
                 <InputLabel>Client</InputLabel>
                 <Select
                   value={formData.clientId}
                   onChange={(e) => setFormData({ ...formData, clientId: Number(e.target.value) })}
-                  disabled={createMutation.isPending || updateMutation.isPending}
+                  disabled={isSaving}
                 >
                   {clients.map((client: { id: number; name: string }) => (
                     <MenuItem key={client.id} value={client.id}>
@@ -313,7 +321,7 @@ const ProjectsPage: React.FC = () => {
                   label="Start Date"
                   value={formData.startDate}
                   onChange={(date) => setFormData({ ...formData, startDate: date || new Date() })}
-                  disabled={createMutation.isPending || updateMutation.isPending}
+                  disabled={isSaving}
                   slotProps={{ textField: { fullWidth: true, margin: 'dense' } }}
                 />
               </Box>
@@ -322,7 +330,7 @@ const ProjectsPage: React.FC = () => {
                 <Select
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  disabled={createMutation.isPending || updateMutation.isPending}
+                  disabled={isSaving}
                 >
                   {statusOptions.map((status) => (
                     <MenuItem key={status} value={status}>
@@ -339,21 +347,13 @@ const ProjectsPage: React.FC = () => {
                 rows={3}
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                disabled={createMutation.isPending || updateMutation.isPending}
+                disabled={isSaving}
               />
             </DialogContent>
             <DialogActions>
               <Button onClick={handleClose}>Cancel</Button>
-              <Button
-                type="submit"
-                variant="contained"
-                disabled={createMutation.isPending || updateMutation.isPending}
-              >
-                {createMutation.isPending || updateMutation.isPending
-                  ? 'Saving...'
-                  : editingProject
-                    ? 'Update'
-                    : 'Create'}
+              <Button type="submit" variant="contained" disabled={isSaving}>
+                {isSaving ? 'Saving...' : editingProject ? 'Update' : 'Create'}
               </Button>
             </DialogActions>
           </form>
