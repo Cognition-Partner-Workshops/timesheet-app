@@ -44,16 +44,17 @@ const statusColors: Record<string, 'success' | 'default' | 'warning'> = {
   'on-hold': 'warning',
 };
 
+function extractApiError(err: unknown, fallback: string): string {
+  const typed = err as { response?: { data?: { error?: string } } };
+  return typed.response?.data?.error || fallback;
+}
+
+const INITIAL_FORM = { name: '', description: '', clientId: 0, startDate: new Date(), status: 'active' };
+
 const ProjectsPage: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    clientId: 0,
-    startDate: new Date(),
-    status: 'active' as string,
-  });
+  const [formData, setFormData] = useState(INITIAL_FORM);
   const [error, setError] = useState('');
 
   const queryClient = useQueryClient();
@@ -68,41 +69,27 @@ const ProjectsPage: React.FC = () => {
     queryFn: () => apiClient.getClients(),
   });
 
+  const invalidateAndClose = () => { queryClient.invalidateQueries({ queryKey: ['projects'] }); handleClose(); };
+  const invalidateOnly = () => { queryClient.invalidateQueries({ queryKey: ['projects'] }); };
+
   const createMutation = useMutation({
     mutationFn: (projectData: { name: string; description?: string; clientId: number; startDate: string; status: string }) =>
       apiClient.createProject(projectData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      handleClose();
-    },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to create project');
-    },
+    onSuccess: invalidateAndClose,
+    onError: (err: unknown) => setError(extractApiError(err, 'Failed to create project')),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: { name?: string; description?: string; clientId?: number; startDate?: string; status?: string } }) =>
       apiClient.updateProject(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      handleClose();
-    },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to update project');
-    },
+    onSuccess: invalidateAndClose,
+    onError: (err: unknown) => setError(extractApiError(err, 'Failed to update project')),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiClient.deleteProject(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-    },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to delete project');
-    },
+    onSuccess: invalidateOnly,
+    onError: (err: unknown) => setError(extractApiError(err, 'Failed to delete project')),
   });
 
   const projects = projectsData?.projects || [];
@@ -120,13 +107,7 @@ const ProjectsPage: React.FC = () => {
       });
     } else {
       setEditingProject(null);
-      setFormData({
-        name: '',
-        description: '',
-        clientId: 0,
-        startDate: new Date(),
-        status: 'active',
-      });
+      setFormData({ ...INITIAL_FORM, startDate: new Date() });
     }
     setError('');
     setOpen(true);
@@ -135,13 +116,7 @@ const ProjectsPage: React.FC = () => {
   const handleClose = () => {
     setOpen(false);
     setEditingProject(null);
-    setFormData({
-      name: '',
-      description: '',
-      clientId: 0,
-      startDate: new Date(),
-      status: 'active',
-    });
+    setFormData({ ...INITIAL_FORM, startDate: new Date() });
     setError('');
   };
 
