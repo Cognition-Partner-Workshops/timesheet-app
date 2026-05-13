@@ -1,23 +1,13 @@
 const request = require('supertest');
-const express = require('express');
 const projectRoutes = require('../../routes/projects');
-const { getDatabase } = require('../../database/init');
+const { createTestApp, createMockDb } = require('../helpers/routeTestSetup');
 
 jest.mock('../../database/init');
 jest.mock('../../middleware/auth', () => ({
-  authenticateUser: (req, res, next) => {
-    req.userEmail = 'test@example.com';
-    next();
-  }
+  authenticateUser: (req, res, next) => { req.userEmail = 'test@example.com'; next(); }
 }));
 
-const app = express();
-app.use(express.json());
-app.use('/api/projects', projectRoutes);
-app.use((err, req, res, next) => {
-  if (err.isJoi) return res.status(400).json({ error: 'Validation error' });
-  res.status(500).json({ error: 'Internal server error' });
-});
+const app = createTestApp('/api/projects', projectRoutes);
 
 const SAMPLE_PROJECT = {
   id: 1, name: 'Project A', description: 'Desc A',
@@ -28,11 +18,7 @@ const SAMPLE_PROJECT = {
 describe('Project Routes', () => {
   let mockDb;
 
-  beforeEach(() => {
-    mockDb = { all: jest.fn(), get: jest.fn(), run: jest.fn() };
-    getDatabase.mockReturnValue(mockDb);
-  });
-
+  beforeEach(() => { mockDb = createMockDb(); });
   afterEach(() => jest.clearAllMocks());
 
   describe('GET /api/projects', () => {
