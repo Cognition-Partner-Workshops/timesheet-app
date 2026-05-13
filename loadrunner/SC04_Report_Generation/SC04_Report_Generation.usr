@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ScriptSettings>
+    <General>
+        <ScriptName>SC04_Report_Generation</ScriptName>
+        <Protocol>Web HTTP/HTML</Protocol>
+        <Description>Performance test script for Report Generation and CSV/PDF Export</Description>
+    </General>
+    <RunLogic>
+        <InitSection>vuser_init</InitSection>
+        <RunSection>Action</RunSection>
+        <EndSection>vuser_end</EndSection>
+        <IterationCount>1</IterationCount>
+    </RunLogic>
+    <Pacing>
+        <PacingType>FixedDelay</PacingType>
+        <FixedDelay>2</FixedDelay>
+    </Pacing>
+    <ThinkTime>
+        <ThinkTimeType>AsRecorded</ThinkTimeType>
+        <LimitThinkTime>Yes</LimitThinkTime>
+        <MaxThinkTime>30</MaxThinkTime>
+    </ThinkTime>
+    <Log>
+        <LogLevel>Standard</LogLevel>
+        <EnableLogging>Yes</EnableLogging>
+        <LogOnError>Yes</LogOnError>
+    </Log>
+    <Network>
+        <BrowserEmulation>Chrome/120</BrowserEmulation>
+        <MaxConnections>6</MaxConnections>
+        <KeepAlive>Yes</KeepAlive>
+    </Network>
+    <Parameters>
+        <Parameter>
+            <Name>P_UserEmail</Name>
+            <Type>File</Type>
+            <FilePath>params/users.dat</FilePath>
+            <ColumnName>P_UserEmail</ColumnName>
+            <Delimiter>,</Delimiter>
+            <FirstDataLine>2</FirstDataLine>
+            <SelectNextRow>Unique</SelectNextRow>
+            <WhenOutOfValues>AbortVuser</WhenOutOfValues>
+            <UpdateValueOn>EachIteration</UpdateValueOn>
+        </Parameter>
+    </Parameters>
+</ScriptSettings>
