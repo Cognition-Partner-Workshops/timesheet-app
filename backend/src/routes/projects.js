@@ -35,6 +35,14 @@ function findProject(db, projectId, userEmail, callback) {
   );
 }
 
+function verifyClientOwnership(db, clientId, userEmail, callback) {
+  db.get(
+    'SELECT id FROM clients WHERE id = ? AND user_email = ?',
+    [clientId, userEmail],
+    callback
+  );
+}
+
 router.get('/', (req, res) => {
   getDatabase().all(
     `${PROJECT_SELECT} WHERE p.user_email = ? ORDER BY p.name`,
@@ -48,7 +56,7 @@ router.get('/', (req, res) => {
 
 router.get('/:id', (req, res) => {
   const projectId = parseId(req, res);
-  if (!projectId) return;
+  if (projectId === null) return;
 
   getDatabase().get(
     `${PROJECT_SELECT} WHERE p.id = ? AND p.user_email = ?`,
@@ -69,9 +77,10 @@ router.post('/', (req, res, next) => {
     const { name, description, clientId, startDate, status } = value;
     const db = getDatabase();
 
-    db.run(
-      'INSERT INTO projects (name, description, client_id, start_date, status, user_email) VALUES (?, ?, ?, ?, ?, ?)',
-      [name, description || null, clientId || null, startDate || null, status, req.userEmail],
+    const doInsert = () => {
+      db.run(
+        'INSERT INTO projects (name, description, client_id, start_date, status, user_email) VALUES (?, ?, ?, ?, ?, ?)',
+        [name, description || null, clientId || null, startDate || null, status, req.userEmail],
       function(err) {
         if (err) return dbError(res, 'Failed to create project')(err);
 
@@ -81,6 +90,17 @@ router.post('/', (req, res, next) => {
         });
       }
     );
+    };
+
+    if (clientId) {
+      verifyClientOwnership(db, clientId, req.userEmail, (err, row) => {
+        if (err) return dbError(res, 'Internal server error')(err);
+        if (!row) return res.status(400).json({ error: 'Client not found or does not belong to user' });
+        doInsert();
+      });
+    } else {
+      doInsert();
+    }
   } catch (err) {
     next(err);
   }
@@ -89,7 +109,7 @@ router.post('/', (req, res, next) => {
 router.put('/:id', (req, res, next) => {
   try {
     const projectId = parseId(req, res);
-    if (!projectId) return;
+    if (projectId === null) return;
 
     const { error, value } = updateProjectSchema.validate(req.body);
     if (error) return next(error);
@@ -104,18 +124,19 @@ router.put('/:id', (req, res, next) => {
       if (err) return dbError(res, 'Internal server error')(err);
       if (!row) return res.status(404).json({ error: 'Project not found' });
 
-      const updates = [];
-      const values = [];
-      for (const [key, col] of Object.entries(fieldMap)) {
-        if (value[key] !== undefined) {
-          updates.push(`${col} = ?`);
-          values.push(key === 'status' ? value[key] : (value[key] || null));
+      const doUpdate = () => {
+        const updates = [];
+        const values = [];
+        for (const [key, col] of Object.entries(fieldMap)) {
+          if (value[key] !== undefined) {
+            updates.push(`${col} = ?`);
+            values.push(key === 'status' ? value[key] : (value[key] || null));
+          }
         }
-      }
-      updates.push('updated_at = CURRENT_TIMESTAMP');
-      values.push(projectId, req.userEmail);
+        updates.push('updated_at = CURRENT_TIMESTAMP');
+        values.push(projectId, req.userEmail);
 
-      db.run(`UPDATE projects SET ${updates.join(', ')} WHERE id = ? AND user_email = ?`, values, function(err) {
+        db.run(`UPDATE projects SET ${updates.join(', ')} WHERE id = ? AND user_email = ?`, values, function(err) {
         if (err) return dbError(res, 'Failed to update project')(err);
 
         db.get(`${PROJECT_SELECT} WHERE p.id = ?`, [projectId], (err, row) => {
@@ -123,6 +144,17 @@ router.put('/:id', (req, res, next) => {
           res.json({ message: 'Project updated successfully', project: row });
         });
       });
+      };
+
+      if (value.clientId) {
+        verifyClientOwnership(db, value.clientId, req.userEmail, (err, clientRow) => {
+          if (err) return dbError(res, 'Internal server error')(err);
+          if (!clientRow) return res.status(400).json({ error: 'Client not found or does not belong to user' });
+          doUpdate();
+        });
+      } else {
+        doUpdate();
+      }
     });
   } catch (err) {
     next(err);
@@ -131,7 +163,7 @@ router.put('/:id', (req, res, next) => {
 
 router.delete('/:id', (req, res) => {
   const projectId = parseId(req, res);
-  if (!projectId) return;
+  if (projectId === null) return;
 
   const db = getDatabase();
 

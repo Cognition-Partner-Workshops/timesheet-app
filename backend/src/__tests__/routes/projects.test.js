@@ -86,12 +86,22 @@ describe('Project Routes', () => {
       expect(res.body.project.name).toBe('Project A');
     });
 
-    test('creates project with client assignment', async () => {
+    test('creates project with client assignment after ownership check', async () => {
       const withClient = { ...SAMPLE_PROJECT, id: 2 };
-      mockSuccessfulCreate(withClient);
+      // First get: verify client ownership; then run: insert; then get: retrieve created project
+      mockDb.get.mockImplementationOnce((q, p, cb) => cb(null, { id: 1 }));
+      mockDb.run.mockImplementation(function(q, p, cb) { this.lastID = 2; cb.call(this, null); });
+      mockDb.get.mockImplementationOnce((q, p, cb) => cb(null, withClient));
       const res = await request(app).post('/api/projects').send({ name: 'Client Project', clientId: 1, startDate: '2024-06-01' });
       expect(res.status).toBe(201);
       expect(res.body.project.client_id).toBe(1);
+    });
+
+    test('rejects create with clientId not owned by user', async () => {
+      mockDb.get.mockImplementation((q, p, cb) => cb(null, null));
+      const res = await request(app).post('/api/projects').send({ name: 'Bad Project', clientId: 999 });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('Client not found or does not belong to user');
     });
 
     test('rejects missing name', async () => {
@@ -143,6 +153,15 @@ describe('Project Routes', () => {
     test('returns 400 for invalid ID', async () => {
       const res = await request(app).put('/api/projects/invalid').send({ name: 'X' });
       expect(res.status).toBe(400);
+    });
+
+    test('rejects update with clientId not owned by user', async () => {
+      // First get: find project (exists); second get: verify client ownership (fails)
+      mockDb.get.mockImplementationOnce((q, p, cb) => cb(null, { id: 1 }));
+      mockDb.get.mockImplementationOnce((q, p, cb) => cb(null, null));
+      const res = await request(app).put('/api/projects/1').send({ clientId: 999 });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('Client not found or does not belong to user');
     });
 
     test('rejects empty body', async () => {
