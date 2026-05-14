@@ -142,6 +142,63 @@ describe('Database Initialization', () => {
 
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
+
+    test('should resolve immediately when db is null', async () => {
+      jest.resetModules();
+
+      jest.doMock('sqlite3', () => {
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, callback) => {
+              if (callback) callback(null);
+              return {};
+            })
+          }))
+        };
+      });
+
+      const { closeDatabase: closeFresh } = require('../../database/init');
+      await expect(closeFresh()).resolves.toBeUndefined();
+    });
+
+    test('should wait when close is already in progress', async () => {
+      jest.useFakeTimers();
+      jest.resetModules();
+
+      let closeCallback;
+      jest.doMock('sqlite3', () => {
+        const mockDb = {
+          serialize: jest.fn((cb) => cb()),
+          run: jest.fn(),
+          close: jest.fn((cb) => { closeCallback = cb; })
+        };
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, callback) => {
+              if (callback) callback(null);
+              return mockDb;
+            })
+          }))
+        };
+      });
+
+      const { getDatabase: getDb, closeDatabase: closeDb } = require('../../database/init');
+      getDb();
+
+      const firstClose = closeDb();
+      const secondClose = closeDb();
+
+      // Complete the first close
+      closeCallback(null);
+
+      // Advance timers so the interval in secondClose fires
+      jest.advanceTimersByTime(50);
+
+      await firstClose;
+      await secondClose;
+
+      jest.useRealTimers();
+    });
   });
 
   describe('Database Schema', () => {
