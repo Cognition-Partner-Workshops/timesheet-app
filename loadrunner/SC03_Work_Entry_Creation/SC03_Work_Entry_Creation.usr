@@ -1,0 +1,83 @@
+[General]
+Type=Multi
+ActiveAction=Action
+ParameterFile=params/users.dat
+ParameterFile=params/workentries.dat
+
+[Actions]
+vuser_init=vuser_init.c
+Actions=Action.c
+vuser_end=vuser_end.c
+
+[RunLogicInitAction]
+name=vuser_init
+LAST
+
+[RunLogicRunAction]
+name=Action
+LAST
+
+[RunLogicEndAction]
+name=vuser_end
+LAST
+
+[RunLogicAction]
+Action=Action
+
+[Run]
+Iteration=1
+
+[Recording]
+Protocol=Web(HTTP/HTML)
+
+[RuntimeSettings]
+ThinkTimeType=Recorded
+ThinkTimeMultiplier=1
+ThinkTimeLimit=8
+ThinkTimeMin=0
+IterationPacing=AsapAfterPrevIteration
+ContinueOnError=0
+FailTransOnError=1
+GenerateSnapshot=1
+
+[ThinkTime]
+Options=RECORDED
+LimitFlag=1
+Limit=8
+
+[Iterations]
+NumOfIterations=1
+IterationPace=ConstantPace
+ConstantPace=0
+
+[Log]
+LogOptions=LogExtended
+MsgClassData=0
+MsgClassParameters=1
+MsgClassFull=0
+
+[Browser]
+BrowserEmulation=1
+UserAgent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+
+[Network]
+Speed=MAX
+
+[Proxy]
+ProxyUseProxy=0
+
+[ContentCheck]
+EnableContentCheck=1
+
+[MiscOptions]
+SnapshotOnErrorEnabled=1
+ContinueOnError=0
+FailTransOnError=1
+
+[Parameters]
+; P_UserEmail – unique user email per vuser (from params/users.dat)
+; P_Hours – hours worked (from params/workentries.dat)
+; P_EntryDate – work entry date (from params/workentries.dat)
+; P_WorkDescription – description of work performed (from params/workentries.dat)
+; C_ClientId – correlated from POST /api/clients response
+; C_EntryId – correlated from POST /api/work-entries response
