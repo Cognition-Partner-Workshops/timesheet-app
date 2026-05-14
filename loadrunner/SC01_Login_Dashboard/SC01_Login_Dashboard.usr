@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Script>
+  <General>
+    <Type>Web HTTP/HTML</Type>
+    <ScriptName>SC01_Login_Dashboard</ScriptName>
+    <Description>SC-01: User Login and Dashboard Load - Performance test for Time Tracker application login flow and dashboard data loading.</Description>
+    <VuserClass>Web</VuserClass>
+  </General>
+
+  <RunLogic>
+    <Scripts>
+      <Script>
+        <Name>vuser_init</Name>
+        <Path>vuser_init.c</Path>
+        <Type>init</Type>
+      </Script>
+      <Script>
+        <Name>Action</Name>
+        <Path>Action.c</Path>
+        <Type>action</Type>
+      </Script>
+      <Script>
+        <Name>vuser_end</Name>
+        <Path>vuser_end.c</Path>
+        <Type>end</Type>
+      </Script>
+    </Scripts>
+  </RunLogic>
+
+  <RunTimeSettings>
+    <Iterations>
+      <IterationCount>10</IterationCount>
+      <InfiniteLoop>false</InfiniteLoop>
+    </Iterations>
+
+    <Pacing>
+      <Type>ConstantDelay</Type>
+      <ConstantDelay>
+        <Delay>2</Delay>
+      </ConstantDelay>
+      <RandomDelay>
+        <MinDelay>1</MinDelay>
+        <MaxDelay>5</MaxDelay>
+      </RandomDelay>
+    </Pacing>
+
+    <ThinkTime>
+      <Type>RecordedThinkTime</Type>
+      <Options>
+        <UseRecordedThinkTime>true</UseRecordedThinkTime>
+        <Multiplier>1</Multiplier>
+        <LimitThinkTime>true</LimitThinkTime>
+        <MaxThinkTime>30</MaxThinkTime>
+        <MinPercentage>50</MinPercentage>
+        <MaxPercentage>150</MaxPercentage>
+      </Options>
+    </ThinkTime>
+
+    <Log>
+      <Type>Standard</Type>
+      <Options>
+        <EnableExtendedLog>true</EnableExtendedLog>
+        <ParameterSubstitution>true</ParameterSubstitution>
+        <ServerDataReturn>true</ServerDataReturn>
+        <AdvancedTrace>false</AdvancedTrace>
+      </Options>
+    </Log>
+
+    <Network>
+      <BandwidthAttenuation>
+        <Enabled>false</Enabled>
+        <Type>MaxBandwidth</Type>
+      </BandwidthAttenuation>
+      <BrowserEmulation>
+        <UserAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36</UserAgent>
+        <DownloadNonHTMLResources>true</DownloadNonHTMLResources>
+      </BrowserEmulation>
+    </Network>
+
+    <Timeout>
+      <HTTPRequestConnectTimeout>120</HTTPRequestConnectTimeout>
+      <HTTPRequestReceiveTimeout>120</HTTPRequestReceiveTimeout>
+      <StepDownloadTimeout>120</StepDownloadTimeout>
+    </Timeout>
+
+    <ContentCheck>
+      <EnableContentCheck>true</EnableContentCheck>
+    </ContentCheck>
+
+    <ErrorHandling>
+      <ContinueOnError>false</ContinueOnError>
+      <GenerateSnapshot>true</GenerateSnapshot>
+    </ErrorHandling>
+  </RunTimeSettings>
+
+  <Parameters>
+    <Parameter>
+      <Name>P_UserEmail</Name>
+      <Type>File</Type>
+      <File>
+        <Path>params/users.dat</Path>
+        <Delimiter>,</Delimiter>
+        <ColumnIndex>0</ColumnIndex>
+        <FirstDataRow>2</FirstDataRow>
+        <SelectNextRow>Sequential</SelectNextRow>
+        <WhenOutOfValues>ContinueWithLast</WhenOutOfValues>
+        <UpdateValueOn>EachIteration</UpdateValueOn>
+      </File>
+    </Parameter>
+  </Parameters>
+</Script>
