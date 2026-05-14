@@ -1,0 +1,11 @@
+P_ClientName,P_Department,P_ClientEmail,P_ClientDescription
+Acme Corp,Engineering,acme.contact@acmecorp.com,Enterprise software development client
+Globex Industries,Marketing,info@globexind.com,Marketing and advertising services
+Initech Solutions,Finance,support@initech.com,Financial consulting and analytics
+Hooli Technologies,Research,hello@hooli.com,AI and machine learning research
+Umbrella Ltd,Operations,ops@umbrellaltd.com,Supply chain and logistics management
+Stark Enterprises,Engineering,contact@starkent.com,Hardware and firmware development
+Wayne Industries,Security,security@wayneinc.com,Cybersecurity and compliance audits
+Wonka Manufacturing,Production,info@wonkamfg.com,Production line automation project
+Cyberdyne Systems,Research,research@cyberdyne.com,Robotics and autonomous systems
+Oscorp Sciences,Healthcare,lab@oscorp.com,Biotech and pharmaceutical analytics
