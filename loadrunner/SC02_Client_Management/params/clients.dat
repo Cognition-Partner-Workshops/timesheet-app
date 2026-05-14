@@ -1,0 +1,11 @@
+P_ClientName,P_Department,P_ClientEmail,P_ClientDescription
+Acme Corporation,Engineering,contact@acme.com,Enterprise software client
+Globex Industries,Marketing,info@globex.com,Digital marketing solutions provider
+Initech Systems,Finance,support@initech.com,Financial technology consulting firm
+Umbrella Corp,Research,labs@umbrella.com,Biotech research and development
+Wayne Enterprises,Operations,ops@wayne.com,Infrastructure and defense contractor
+Stark Technologies,Product,hello@stark.com,Advanced technology and innovation
+Oceanic Solutions,Sales,sales@oceanic.com,Maritime logistics and shipping
+Pinnacle Group,Human Resources,hr@pinnacle.com,Talent acquisition and staffing services
+Meridian Analytics,Data Science,data@meridian.com,Business intelligence and analytics
+Horizon Digital,Design,creative@horizon.com,UI/UX design and branding agency
