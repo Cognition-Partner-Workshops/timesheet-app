@@ -33,7 +33,7 @@ async function initializeDatabase() {
           email TEXT PRIMARY KEY,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
-      `);
+      `, (err) => { if (err) reject(err); });
 
       // Create clients table
       database.run(`
@@ -48,7 +48,7 @@ async function initializeDatabase() {
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
         )
-      `);
+      `, (err) => { if (err) reject(err); });
 
       // Create work_entries table
       database.run(`
@@ -64,16 +64,36 @@ async function initializeDatabase() {
           FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE,
           FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
         )
-      `);
+      `, (err) => { if (err) reject(err); });
 
       // Create indexes for better performance
-      database.run(`CREATE INDEX IF NOT EXISTS idx_clients_user_email ON clients (user_email)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_client_id ON work_entries (client_id)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_user_email ON work_entries (user_email)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_date ON work_entries (date)`);
+      database.run(`CREATE INDEX IF NOT EXISTS idx_clients_user_email ON clients (user_email)`, (err) => { if (err) reject(err); });
+      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_client_id ON work_entries (client_id)`, (err) => { if (err) reject(err); });
+      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_user_email ON work_entries (user_email)`, (err) => { if (err) reject(err); });
+      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_date ON work_entries (date)`, (err) => { if (err) reject(err); });
 
-      console.log('Database tables created successfully');
-      resolve();
+      // Verify all required tables were created
+      const requiredTables = ['users', 'clients', 'work_entries'];
+      let verified = 0;
+      let verificationFailed = false;
+
+      requiredTables.forEach((table) => {
+        database.run(
+          `SELECT 1 FROM sqlite_master WHERE type='table' AND name='${table}'`,
+          (err) => {
+            if (err && !verificationFailed) {
+              verificationFailed = true;
+              reject(new Error(`Database initialization verification failed: table '${table}' is not accessible`));
+              return;
+            }
+            verified++;
+            if (verified === requiredTables.length && !verificationFailed) {
+              console.log('Database tables created successfully');
+              resolve();
+            }
+          }
+        );
+      });
     });
   });
 }
