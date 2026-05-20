@@ -25,13 +25,13 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Cache frontend node_modules
+      - name: Cache npm cache
         uses: actions/cache@v4
         with:
-          path: frontend/node_modules
-          key: frontend-deps-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+          path: ~/.npm
+          key: frontend-npm-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
           restore-keys: |
-            frontend-deps-${{ runner.os }}-
+            frontend-npm-${{ runner.os }}-
 
       - name: Install frontend dependencies
         working-directory: frontend
@@ -54,13 +54,13 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Cache backend node_modules
+      - name: Cache npm cache
         uses: actions/cache@v4
         with:
-          path: backend/node_modules
-          key: backend-deps-${{ runner.os }}-${{ hashFiles('backend/package-lock.json') }}
+          path: ~/.npm
+          key: backend-npm-${{ runner.os }}-${{ hashFiles('backend/package-lock.json') }}
           restore-keys: |
-            backend-deps-${{ runner.os }}-
+            backend-npm-${{ runner.os }}-
 
       - name: Install backend dependencies
         working-directory: backend
