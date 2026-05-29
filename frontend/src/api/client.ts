@@ -86,6 +86,51 @@ class ApiClient {
     return response.data;
   }
 
+  // Project endpoints
+  async getProjects(filters?: { status?: string; clientId?: number }) {
+    const params: Record<string, string | number> = {};
+    if (filters?.status) params.status = filters.status;
+    if (filters?.clientId) params.clientId = filters.clientId;
+    const response = await this.client.get('/api/projects', { params });
+    return response.data;
+  }
+
+  async getProject(id: number) {
+    const response = await this.client.get(`/api/projects/${id}`);
+    return response.data;
+  }
+
+  async createProject(projectData: {
+    name: string;
+    description?: string;
+    clientId: number;
+    startDate?: string | null;
+    endDate?: string | null;
+    status?: string;
+    budgetHours?: number | null;
+  }) {
+    const response = await this.client.post('/api/projects', projectData);
+    return response.data;
+  }
+
+  async updateProject(id: number, projectData: {
+    name?: string;
+    description?: string;
+    clientId?: number;
+    startDate?: string | null;
+    endDate?: string | null;
+    status?: string;
+    budgetHours?: number | null;
+  }) {
+    const response = await this.client.put(`/api/projects/${id}`, projectData);
+    return response.data;
+  }
+
+  async deleteProject(id: number) {
+    const response = await this.client.delete(`/api/projects/${id}`);
+    return response.data;
+  }
+
   // Work entry endpoints
   async getWorkEntries(clientId?: number) {
     const params = clientId ? { clientId } : {};
@@ -98,12 +143,12 @@ class ApiClient {
     return response.data;
   }
 
-  async createWorkEntry(entryData: { clientId: number; hours: number; description?: string; date: string }) {
+  async createWorkEntry(entryData: { clientId: number; projectId?: number | null; hours: number; description?: string; date: string }) {
     const response = await this.client.post('/api/work-entries', entryData);
     return response.data;
   }
 
-  async updateWorkEntry(id: number, entryData: { clientId?: number; hours?: number; description?: string; date?: string }) {
+  async updateWorkEntry(id: number, entryData: { clientId?: number; projectId?: number | null; hours?: number; description?: string; date?: string }) {
     const response = await this.client.put(`/api/work-entries/${id}`, entryData);
     return response.data;
   }

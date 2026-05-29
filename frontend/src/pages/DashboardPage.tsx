@@ -10,6 +10,7 @@ import {
 } from '@mui/material';
 import {
   Business as BusinessIcon,
+  AccountTree as AccountTreeIcon,
   Assignment as AssignmentIcon,
   Assessment as AssessmentIcon,
   Add as AddIcon,
@@ -31,8 +32,14 @@ const DashboardPage: React.FC = () => {
     queryFn: () => apiClient.getWorkEntries(),
   });
 
+  const { data: projectsData } = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => apiClient.getProjects(),
+  });
+
   const clients = clientsData?.clients || [];
   const workEntries = workEntriesData?.workEntries || [];
+  const projects = projectsData?.projects || [];
 
   const totalHours = workEntries.reduce((sum: number, entry: { hours: number }) => sum + entry.hours, 0);
   const recentEntries = workEntries.slice(0, 5);
@@ -44,6 +51,13 @@ const DashboardPage: React.FC = () => {
       icon: <BusinessIcon />,
       color: '#1976d2',
       action: () => navigate('/clients'),
+    },
+    {
+      title: 'Active Projects',
+      value: projects.filter((p: { status: string }) => p.status === 'active').length,
+      icon: <AccountTreeIcon />,
+      color: '#7b1fa2',
+      action: () => navigate('/projects'),
     },
     {
       title: 'Total Work Entries',
@@ -158,6 +172,14 @@ const DashboardPage: React.FC = () => {
                 fullWidth
               >
                 Add Client
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => navigate('/projects')}
+                fullWidth
+              >
+                Add Project
               </Button>
               <Button
                 variant="contained"
