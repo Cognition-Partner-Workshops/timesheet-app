@@ -1,6 +1,6 @@
 const express = require('express');
 const { getDatabase } = require('../database/init');
-const { buildUpdateQuery, verifyOwnership, collectUpdateFields } = require('../database/helpers');
+const { buildUpdateQuery, verifyOwnership, collectUpdateFields, parseIntFilter, queryAll } = require('../database/helpers');
 const { authenticateUser } = require('../middleware/auth');
 const { projectSchema, updateProjectSchema } = require('../validation/schemas');
 
@@ -46,24 +46,17 @@ router.get('/', (req, res) => {
     params.push(status);
   }
 
-  if (clientId) {
-    const clientIdNum = parseInt(clientId);
-    if (isNaN(clientIdNum)) {
-      return res.status(400).json({ error: 'Invalid client ID' });
-    }
+  const parsedClientId = parseIntFilter(clientId);
+  if (parsedClientId === false) {
+    return res.status(400).json({ error: 'Invalid client ID' });
+  }
+  if (parsedClientId) {
     query += ' AND p.client_id = ?';
-    params.push(clientIdNum);
+    params.push(parsedClientId);
   }
 
   query += ' ORDER BY p.name';
-
-  db.all(query, params, (err, rows) => {
-    if (err) {
-      console.error('Database error:', err);
-      return res.status(500).json({ error: 'Internal server error' });
-    }
-    res.json({ projects: rows });
-  });
+  queryAll(db, query, params, res, 'projects');
 });
 
 router.get('/:id', (req, res) => {

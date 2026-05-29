@@ -104,4 +104,20 @@ function collectUpdateFields(value, fieldMap) {
   return fields;
 }
 
-module.exports = { buildUpdateQuery, buildFilteredQuery, verifyOwnership, collectUpdateFields, ALLOWED_COLUMNS };
+function parseIntFilter(value) {
+  if (!value) return null;
+  const num = parseInt(value);
+  return isNaN(num) ? false : num;
+}
+
+function queryAll(db, sql, params, res, key) {
+  db.all(sql, params, (err, rows) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+    res.json({ [key]: rows });
+  });
+}
+
+module.exports = { buildUpdateQuery, buildFilteredQuery, verifyOwnership, collectUpdateFields, parseIntFilter, queryAll, ALLOWED_COLUMNS };
