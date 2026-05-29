@@ -1,6 +1,6 @@
 const express = require('express');
 const { getDatabase } = require('../database/init');
-const { buildUpdateQuery } = require('../database/helpers');
+const { buildUpdateQuery, verifyOwnership, collectUpdateFields } = require('../database/helpers');
 const { authenticateUser } = require('../middleware/auth');
 const { workEntrySchema, updateWorkEntrySchema } = require('../validation/schemas');
 
@@ -16,35 +16,18 @@ const WORK_ENTRY_SELECT = `
   JOIN clients c ON we.client_id = c.id
   LEFT JOIN projects p ON we.project_id = p.id`;
 
+const WORK_ENTRY_FIELD_MAP = {
+  clientId: { column: 'client_id' },
+  projectId: { column: 'project_id', nullable: true },
+  hours: { column: 'hours' },
+  description: { column: 'description', nullable: true },
+  date: { column: 'date' }
+};
+
 function getWorkEntryById(db, entryId, callback) {
   db.get(`${WORK_ENTRY_SELECT} WHERE we.id = ?`, [entryId], callback);
 }
 
-function verifyClientOwnership(db, clientId, userEmail, callback) {
-  db.get(
-    'SELECT id FROM clients WHERE id = ? AND user_email = ?',
-    [clientId, userEmail],
-    (err, row) => {
-      if (err) return callback(err);
-      if (!row) return callback(null, false);
-      callback(null, true);
-    }
-  );
-}
-
-function verifyProjectOwnership(db, projectId, userEmail, clientId, callback) {
-  db.get(
-    'SELECT id FROM projects WHERE id = ? AND user_email = ? AND client_id = ?',
-    [projectId, userEmail, clientId],
-    (err, row) => {
-      if (err) return callback(err);
-      if (!row) return callback(null, false);
-      callback(null, true);
-    }
-  );
-}
-
-// Get all work entries for authenticated user (with optional client filter)
 router.get('/', (req, res) => {
   const { clientId } = req.query;
   const db = getDatabase();
@@ -72,7 +55,6 @@ router.get('/', (req, res) => {
   });
 });
 
-// Get specific work entry
 router.get('/:id', (req, res) => {
   const workEntryId = parseInt(req.params.id);
   if (isNaN(workEntryId)) {
@@ -96,7 +78,6 @@ router.get('/:id', (req, res) => {
   );
 });
 
-// Create new work entry
 router.post('/', (req, res, next) => {
   try {
     const { error, value } = workEntrySchema.validate(req.body);
@@ -105,7 +86,7 @@ router.post('/', (req, res, next) => {
     const { clientId, projectId, hours, description, date } = value;
     const db = getDatabase();
 
-    verifyClientOwnership(db, clientId, req.userEmail, (err, valid) => {
+    verifyOwnership(db, 'clients', { id: clientId, user_email: req.userEmail }, (err, valid) => {
       if (err) {
         console.error('Database error:', err);
         return res.status(500).json({ error: 'Internal server error' });
@@ -135,7 +116,7 @@ router.post('/', (req, res, next) => {
       };
 
       if (projectId) {
-        verifyProjectOwnership(db, projectId, req.userEmail, clientId, (err, valid) => {
+        verifyOwnership(db, 'projects', { id: projectId, user_email: req.userEmail, client_id: clientId }, (err, valid) => {
           if (err) {
             console.error('Database error:', err);
             return res.status(500).json({ error: 'Internal server error' });
@@ -154,26 +135,6 @@ router.post('/', (req, res, next) => {
   }
 });
 
-const WORK_ENTRY_FIELD_MAP = {
-  clientId: { column: 'client_id' },
-  projectId: { column: 'project_id', nullable: true },
-  hours: { column: 'hours' },
-  description: { column: 'description', nullable: true },
-  date: { column: 'date' }
-};
-
-function collectUpdateFields(value, fieldMap) {
-  const fields = [];
-  for (const [key, config] of Object.entries(fieldMap)) {
-    if (value[key] !== undefined) {
-      const val = config.nullable ? (value[key] != null ? value[key] : null) : value[key];
-      fields.push({ column: config.column, value: val });
-    }
-  }
-  return fields;
-}
-
-// Update work entry
 router.put('/:id', (req, res, next) => {
   try {
     const workEntryId = parseInt(req.params.id);
@@ -220,7 +181,7 @@ router.put('/:id', (req, res, next) => {
         const validateAndUpdate = () => {
           if (value.projectId) {
             const effectiveClientId = value.clientId || row.client_id;
-            verifyProjectOwnership(db, value.projectId, req.userEmail, effectiveClientId, (err, valid) => {
+            verifyOwnership(db, 'projects', { id: value.projectId, user_email: req.userEmail, client_id: effectiveClientId }, (err, valid) => {
               if (err) {
                 console.error('Database error:', err);
                 return res.status(500).json({ error: 'Internal server error' });
@@ -236,7 +197,7 @@ router.put('/:id', (req, res, next) => {
         };
 
         if (value.clientId) {
-          verifyClientOwnership(db, value.clientId, req.userEmail, (err, valid) => {
+          verifyOwnership(db, 'clients', { id: value.clientId, user_email: req.userEmail }, (err, valid) => {
             if (err) {
               console.error('Database error:', err);
               return res.status(500).json({ error: 'Internal server error' });
@@ -256,7 +217,6 @@ router.put('/:id', (req, res, next) => {
   }
 });
 
-// Delete work entry
 router.delete('/:id', (req, res) => {
   const workEntryId = parseInt(req.params.id);
   if (isNaN(workEntryId)) {

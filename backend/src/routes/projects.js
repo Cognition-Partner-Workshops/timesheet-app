@@ -1,6 +1,6 @@
 const express = require('express');
 const { getDatabase } = require('../database/init');
-const { buildUpdateQuery } = require('../database/helpers');
+const { buildUpdateQuery, verifyOwnership, collectUpdateFields } = require('../database/helpers');
 const { authenticateUser } = require('../middleware/auth');
 const { projectSchema, updateProjectSchema } = require('../validation/schemas');
 
@@ -17,23 +17,20 @@ const PROJECT_SELECT = `
 
 const VALID_STATUSES = ['active', 'completed', 'on-hold'];
 
+const PROJECT_FIELD_MAP = {
+  name: { column: 'name' },
+  description: { column: 'description', nullable: true },
+  clientId: { column: 'client_id' },
+  startDate: { column: 'start_date', nullable: true },
+  endDate: { column: 'end_date', nullable: true },
+  status: { column: 'status' },
+  budgetHours: { column: 'budget_hours', nullable: true }
+};
+
 function getProjectById(db, projectId, callback) {
   db.get(`${PROJECT_SELECT} WHERE p.id = ?`, [projectId], callback);
 }
 
-function verifyClientOwnership(db, clientId, userEmail, callback) {
-  db.get(
-    'SELECT id FROM clients WHERE id = ? AND user_email = ?',
-    [clientId, userEmail],
-    (err, row) => {
-      if (err) return callback(err);
-      if (!row) return callback(null, false);
-      callback(null, true);
-    }
-  );
-}
-
-// Get all projects for authenticated user (with optional filters)
 router.get('/', (req, res) => {
   const { status, clientId } = req.query;
   const db = getDatabase();
@@ -69,7 +66,6 @@ router.get('/', (req, res) => {
   });
 });
 
-// Get specific project
 router.get('/:id', (req, res) => {
   const projectId = parseInt(req.params.id);
   if (isNaN(projectId)) {
@@ -93,7 +89,6 @@ router.get('/:id', (req, res) => {
   );
 });
 
-// Create new project
 router.post('/', (req, res, next) => {
   try {
     const { error, value } = projectSchema.validate(req.body);
@@ -102,7 +97,7 @@ router.post('/', (req, res, next) => {
     const { name, description, clientId, startDate, endDate, status, budgetHours } = value;
     const db = getDatabase();
 
-    verifyClientOwnership(db, clientId, req.userEmail, (err, valid) => {
+    verifyOwnership(db, 'clients', { id: clientId, user_email: req.userEmail }, (err, valid) => {
       if (err) {
         console.error('Database error:', err);
         return res.status(500).json({ error: 'Internal server error' });
@@ -137,29 +132,6 @@ router.post('/', (req, res, next) => {
   }
 });
 
-// Field mapping from validated request body to DB columns
-const PROJECT_FIELD_MAP = {
-  name: { column: 'name' },
-  description: { column: 'description', nullable: true },
-  clientId: { column: 'client_id' },
-  startDate: { column: 'start_date', nullable: true },
-  endDate: { column: 'end_date', nullable: true },
-  status: { column: 'status' },
-  budgetHours: { column: 'budget_hours', nullable: true }
-};
-
-function collectUpdateFields(value, fieldMap) {
-  const fields = [];
-  for (const [key, config] of Object.entries(fieldMap)) {
-    if (value[key] !== undefined) {
-      const val = config.nullable ? (value[key] != null ? value[key] : null) : value[key];
-      fields.push({ column: config.column, value: val });
-    }
-  }
-  return fields;
-}
-
-// Update project
 router.put('/:id', (req, res, next) => {
   try {
     const projectId = parseInt(req.params.id);
@@ -204,7 +176,7 @@ router.put('/:id', (req, res, next) => {
         };
 
         if (value.clientId !== undefined) {
-          verifyClientOwnership(db, value.clientId, req.userEmail, (err, valid) => {
+          verifyOwnership(db, 'clients', { id: value.clientId, user_email: req.userEmail }, (err, valid) => {
             if (err) {
               console.error('Database error:', err);
               return res.status(500).json({ error: 'Internal server error' });
@@ -224,7 +196,6 @@ router.put('/:id', (req, res, next) => {
   }
 });
 
-// Delete project
 router.delete('/:id', (req, res) => {
   const projectId = parseInt(req.params.id);
   if (isNaN(projectId)) {
