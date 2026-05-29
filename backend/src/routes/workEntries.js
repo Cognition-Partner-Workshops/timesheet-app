@@ -183,7 +183,7 @@ router.put('/:id', (req, res, next) => {
 
     // Check if work entry exists and belongs to user
     db.get(
-      'SELECT id FROM work_entries WHERE id = ? AND user_email = ?',
+      'SELECT id, client_id FROM work_entries WHERE id = ? AND user_email = ?',
       [workEntryId, req.userEmail],
       (err, row) => {
         if (err) {
@@ -195,27 +195,54 @@ router.put('/:id', (req, res, next) => {
           return res.status(404).json({ error: 'Work entry not found' });
         }
 
-        // If clientId is being updated, verify it belongs to user
-        if (value.clientId) {
-          db.get(
-            'SELECT id FROM clients WHERE id = ? AND user_email = ?',
-            [value.clientId, req.userEmail],
-            (err, clientRow) => {
-              if (err) {
-                console.error('Database error:', err);
-                return res.status(500).json({ error: 'Internal server error' });
+        const validateClient = (callback) => {
+          if (value.clientId) {
+            db.get(
+              'SELECT id FROM clients WHERE id = ? AND user_email = ?',
+              [value.clientId, req.userEmail],
+              (err, clientRow) => {
+                if (err) {
+                  console.error('Database error:', err);
+                  return res.status(500).json({ error: 'Internal server error' });
+                }
+                if (!clientRow) {
+                  return res.status(400).json({ error: 'Client not found or does not belong to user' });
+                }
+                callback();
               }
+            );
+          } else {
+            callback();
+          }
+        };
 
-              if (!clientRow) {
-                return res.status(400).json({ error: 'Client not found or does not belong to user' });
+        const validateProject = (callback) => {
+          if (value.projectId) {
+            const effectiveClientId = value.clientId || row.client_id;
+            db.get(
+              'SELECT id FROM projects WHERE id = ? AND user_email = ? AND client_id = ?',
+              [value.projectId, req.userEmail, effectiveClientId],
+              (err, projectRow) => {
+                if (err) {
+                  console.error('Database error:', err);
+                  return res.status(500).json({ error: 'Internal server error' });
+                }
+                if (!projectRow) {
+                  return res.status(400).json({ error: 'Project not found or does not belong to the selected client' });
+                }
+                callback();
               }
+            );
+          } else {
+            callback();
+          }
+        };
 
-              performUpdate();
-            }
-          );
-        } else {
-          performUpdate();
-        }
+        validateClient(() => {
+          validateProject(() => {
+            performUpdate();
+          });
+        });
 
         function performUpdate() {
           // Build update query dynamically
