@@ -96,33 +96,53 @@ router.post('/', (req, res, next) => {
           return res.status(400).json({ error: 'Client not found or does not belong to user' });
         }
 
-        // Create work entry
-        db.run(
-          'INSERT INTO work_entries (client_id, project_id, user_email, hours, description, date) VALUES (?, ?, ?, ?, ?, ?)',
-          [clientId, projectId || null, req.userEmail, hours, description || null, date],
-          function(err) {
-            if (err) {
-              console.error('Database error:', err);
-              return res.status(500).json({ error: 'Failed to create work entry' });
-            }
-
-            db.get(
-              `${WORK_ENTRY_SELECT} WHERE we.id = ?`,
-              [this.lastID],
-              (err, row) => {
-                if (err) {
-                  console.error('Database error:', err);
-                  return res.status(500).json({ error: 'Work entry created but failed to retrieve' });
-                }
-
-                res.status(201).json({
-                  message: 'Work entry created successfully',
-                  workEntry: row
-                });
+        const insertEntry = () => {
+          db.run(
+            'INSERT INTO work_entries (client_id, project_id, user_email, hours, description, date) VALUES (?, ?, ?, ?, ?, ?)',
+            [clientId, projectId || null, req.userEmail, hours, description || null, date],
+            function(err) {
+              if (err) {
+                console.error('Database error:', err);
+                return res.status(500).json({ error: 'Failed to create work entry' });
               }
-            );
-          }
-        );
+
+              db.get(
+                `${WORK_ENTRY_SELECT} WHERE we.id = ?`,
+                [this.lastID],
+                (err, row) => {
+                  if (err) {
+                    console.error('Database error:', err);
+                    return res.status(500).json({ error: 'Work entry created but failed to retrieve' });
+                  }
+
+                  res.status(201).json({
+                    message: 'Work entry created successfully',
+                    workEntry: row
+                  });
+                }
+              );
+            }
+          );
+        };
+
+        if (projectId) {
+          db.get(
+            'SELECT id FROM projects WHERE id = ? AND user_email = ?',
+            [projectId, req.userEmail],
+            (err, projectRow) => {
+              if (err) {
+                console.error('Database error:', err);
+                return res.status(500).json({ error: 'Internal server error' });
+              }
+              if (!projectRow) {
+                return res.status(400).json({ error: 'Project not found or does not belong to user' });
+              }
+              insertEntry();
+            }
+          );
+        } else {
+          insertEntry();
+        }
       }
     );
   } catch (error) {
@@ -160,6 +180,27 @@ router.put('/:id', (req, res, next) => {
           return res.status(404).json({ error: 'Work entry not found' });
         }
 
+        const verifyAndUpdate = () => {
+          if (value.projectId) {
+            db.get(
+              'SELECT id FROM projects WHERE id = ? AND user_email = ?',
+              [value.projectId, req.userEmail],
+              (err, projectRow) => {
+                if (err) {
+                  console.error('Database error:', err);
+                  return res.status(500).json({ error: 'Internal server error' });
+                }
+                if (!projectRow) {
+                  return res.status(400).json({ error: 'Project not found or does not belong to user' });
+                }
+                performUpdate();
+              }
+            );
+          } else {
+            performUpdate();
+          }
+        };
+
         // If clientId is being updated, verify it belongs to user
         if (value.clientId) {
           db.get(
@@ -175,11 +216,11 @@ router.put('/:id', (req, res, next) => {
                 return res.status(400).json({ error: 'Client not found or does not belong to user' });
               }
 
-              performUpdate();
+              verifyAndUpdate();
             }
           );
         } else {
-          performUpdate();
+          verifyAndUpdate();
         }
 
         function performUpdate() {
