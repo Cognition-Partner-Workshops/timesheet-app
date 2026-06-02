@@ -103,10 +103,10 @@ router.post('/', (req, res, next) => {
           return res.status(400).json({ error: 'Client not found or does not belong to user' });
         }
 
-        // Create work entry
-        db.run(
-          'INSERT INTO work_entries (client_id, project_id, user_email, hours, description, date) VALUES (?, ?, ?, ?, ?, ?)',
-          [clientId, projectId || null, req.userEmail, hours, description || null, date],
+        const insertEntry = () => {
+          db.run(
+            'INSERT INTO work_entries (client_id, project_id, user_email, hours, description, date) VALUES (?, ?, ?, ?, ?, ?)',
+            [clientId, projectId || null, req.userEmail, hours, description || null, date],
           function(err) {
             if (err) {
               console.error('Database error:', err);
@@ -136,6 +136,17 @@ router.post('/', (req, res, next) => {
             );
           }
         );
+        };
+
+        if (projectId) {
+          db.get('SELECT id FROM projects WHERE id = ? AND user_email = ?', [projectId, req.userEmail], (err, projectRow) => {
+            if (err) { console.error('Database error:', err); return res.status(500).json({ error: 'Internal server error' }); }
+            if (!projectRow) { return res.status(400).json({ error: 'Project not found or does not belong to user' }); }
+            insertEntry();
+          });
+        } else {
+          insertEntry();
+        }
       }
     );
   } catch (error) {
@@ -173,7 +184,18 @@ router.put('/:id', (req, res, next) => {
           return res.status(404).json({ error: 'Work entry not found' });
         }
 
-        // If clientId is being updated, verify it belongs to user
+        const validateThenUpdate = () => {
+          if (value.projectId) {
+            db.get('SELECT id FROM projects WHERE id = ? AND user_email = ?', [value.projectId, req.userEmail], (err, projectRow) => {
+              if (err) { console.error('Database error:', err); return res.status(500).json({ error: 'Internal server error' }); }
+              if (!projectRow) { return res.status(400).json({ error: 'Project not found or does not belong to user' }); }
+              performUpdate();
+            });
+          } else {
+            performUpdate();
+          }
+        };
+
         if (value.clientId) {
           db.get(
             'SELECT id FROM clients WHERE id = ? AND user_email = ?',
@@ -188,11 +210,11 @@ router.put('/:id', (req, res, next) => {
                 return res.status(400).json({ error: 'Client not found or does not belong to user' });
               }
 
-              performUpdate();
+              validateThenUpdate();
             }
           );
         } else {
-          performUpdate();
+          validateThenUpdate();
         }
 
         function performUpdate() {
