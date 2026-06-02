@@ -31,28 +31,10 @@ function mockDbError(mockFn) {
   mockFn.mockImplementationOnce((query, params, callback) => callback(new Error('Database error'), null));
 }
 
-function mockInsert(mockDb, lastID) {
+function mockRun(mockDb, { error = null, lastID = undefined } = {}) {
   mockDb.run.mockImplementation(function(query, params, callback) {
-    this.lastID = lastID;
-    callback.call(this, null);
-  });
-}
-
-function mockInsertError(mockDb) {
-  mockDb.run.mockImplementation(function(query, params, callback) {
-    callback.call(this, new Error('Database error'));
-  });
-}
-
-function mockRunSuccess(mockDb) {
-  mockDb.run.mockImplementation(function(query, params, callback) {
-    callback.call(this, null);
-  });
-}
-
-function mockRunError(mockDb) {
-  mockDb.run.mockImplementation(function(query, params, callback) {
-    callback.call(this, new Error('Database error'));
+    if (lastID !== undefined) this.lastID = lastID;
+    callback.call(this, error ? new Error(error) : null);
   });
 }
 
@@ -135,7 +117,7 @@ describe('Project Routes', () => {
   describe('POST /api/projects', () => {
     test('creates project with valid data', async () => {
       mockDbSuccess(mockDb.get, { id: 1 }); // client exists
-      mockInsert(mockDb, 1);
+      mockRun(mockDb, { lastID: 1 });
       mockDbSuccess(mockDb.get, sampleProject); // fetch created
       const res = await request(app).post('/api/projects').send({ name: 'New Project', clientId: 1 });
       expect(res.status).toBe(201);
@@ -146,7 +128,7 @@ describe('Project Routes', () => {
       const body = { name: 'Full', description: 'Desc', clientId: 1, startDate: '2024-01-01',
         endDate: '2024-12-31', status: 'active', budgetHours: 100 };
       mockDbSuccess(mockDb.get, { id: 1 });
-      mockInsert(mockDb, 1);
+      mockRun(mockDb, { lastID: 1 });
       mockDbSuccess(mockDb.get, { ...sampleProject, ...body });
       const res = await request(app).post('/api/projects').send(body);
       expect(res.status).toBe(201);
@@ -176,7 +158,7 @@ describe('Project Routes', () => {
 
     test('handles db error on insert', async () => {
       mockDbSuccess(mockDb.get, { id: 1 });
-      mockInsertError(mockDb);
+      mockRun(mockDb, { error: 'Database error' });
       const res = await request(app).post('/api/projects').send({ name: 'Test', clientId: 1 });
       expect(res.status).toBe(500);
     });
@@ -185,7 +167,7 @@ describe('Project Routes', () => {
   describe('PUT /api/projects/:id', () => {
     test('updates project', async () => {
       mockDbSuccess(mockDb.get, { id: 1 }); // project exists
-      mockRunSuccess(mockDb);
+      mockRun(mockDb);
       mockDbSuccess(mockDb.get, { ...sampleProject, status: 'completed' }); // fetch updated
       const res = await request(app).put('/api/projects/1').send({ name: 'Updated', status: 'completed' });
       expect(res.status).toBe(200);
@@ -225,7 +207,7 @@ describe('Project Routes', () => {
   describe('DELETE /api/projects/:id', () => {
     test('deletes project', async () => {
       mockDbSuccess(mockDb.get, { id: 1 });
-      mockRunSuccess(mockDb);
+      mockRun(mockDb);
       const res = await request(app).delete('/api/projects/1');
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ message: 'Project deleted successfully' });
@@ -250,7 +232,7 @@ describe('Project Routes', () => {
 
     test('handles db error on delete', async () => {
       mockDbSuccess(mockDb.get, { id: 1 });
-      mockRunError(mockDb);
+      mockRun(mockDb, { error: 'Database error' });
       const res = await request(app).delete('/api/projects/1');
       expect(res.status).toBe(500);
     });

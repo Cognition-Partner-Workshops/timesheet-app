@@ -15,12 +15,8 @@ function fetchProjectById(db, projectId, callback) {
   db.get(`SELECT ${PROJECT_COLUMNS} ${PROJECT_JOIN} WHERE p.id = ?`, [projectId], callback);
 }
 
-function verifyClientOwnership(db, clientId, userEmail, callback) {
-  db.get('SELECT id FROM clients WHERE id = ? AND user_email = ?', [clientId, userEmail], callback);
-}
-
-function verifyProjectOwnership(db, projectId, userEmail, callback) {
-  db.get('SELECT id FROM projects WHERE id = ? AND user_email = ?', [projectId, userEmail], callback);
+function verifyOwnership(db, table, id, userEmail, callback) {
+  db.get(`SELECT id FROM ${table} WHERE id = ? AND user_email = ?`, [id, userEmail], callback);
 }
 
 function parseId(raw, label) {
@@ -87,7 +83,7 @@ router.post('/', (req, res, next) => {
     const { name, description, clientId, startDate, endDate, status, budgetHours } = value;
     const db = getDatabase();
 
-    verifyClientOwnership(db, clientId, req.userEmail, (err, row) => {
+    verifyOwnership(db, 'clients', clientId, req.userEmail, (err, row) => {
       if (dbError(res, 'Internal server error')(err)) return;
       if (!row) return res.status(400).json({ error: 'Client not found or does not belong to user' });
 
@@ -123,7 +119,7 @@ router.put('/:id', (req, res, next) => {
 
     const db = getDatabase();
 
-    verifyProjectOwnership(db, parsed.id, req.userEmail, (err, row) => {
+    verifyOwnership(db, 'projects', parsed.id, req.userEmail, (err, row) => {
       if (dbError(res, 'Internal server error')(err)) return;
       if (!row) return res.status(404).json({ error: 'Project not found' });
 
@@ -153,7 +149,7 @@ router.put('/:id', (req, res, next) => {
       };
 
       if (value.clientId) {
-        verifyClientOwnership(db, value.clientId, req.userEmail, (err, clientRow) => {
+        verifyOwnership(db, 'clients', value.clientId, req.userEmail, (err, clientRow) => {
           if (dbError(res, 'Internal server error')(err)) return;
           if (!clientRow) return res.status(400).json({ error: 'Client not found or does not belong to user' });
           applyUpdate();
@@ -174,7 +170,7 @@ router.delete('/:id', (req, res) => {
 
   const db = getDatabase();
 
-  verifyProjectOwnership(db, parsed.id, req.userEmail, (err, row) => {
+  verifyOwnership(db, 'projects', parsed.id, req.userEmail, (err, row) => {
     if (dbError(res, 'Internal server error')(err)) return;
     if (!row) return res.status(404).json({ error: 'Project not found' });
 
