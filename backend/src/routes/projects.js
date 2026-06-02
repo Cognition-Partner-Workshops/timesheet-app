@@ -25,6 +25,11 @@ function parseId(raw, label) {
   return { id };
 }
 
+function toDateStr(val) {
+  if (!val) return null;
+  return val instanceof Date ? val.toISOString().split('T')[0] : val;
+}
+
 function dbError(res, message) {
   return (err) => {
     if (err) {
@@ -87,8 +92,8 @@ router.post('/', (req, res, next) => {
       if (dbError(res, 'Internal server error')(err)) return;
       if (!row) return res.status(400).json({ error: 'Client not found or does not belong to user' });
 
-      const insertParams = [name, description || null, clientId, startDate || null,
-        endDate || null, status || 'active', budgetHours || null, req.userEmail];
+      const insertParams = [name, description || null, clientId, toDateStr(startDate),
+        toDateStr(endDate), status || 'active', budgetHours || null, req.userEmail];
 
       db.run(
         `INSERT INTO projects (name, description, client_id, start_date, end_date, status, budget_hours, user_email)
@@ -133,7 +138,8 @@ router.put('/:id', (req, res, next) => {
         for (const [jsKey, dbCol] of Object.entries(fieldMap)) {
           if (value[jsKey] !== undefined) {
             updates.push(`${dbCol} = ?`);
-            values.push(value[jsKey] || null);
+            const v = (jsKey === 'startDate' || jsKey === 'endDate') ? toDateStr(value[jsKey]) : (value[jsKey] || null);
+            values.push(v);
           }
         }
         updates.push('updated_at = CURRENT_TIMESTAMP');
