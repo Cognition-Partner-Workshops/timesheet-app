@@ -1,43 +1,14 @@
 const request = require('supertest');
-const express = require('express');
 const projectRoutes = require('../../routes/projects');
 const { getDatabase } = require('../../database/init');
+const { createTestApp, createMockDb, mockDbSuccess, mockDbError, mockRun } = require('../helpers/routeTestHelper');
 
 jest.mock('../../database/init');
 jest.mock('../../middleware/auth', () => ({
-  authenticateUser: (req, res, next) => {
-    req.userEmail = 'test@example.com';
-    next();
-  }
+  authenticateUser: (req, _res, next) => { req.userEmail = 'test@example.com'; next(); }
 }));
 
-const app = express();
-app.use(express.json());
-app.use('/api/projects', projectRoutes);
-app.use((err, req, res, next) => {
-  if (err.isJoi) return res.status(400).json({ error: 'Validation error' });
-  res.status(500).json({ error: 'Internal server error' });
-});
-
-function createMockDb() {
-  return { all: jest.fn(), get: jest.fn(), run: jest.fn() };
-}
-
-function mockDbSuccess(mockFn, result) {
-  mockFn.mockImplementationOnce((query, params, callback) => callback(null, result));
-}
-
-function mockDbError(mockFn) {
-  mockFn.mockImplementationOnce((query, params, callback) => callback(new Error('Database error'), null));
-}
-
-function mockRun(mockDb, { error = null, lastID = undefined } = {}) {
-  mockDb.run.mockImplementation(function(query, params, callback) {
-    if (lastID !== undefined) this.lastID = lastID;
-    callback.call(this, error ? new Error(error) : null);
-  });
-}
-
+const app = createTestApp('/api/projects', projectRoutes);
 const sampleProject = { id: 1, name: 'Project A', client_id: 1, status: 'active', client_name: 'Client A' };
 
 describe('Project Routes', () => {
