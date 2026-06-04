@@ -49,7 +49,15 @@ async function fetchJwks(issuerUrl) {
     throw new Error('OIDC discovery response missing jwks_uri');
   }
 
-  const res = await fetch(discovery.jwks_uri);
+  const jwksUrl = new URL(discovery.jwks_uri);
+  const issuerOrigin = new URL(issuerUrl).origin;
+  if (jwksUrl.origin !== issuerOrigin) {
+    throw new Error(
+      `JWKS URI origin (${jwksUrl.origin}) does not match issuer origin (${issuerOrigin})`
+    );
+  }
+
+  const res = await fetch(jwksUrl.href);
   if (!res.ok) {
     throw new Error(`JWKS fetch failed: ${res.status} ${res.statusText}`);
   }

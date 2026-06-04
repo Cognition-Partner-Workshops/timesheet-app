@@ -32,6 +32,24 @@ describe('Authentication Middleware', () => {
     jest.clearAllMocks();
   });
 
+  function mockUserNotFoundThenInsertOk() {
+    mockDb.get.mockImplementation((query, params, callback) => callback(null, null));
+    mockDb.run.mockImplementation((query, params, callback) => callback(null));
+  }
+
+  function expectUserCreated(email, done) {
+    setImmediate(() => {
+      expect(mockDb.run).toHaveBeenCalledWith(
+        'INSERT INTO users (email) VALUES (?)',
+        [email],
+        expect.any(Function)
+      );
+      expect(req.userEmail).toBe(email);
+      expect(next).toHaveBeenCalled();
+      done();
+    });
+  }
+
   describe('Email Header Validation', () => {
     test('should return 401 if x-user-email header is missing', () => {
       authenticateUser(req, res, next);
@@ -109,27 +127,9 @@ describe('Authentication Middleware', () => {
   describe('New User Creation', () => {
     test('should create new user if not exists and call next()', (done) => {
       req.headers['x-user-email'] = 'newuser@example.com';
-      
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, null); // User doesn't exist
-      });
-      
-      mockDb.run.mockImplementation((query, params, callback) => {
-        callback(null);
-      });
-
+      mockUserNotFoundThenInsertOk();
       authenticateUser(req, res, next);
-
-      setImmediate(() => {
-        expect(mockDb.run).toHaveBeenCalledWith(
-          'INSERT INTO users (email) VALUES (?)',
-          ['newuser@example.com'],
-          expect.any(Function)
-        );
-        expect(req.userEmail).toBe('newuser@example.com');
-        expect(next).toHaveBeenCalled();
-        done();
-      });
+      expectUserCreated('newuser@example.com', done);
     });
 
     test('should handle error when creating new user', (done) => {
@@ -262,25 +262,9 @@ describe('Authentication Middleware', () => {
         claims: { iss: 'https://issuer.example.com' },
       });
 
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, null);
-      });
-      mockDb.run.mockImplementation((query, params, callback) => {
-        callback(null);
-      });
-
+      mockUserNotFoundThenInsertOk();
       authenticateUser(req, res, next);
-
-      setImmediate(() => {
-        expect(mockDb.run).toHaveBeenCalledWith(
-          'INSERT INTO users (email) VALUES (?)',
-          ['new-oidc@example.com'],
-          expect.any(Function)
-        );
-        expect(req.userEmail).toBe('new-oidc@example.com');
-        expect(next).toHaveBeenCalled();
-        done();
-      });
+      expectUserCreated('new-oidc@example.com', done);
     });
 
     test('should return 500 on DB error during OIDC auth', (done) => {
