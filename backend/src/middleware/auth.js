@@ -1,46 +1,75 @@
 const { getDatabase } = require('../database/init');
+const { isOidcEnabled, extractBearerToken, verifyOidcToken } = require('./oidc');
 
-// Simple email-based authentication middleware
+function ensureUser(email, callback) {
+  const db = getDatabase();
+
+  db.get('SELECT email FROM users WHERE email = ?', [email], (err, row) => {
+    if (err) return callback(err);
+
+    if (row) return callback(null, email);
+
+    db.run('INSERT INTO users (email) VALUES (?)', [email], (insertErr) => {
+      if (insertErr) return callback(insertErr);
+      callback(null, email);
+    });
+  });
+}
+
 function authenticateUser(req, res, next) {
+  const bearerToken = extractBearerToken(req);
+
+  if (bearerToken && isOidcEnabled()) {
+    verifyOidcToken(bearerToken)
+      .then(({ email }) => {
+        try {
+          ensureUser(email, (err, userEmail) => {
+            if (err) {
+              console.error('Database error:', err);
+              return res.status(500).json({ error: 'Internal server error' });
+            }
+            req.userEmail = userEmail;
+            next();
+          });
+        } catch (dbErr) {
+          console.error('Database error:', dbErr);
+          res.status(500).json({ error: 'Internal server error' });
+        }
+      })
+      .catch((err) => {
+        console.error('OIDC token verification failed:', err.message);
+        return res.status(401).json({ error: 'Invalid or expired token' });
+      });
+    return;
+  }
+
+  if (isOidcEnabled()) {
+    return res.status(401).json({ error: 'Bearer token required when OIDC is enabled' });
+  }
+
+  // Legacy email-header auth (dev / non-OIDC mode only)
   const userEmail = req.headers['x-user-email'];
-  
+
   if (!userEmail) {
     return res.status(401).json({ error: 'User email required in x-user-email header' });
   }
 
-  // Validate email format
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(userEmail)) {
     return res.status(400).json({ error: 'Invalid email format' });
   }
 
-  const db = getDatabase();
-  
-  // Check if user exists, create if not
-  db.get('SELECT email FROM users WHERE email = ?', [userEmail], (err, row) => {
+  ensureUser(userEmail, (err, email) => {
     if (err) {
       console.error('Database error:', err);
       return res.status(500).json({ error: 'Internal server error' });
     }
-    
-    if (!row) {
-      // Create new user
-      db.run('INSERT INTO users (email) VALUES (?)', [userEmail], (err) => {
-        if (err) {
-          console.error('Error creating user:', err);
-          return res.status(500).json({ error: 'Failed to create user' });
-        }
-        
-        req.userEmail = userEmail;
-        next();
-      });
-    } else {
-      req.userEmail = userEmail;
-      next();
-    }
+    req.userEmail = email;
+    next();
   });
 }
 
 module.exports = {
-  authenticateUser
+  authenticateUser,
+  ensureUser,
 };
