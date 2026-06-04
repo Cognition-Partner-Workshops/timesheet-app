@@ -40,15 +40,18 @@ describe('OIDC Middleware', () => {
       process.env.OIDC_ISSUER_URL = 'https://accounts.google.com/';
       const config = getOidcConfig();
 
-      expect(config.issuerUrl).toBe('https://accounts.google.com');
+      expect(config.issuerUrl).toBe('https://accounts.google.com/');
+      expect(config.discoveryBase).toBe('https://accounts.google.com');
       expect(config.audience).toBeUndefined();
       expect(config.emailClaim).toBe('email');
       expect(config.allowedAlgorithms).toEqual(['RS256']);
     });
 
-    test('strips trailing slashes from issuer URL', () => {
-      process.env.OIDC_ISSUER_URL = 'https://example.com///';
-      expect(getOidcConfig().issuerUrl).toBe('https://example.com');
+    test('strips trailing slashes from discoveryBase but preserves issuerUrl', () => {
+      process.env.OIDC_ISSUER_URL = 'https://myapp.auth0.com/';
+      const config = getOidcConfig();
+      expect(config.issuerUrl).toBe('https://myapp.auth0.com/');
+      expect(config.discoveryBase).toBe('https://myapp.auth0.com');
     });
 
     test('respects custom audience', () => {

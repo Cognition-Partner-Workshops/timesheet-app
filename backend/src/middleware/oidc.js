@@ -11,11 +11,12 @@ function getOidcConfig() {
   const issuer = process.env.OIDC_ISSUER_URL;
   if (!issuer) return null;
 
-  let url = issuer;
-  while (url.endsWith('/')) url = url.slice(0, -1);
+  let discoveryBase = issuer;
+  while (discoveryBase.endsWith('/')) discoveryBase = discoveryBase.slice(0, -1);
 
   return {
-    issuerUrl: url,
+    issuerUrl: issuer,
+    discoveryBase,
     audience: process.env.OIDC_AUDIENCE || undefined,
     emailClaim: process.env.OIDC_EMAIL_CLAIM || 'email',
     allowedAlgorithms: (process.env.OIDC_ALLOWED_ALGORITHMS || 'RS256').split(',').map(s => s.trim()),
@@ -29,6 +30,9 @@ async function fetchDiscovery(issuerUrl) {
   }
 
   const url = `${issuerUrl}/.well-known/openid-configuration`;
+  if (!url.startsWith('https://')) {
+    throw new Error(`OIDC discovery URL must use HTTPS, got: ${url}`);
+  }
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`OIDC discovery failed: ${res.status} ${res.statusText}`);
@@ -96,14 +100,14 @@ async function verifyOidcToken(token) {
     throw new Error('JWT missing kid header');
   }
 
-  let jwks = await fetchJwks(config.issuerUrl);
+  let jwks = await fetchJwks(config.discoveryBase);
   let signingKey;
   try {
     signingKey = findSigningKey(jwks, kid);
   } catch (err) {
     _jwksCache = null;
     _jwksCacheTime = 0;
-    jwks = await fetchJwks(config.issuerUrl);
+    jwks = await fetchJwks(config.discoveryBase);
     signingKey = findSigningKey(jwks, kid);
   }
 
