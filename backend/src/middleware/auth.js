@@ -22,14 +22,19 @@ function authenticateUser(req, res, next) {
   if (bearerToken && isOidcEnabled()) {
     verifyOidcToken(bearerToken)
       .then(({ email }) => {
-        ensureUser(email, (err, userEmail) => {
-          if (err) {
-            console.error('Database error:', err);
-            return res.status(500).json({ error: 'Internal server error' });
-          }
-          req.userEmail = userEmail;
-          next();
-        });
+        try {
+          ensureUser(email, (err, userEmail) => {
+            if (err) {
+              console.error('Database error:', err);
+              return res.status(500).json({ error: 'Internal server error' });
+            }
+            req.userEmail = userEmail;
+            next();
+          });
+        } catch (dbErr) {
+          console.error('Database error:', dbErr);
+          res.status(500).json({ error: 'Internal server error' });
+        }
       })
       .catch((err) => {
         console.error('OIDC token verification failed:', err.message);
