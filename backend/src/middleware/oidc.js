@@ -50,11 +50,8 @@ async function fetchJwks(issuerUrl) {
   }
 
   const jwksUrl = new URL(discovery.jwks_uri);
-  const issuerOrigin = new URL(issuerUrl).origin;
-  if (jwksUrl.origin !== issuerOrigin) {
-    throw new Error(
-      `JWKS URI origin (${jwksUrl.origin}) does not match issuer origin (${issuerOrigin})`
-    );
+  if (jwksUrl.protocol !== 'https:') {
+    throw new Error(`JWKS URI must use HTTPS, got: ${jwksUrl.protocol}`);
   }
 
   const res = await fetch(jwksUrl.href);
