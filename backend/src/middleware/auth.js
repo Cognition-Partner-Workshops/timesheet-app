@@ -38,7 +38,11 @@ function authenticateUser(req, res, next) {
     return;
   }
 
-  // Fallback: legacy email-header auth (dev / non-OIDC mode)
+  if (isOidcEnabled()) {
+    return res.status(401).json({ error: 'Bearer token required when OIDC is enabled' });
+  }
+
+  // Legacy email-header auth (dev / non-OIDC mode only)
   const userEmail = req.headers['x-user-email'];
 
   if (!userEmail) {
@@ -53,9 +57,6 @@ function authenticateUser(req, res, next) {
   ensureUser(userEmail, (err, email) => {
     if (err) {
       console.error('Database error:', err);
-      if (err.message === 'Failed to create user' || err.code === 'SQLITE_CONSTRAINT') {
-        return res.status(500).json({ error: 'Failed to create user' });
-      }
       return res.status(500).json({ error: 'Internal server error' });
     }
     req.userEmail = email;

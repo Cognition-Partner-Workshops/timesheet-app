@@ -88,7 +88,7 @@ describe('OIDC Middleware', () => {
 
     test('returns null for empty Bearer value', () => {
       const req = { headers: { authorization: 'Bearer ' } };
-      expect(extractBearerToken(req)).toBe('');
+      expect(extractBearerToken(req)).toBeNull();
     });
   });
 });

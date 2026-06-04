@@ -99,8 +99,16 @@ async function verifyOidcToken(token) {
     throw new Error('JWT missing kid header');
   }
 
-  const jwks = await fetchJwks(config.issuerUrl);
-  const signingKey = findSigningKey(jwks, kid);
+  let jwks = await fetchJwks(config.issuerUrl);
+  let signingKey;
+  try {
+    signingKey = findSigningKey(jwks, kid);
+  } catch (err) {
+    _jwksCache = null;
+    _jwksCacheTime = 0;
+    jwks = await fetchJwks(config.issuerUrl);
+    signingKey = findSigningKey(jwks, kid);
+  }
 
   const verifyOptions = {
     issuer: config.issuerUrl,
@@ -132,7 +140,8 @@ function isOidcEnabled() {
 function extractBearerToken(req) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
-  return authHeader.slice(7);
+  const token = authHeader.slice(7);
+  return token || null;
 }
 
 function resetCache() {

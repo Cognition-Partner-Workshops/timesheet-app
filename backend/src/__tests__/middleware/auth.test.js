@@ -223,19 +223,17 @@ describe('Authentication Middleware', () => {
       });
     });
 
-    test('should fall back to email header when no Bearer token present and OIDC enabled', () => {
+    test('should reject with 401 when no Bearer token present and OIDC enabled', () => {
       oidc.extractBearerToken.mockReturnValue(null);
       oidc.isOidcEnabled.mockReturnValue(true);
       req.headers['x-user-email'] = 'fallback@example.com';
 
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, { email: 'fallback@example.com' });
-      });
-
       authenticateUser(req, res, next);
 
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Bearer token required when OIDC is enabled' });
       expect(oidc.verifyOidcToken).not.toHaveBeenCalled();
-      expect(mockDb.get).toHaveBeenCalled();
+      expect(next).not.toHaveBeenCalled();
     });
 
     test('should fall back to email header when OIDC is not enabled even with Bearer token', () => {
