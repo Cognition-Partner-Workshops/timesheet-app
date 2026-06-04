@@ -6,6 +6,33 @@ const { isOidcEnabled, getOidcConfig, verifyOidcToken } = require('../middleware
 
 const router = express.Router();
 
+/**
+ * Finds an existing user or creates a new one, then calls back with the result.
+ * Shared by both login flows.
+ */
+function findOrCreateUser(email, callback) {
+  const db = getDatabase();
+
+  db.get('SELECT email, created_at FROM users WHERE email = ?', [email], (err, row) => {
+    if (err) {
+      console.error('Database error:', err);
+      return callback({ status: 500, body: { error: 'Internal server error' } });
+    }
+
+    if (row) {
+      return callback(null, { isNew: false, user: { email: row.email, createdAt: row.created_at } });
+    }
+
+    db.run('INSERT INTO users (email) VALUES (?)', [email], function (insertErr) {
+      if (insertErr) {
+        console.error('Error creating user:', insertErr);
+        return callback({ status: 500, body: { error: 'Failed to create user' } });
+      }
+      callback(null, { isNew: true, user: { email, createdAt: new Date().toISOString() } });
+    });
+  });
+}
+
 // Expose OIDC configuration to the frontend
 router.get('/oidc/config', (req, res) => {
   if (!isOidcEnabled()) {
@@ -40,33 +67,16 @@ router.post('/token', async (req, res, next) => {
     }
 
     const { email, subject, claims } = tokenPayload;
-    const db = getDatabase();
 
-    db.get('SELECT email, created_at FROM users WHERE email = ?', [email], (err, row) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ error: 'Internal server error' });
-      }
+    findOrCreateUser(email, (err, result) => {
+      if (err) return res.status(err.status).json(err.body);
 
-      if (row) {
-        return res.json({
-          message: 'Login successful',
-          user: { email: row.email, createdAt: row.created_at },
-          oidc: { subject, issuer: claims.iss },
-        });
-      }
-
-      db.run('INSERT INTO users (email) VALUES (?)', [email], function (insertErr) {
-        if (insertErr) {
-          console.error('Error creating user:', insertErr);
-          return res.status(500).json({ error: 'Failed to create user' });
-        }
-
-        res.status(201).json({
-          message: 'User created and logged in successfully',
-          user: { email, createdAt: new Date().toISOString() },
-          oidc: { subject, issuer: claims.iss },
-        });
+      const status = result.isNew ? 201 : 200;
+      const message = result.isNew ? 'User created and logged in successfully' : 'Login successful';
+      res.status(status).json({
+        message,
+        user: result.user,
+        oidc: { subject, issuer: claims.iss },
       });
     });
   } catch (error) {
@@ -82,42 +92,12 @@ router.post('/login', async (req, res, next) => {
       return next(error);
     }
 
-    const { email } = value;
-    const db = getDatabase();
+    findOrCreateUser(value.email, (err, result) => {
+      if (err) return res.status(err.status).json(err.body);
 
-    // Check if user exists
-    db.get('SELECT email, created_at FROM users WHERE email = ?', [email], (err, row) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ error: 'Internal server error' });
-      }
-
-      if (row) {
-        // User exists
-        return res.json({
-          message: 'Login successful',
-          user: {
-            email: row.email,
-            createdAt: row.created_at
-          }
-        });
-      } else {
-        // Create new user
-        db.run('INSERT INTO users (email) VALUES (?)', [email], function(err) {
-          if (err) {
-            console.error('Error creating user:', err);
-            return res.status(500).json({ error: 'Failed to create user' });
-          }
-
-          res.status(201).json({
-            message: 'User created and logged in successfully',
-            user: {
-              email: email,
-              createdAt: new Date().toISOString()
-            }
-          });
-        });
-      }
+      const status = result.isNew ? 201 : 200;
+      const message = result.isNew ? 'User created and logged in successfully' : 'Login successful';
+      res.status(status).json({ message, user: result.user });
     });
   } catch (error) {
     next(error);

@@ -11,8 +11,11 @@ function getOidcConfig() {
   const issuer = process.env.OIDC_ISSUER_URL;
   if (!issuer) return null;
 
+  let url = issuer;
+  while (url.endsWith('/')) url = url.slice(0, -1);
+
   return {
-    issuerUrl: issuer.replace(/\/+$/, ''),
+    issuerUrl: url,
     audience: process.env.OIDC_AUDIENCE || undefined,
     emailClaim: process.env.OIDC_EMAIL_CLAIM || 'email',
     allowedAlgorithms: (process.env.OIDC_ALLOWED_ALGORITHMS || 'RS256').split(',').map(s => s.trim()),
