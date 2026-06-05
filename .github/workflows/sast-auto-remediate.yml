@@ -239,6 +239,9 @@ jobs:
   trigger-remediation:
     name: Trigger Devin Remediation
     needs: [npm-audit, trivy-scan]
+    concurrency:
+      group: sast-remediate-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     permissions:
       contents: read
       pull-requests: write
@@ -255,7 +258,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           DEVIN_COMMENTS=$(gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments --paginate \
-            --jq '[.[] | select(.body | contains("SAST Auto-Remediate"))] | length')
+            --jq '[.[] | select(.body | contains("Devin Remediation In Progress"))] | length')
 
           if [ "$DEVIN_COMMENTS" -gt 0 ]; then
             echo "Devin has already attempted remediation on this PR. Skipping (max 1 attempt)."
@@ -275,7 +278,7 @@ jobs:
           TRIVY_TOTAL: ${{ needs.trivy-scan.outputs.total_severe }}
           TRIVY_HAS: ${{ needs.trivy-scan.outputs.has_findings }}
         run: |
-          COMMENT="## SAST Auto-Remediate — Findings Summary\n\n"
+          COMMENT="## Security Scan — Findings Summary\n\n"
 
           if [ "$NPM_HAS" = "true" ]; then
             COMMENT+="### npm audit — ${NPM_TOTAL} HIGH/CRITICAL CVE(s)\n\n"
@@ -429,7 +432,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           DEVIN_COMMENTS=$(gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments --paginate \
-            --jq '[.[] | select(.body | contains("SAST Auto-Remediate"))] | length')
+            --jq '[.[] | select(.body | contains("Devin Remediation In Progress"))] | length')
 
           if [ "$DEVIN_COMMENTS" -gt 0 ]; then
             echo "is_rescan=true" >> "$GITHUB_OUTPUT"
