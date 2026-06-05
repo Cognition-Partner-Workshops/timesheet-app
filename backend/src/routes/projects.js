@@ -88,12 +88,13 @@ router.post('/', (req, res, next) => {
     if (error) return next(error);
 
     const { name, description, client_id, start_date, status } = value;
+    const startDateStr = start_date instanceof Date ? start_date.toISOString().split('T')[0] : (start_date || null);
     const db = getDatabase();
 
     function insertProject() {
       db.run(
         'INSERT INTO projects (name, description, client_id, start_date, status, user_email) VALUES (?, ?, ?, ?, ?, ?)',
-        [name, description || null, client_id || null, start_date || null, status, req.userEmail],
+        [name, description || null, client_id || null, startDateStr, status, req.userEmail],
         function(err) {
           if (err) {
             console.error('Database error:', err);
@@ -152,7 +153,8 @@ router.put('/:id', (req, res, next) => {
       function performUpdate() {
         const updates = [];
         const values = [];
-        const fields = { name: value.name, description: value.description, client_id: value.client_id, start_date: value.start_date, status: value.status };
+        const startDateVal = value.start_date instanceof Date ? value.start_date.toISOString().split('T')[0] : value.start_date;
+        const fields = { name: value.name, description: value.description, client_id: value.client_id, start_date: startDateVal, status: value.status };
 
         for (const [key, val] of Object.entries(fields)) {
           if (val !== undefined) {
