@@ -94,8 +94,11 @@ describe('Project Routes', () => {
   describe('POST /api/projects', () => {
     test('creates project with all fields', async () => {
       const created = { id: 1, name: 'New', status: 'active', client_name: 'Acme' };
+      // First findOne: client ownership check
+      mockFindOne.mockResolvedValueOnce({ id: 1 });
       mockRunQuery.mockResolvedValue({ lastID: 1 });
-      mockFindOne.mockResolvedValue(created);
+      // Second findOne: fetch created project
+      mockFindOne.mockResolvedValueOnce(created);
 
       const res = await request(app).post('/api/projects').send({
         name: 'New', description: 'Desc', clientId: 1, startDate: '2024-06-01', status: 'active'
@@ -104,6 +107,13 @@ describe('Project Routes', () => {
       expect(res.status).toBe(201);
       expect(res.body.message).toBe('Project created successfully');
       expect(res.body.project).toEqual(created);
+    });
+
+    test('rejects clientId that does not belong to user', async () => {
+      mockFindOne.mockResolvedValue(null);
+      const res = await request(app).post('/api/projects').send({ name: 'X', clientId: 999 });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('Client not found or does not belong to you');
     });
 
     test('defaults status to active when omitted', async () => {
@@ -147,6 +157,17 @@ describe('Project Routes', () => {
       const res = await request(app).put('/api/projects/1').send({ name: 'Renamed', status: 'completed' });
       expect(res.status).toBe(200);
       expect(res.body.project).toEqual(updated);
+    });
+
+    test('rejects clientId that does not belong to user on update', async () => {
+      // First findOne: project exists
+      mockFindOne.mockResolvedValueOnce({ id: 1 });
+      // Second findOne: client ownership check fails
+      mockFindOne.mockResolvedValueOnce(null);
+
+      const res = await request(app).put('/api/projects/1').send({ clientId: 999 });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('Client not found or does not belong to you');
     });
 
     test('returns 404 for non-existent project', async () => {

@@ -88,7 +88,7 @@ const ProjectsPage: React.FC = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { name?: string; description?: string; clientId?: number | null; startDate?: string | null; status?: string } }) =>
+    mutationFn: ({ id, data }: { id: number; data: { name?: string; description?: string | null; clientId?: number | null; startDate?: string | null; status?: string } }) =>
       apiClient.updateProject(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
@@ -157,7 +157,12 @@ const ProjectsPage: React.FC = () => {
     };
 
     if (editingProject) {
-      updateMutation.mutate({ id: editingProject.id, data: payload });
+      // For updates, explicitly send null to clear description
+      const updatePayload = {
+        ...payload,
+        description: formData.description || null,
+      };
+      updateMutation.mutate({ id: editingProject.id, data: updatePayload });
     } else {
       createMutation.mutate(payload);
     }

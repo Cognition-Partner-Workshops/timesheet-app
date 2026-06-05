@@ -50,6 +50,17 @@ router.post('/', async (req, res, next) => {
 
   try {
     const { name, description, clientId, startDate, status } = value;
+
+    if (clientId) {
+      const client = await findOne(
+        'SELECT id FROM clients WHERE id = ? AND user_email = ?',
+        [clientId, req.userEmail]
+      );
+      if (!client) {
+        return res.status(400).json({ error: 'Client not found or does not belong to you' });
+      }
+    }
+
     const result = await runQuery(
       'INSERT INTO projects (name, description, client_id, start_date, status, user_email) VALUES (?, ?, ?, ?, ?, ?)',
       [name, description || null, clientId || null, startDate || null, status || 'active', req.userEmail]
@@ -79,6 +90,16 @@ router.put('/:id', async (req, res, next) => {
     );
     if (!existing) {
       return res.status(404).json({ error: 'Project not found' });
+    }
+
+    if (value.clientId) {
+      const client = await findOne(
+        'SELECT id FROM clients WHERE id = ? AND user_email = ?',
+        [value.clientId, req.userEmail]
+      );
+      if (!client) {
+        return res.status(400).json({ error: 'Client not found or does not belong to you' });
+      }
     }
 
     const fieldMap = {
