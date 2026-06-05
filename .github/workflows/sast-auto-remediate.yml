@@ -127,9 +127,16 @@ jobs:
       # ── Aggregate ───────────────────────────────────────────────────────
       - name: Summarize findings
         id: summarize
+        env:
+          NPM_HIGH: ${{ steps.npm.outputs.high }}
+          NPM_CRITICAL: ${{ steps.npm.outputs.critical }}
+          NPM_DETAILS: ${{ steps.npm.outputs.details }}
+          TRIVY_HIGH: ${{ steps.trivy_parse.outputs.high }}
+          TRIVY_CRITICAL: ${{ steps.trivy_parse.outputs.critical }}
+          TRIVY_DETAILS: ${{ steps.trivy_parse.outputs.details }}
         run: |
-          NPM_SEV=$(( ${{ steps.npm.outputs.high }} + ${{ steps.npm.outputs.critical }} ))
-          TRIVY_SEV=$(( ${{ steps.trivy_parse.outputs.high }} + ${{ steps.trivy_parse.outputs.critical }} ))
+          NPM_SEV=$(( NPM_HIGH + NPM_CRITICAL ))
+          TRIVY_SEV=$(( TRIVY_HIGH + TRIVY_CRITICAL ))
           TOTAL=$((NPM_SEV + TRIVY_SEV))
 
           echo "total_severe=${TOTAL}" >> "$GITHUB_OUTPUT"
@@ -140,33 +147,35 @@ jobs:
             echo "has_findings=false" >> "$GITHUB_OUTPUT"
           fi
 
-          # Build a markdown summary for reuse
+          # Build a markdown summary for reuse.
+          # Untrusted scan output is read from env vars (never interpolated
+          # into the script source) to avoid shell injection / breakage.
           {
             echo "findings_summary<<SUMMARY_EOF"
             echo "### npm audit"
             echo ""
             echo "| Severity | Count |"
             echo "|----------|-------|"
-            echo "| HIGH     | ${{ steps.npm.outputs.high }} |"
-            echo "| CRITICAL | ${{ steps.npm.outputs.critical }} |"
+            echo "| HIGH     | ${NPM_HIGH} |"
+            echo "| CRITICAL | ${NPM_CRITICAL} |"
             echo ""
-            if [ -n "${{ steps.npm.outputs.details }}" ]; then
+            if [ -n "$NPM_DETAILS" ]; then
               echo "#### Details"
               echo ""
-              echo "${{ steps.npm.outputs.details }}"
+              echo "$NPM_DETAILS"
               echo ""
             fi
             echo "### Trivy Container Scan"
             echo ""
             echo "| Severity | Count |"
             echo "|----------|-------|"
-            echo "| HIGH     | ${{ steps.trivy_parse.outputs.high }} |"
-            echo "| CRITICAL | ${{ steps.trivy_parse.outputs.critical }} |"
+            echo "| HIGH     | ${TRIVY_HIGH} |"
+            echo "| CRITICAL | ${TRIVY_CRITICAL} |"
             echo ""
-            if [ -n "${{ steps.trivy_parse.outputs.details }}" ]; then
+            if [ -n "$TRIVY_DETAILS" ]; then
               echo "#### Details"
               echo ""
-              echo "${{ steps.trivy_parse.outputs.details }}"
+              echo "$TRIVY_DETAILS"
               echo ""
             fi
             echo "SUMMARY_EOF"
@@ -206,22 +215,26 @@ jobs:
         if: steps.guard.outputs.should_run == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          TOTAL_SEVERE: ${{ needs.scan.outputs.total_severe }}
+          FINDINGS_SUMMARY: ${{ needs.scan.outputs.findings_summary }}
         run: |
-          PR_NUMBER=${{ github.event.pull_request.number }}
-          TOTAL=${{ needs.scan.outputs.total_severe }}
-
-          COMMENT=$(cat <<'COMMENT_EOF'
+          # Untrusted scan output (FINDINGS_SUMMARY) is expanded from a shell
+          # variable inside an unquoted heredoc, so its contents are inserted
+          # literally and never re-parsed as shell.
+          COMMENT=$(cat <<EOF
           ## SAST Auto-Remediate — Findings Detected
 
-          **${{ needs.scan.outputs.total_severe }}** HIGH/CRITICAL finding(s) across npm audit and Trivy container scan.
+          **${TOTAL_SEVERE}** HIGH/CRITICAL finding(s) across npm audit and Trivy container scan.
 
-          ${{ needs.scan.outputs.findings_summary }}
+          ${FINDINGS_SUMMARY}
 
           A Devin session will be triggered to auto-remediate these findings on this branch.
-          COMMENT_EOF
+          EOF
           )
 
-          gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+          gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" \
             -f body="$COMMENT"
 
       - name: Invoke Devin v3 API to remediate
@@ -357,16 +370,17 @@ jobs:
         if: steps.check.outputs.should_verify == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           HAS_FINDINGS: ${{ needs.scan.outputs.has_findings }}
           TOTAL_SEVERE: ${{ needs.scan.outputs.total_severe }}
+          FINDINGS_SUMMARY: ${{ needs.scan.outputs.findings_summary }}
         run: |
-          PR_NUMBER=${{ github.event.pull_request.number }}
-
           if [ "$HAS_FINDINGS" = "true" ]; then
             ICON="warning"
             STATUS="Still Failing"
             BODY="Re-scan found **${TOTAL_SEVERE}** remaining HIGH/CRITICAL finding(s). Manual intervention may be required."
-            BODY="${BODY}"$'\n\n'"${{ needs.scan.outputs.findings_summary }}"
+            BODY="${BODY}"$'\n\n'"${FINDINGS_SUMMARY}"
           else
             ICON="white_check_mark"
             STATUS="Passed"
@@ -380,5 +394,5 @@ jobs:
           EOF
           )
 
-          gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+          gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" \
             -f body="$COMMENT"
