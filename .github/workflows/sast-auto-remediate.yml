@@ -97,7 +97,7 @@ jobs:
         run: docker build -f docker/Dockerfile -t timesheet-app:scan .
 
       - name: Run Trivy container scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@bfa4b33a029b9aa80ddb784b45574c30e072c59e # master
         with:
           scan-type: image
           image-ref: timesheet-app:scan
