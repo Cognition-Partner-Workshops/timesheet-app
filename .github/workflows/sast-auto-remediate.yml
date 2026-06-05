@@ -16,11 +16,6 @@ on:
     types: [opened, reopened, synchronize]
     branches: [main]
 
-permissions:
-  contents: read
-  pull-requests: write
-  checks: read
-
 concurrency:
   group: sast-remediate-${{ github.event.pull_request.number }}
   cancel-in-progress: true
@@ -31,6 +26,8 @@ jobs:
     name: Security Scan (npm audit + Trivy)
     if: github.event.pull_request.user.login != 'devin-ai-integration[bot]'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       has_findings: ${{ steps.summarize.outputs.has_findings }}
       total_severe: ${{ steps.summarize.outputs.total_severe }}
@@ -182,6 +179,9 @@ jobs:
     if: |
       needs.scan.outputs.has_findings == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
       - name: Guard – skip if Devin already attempted or if bot-authored
@@ -330,6 +330,9 @@ jobs:
     if: |
       github.event.action == 'synchronize'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
       - name: Check if remediation was previously triggered
