@@ -183,7 +183,7 @@ jobs:
           docker build -t timesheet-app:scan -f docker/Dockerfile .
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2 # v0.28.0
         with:
           image-ref: 'timesheet-app:scan'
           format: 'json'
