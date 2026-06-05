@@ -20,11 +20,11 @@ jobs:
     if: github.event.pull_request.user.login != 'devin-ai-integration[bot]'
     runs-on: ubuntu-latest
     outputs:
-      has_findings: ${{ steps.audit.outputs.has_findings }}
-      total_severe: ${{ steps.audit.outputs.total_severe }}
-      high: ${{ steps.audit.outputs.high }}
-      critical: ${{ steps.audit.outputs.critical }}
-      findings_summary: ${{ steps.audit.outputs.findings_summary }}
+      has_findings: ${{ steps.aggregate.outputs.has_findings }}
+      total_severe: ${{ steps.aggregate.outputs.total_severe }}
+      high: ${{ steps.aggregate.outputs.high }}
+      critical: ${{ steps.aggregate.outputs.critical }}
+      findings_summary: ${{ steps.aggregate.outputs.findings_summary }}
 
     steps:
       - name: Checkout code
@@ -92,8 +92,74 @@ jobs:
           CRITICAL=$(echo "$AUDIT_OUTPUT" | jq -r '.metadata.vulnerabilities.critical // 0')
           TOTAL_SEVERE=$((HIGH + CRITICAL))
 
+          echo "high=$HIGH" >> "$GITHUB_OUTPUT"
+          echo "critical=$CRITICAL" >> "$GITHUB_OUTPUT"
+          echo "total_severe=$TOTAL_SEVERE" >> "$GITHUB_OUTPUT"
+
+          FINDINGS=$(echo "$AUDIT_OUTPUT" | jq -r '
+            .vulnerabilities | to_entries[] |
+            select(.value.severity == "high" or .value.severity == "critical") |
+            "- [\(.value.severity | ascii_upcase)] \(.key)@\(.value.range): \(.value.via | if type == "array" then (map(if type == "object" then .title // .url else . end) | join(", ")) else . end)"
+          ' 2>/dev/null || echo "Could not parse vulnerability details")
+
+          {
+            echo "findings_summary<<BACKEND_FINDINGS_EOF"
+            echo "$FINDINGS"
+            echo "BACKEND_FINDINGS_EOF"
+          } >> "$GITHUB_OUTPUT"
+
           if [ "$TOTAL_SEVERE" -gt 0 ]; then
+            echo "has_findings=true" >> "$GITHUB_OUTPUT"
             echo "::warning::Found $TOTAL_SEVERE high/critical npm vulnerabilities in backend"
+          else
+            echo "has_findings=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Aggregate frontend + backend audit results
+        id: aggregate
+        env:
+          FE_HIGH: ${{ steps.audit.outputs.high }}
+          FE_CRITICAL: ${{ steps.audit.outputs.critical }}
+          FE_FINDINGS: ${{ steps.audit.outputs.findings_summary }}
+          BE_HIGH: ${{ steps.audit_backend.outputs.high }}
+          BE_CRITICAL: ${{ steps.audit_backend.outputs.critical }}
+          BE_FINDINGS: ${{ steps.audit_backend.outputs.findings_summary }}
+        run: |
+          FE_HIGH=${FE_HIGH:-0}
+          FE_CRITICAL=${FE_CRITICAL:-0}
+          BE_HIGH=${BE_HIGH:-0}
+          BE_CRITICAL=${BE_CRITICAL:-0}
+
+          TOTAL_HIGH=$((FE_HIGH + BE_HIGH))
+          TOTAL_CRITICAL=$((FE_CRITICAL + BE_CRITICAL))
+          TOTAL_SEVERE=$((TOTAL_HIGH + TOTAL_CRITICAL))
+
+          echo "high=$TOTAL_HIGH" >> "$GITHUB_OUTPUT"
+          echo "critical=$TOTAL_CRITICAL" >> "$GITHUB_OUTPUT"
+          echo "total_severe=$TOTAL_SEVERE" >> "$GITHUB_OUTPUT"
+
+          # Combine findings summaries
+          COMBINED=""
+          if [ -n "$FE_FINDINGS" ]; then
+            COMBINED+="**frontend/**
+          ${FE_FINDINGS}
+          "
+          fi
+          if [ -n "$BE_FINDINGS" ]; then
+            COMBINED+="**backend/**
+          ${BE_FINDINGS}"
+          fi
+
+          {
+            echo "findings_summary<<AGG_EOF"
+            echo "$COMBINED"
+            echo "AGG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ "$TOTAL_SEVERE" -gt 0 ]; then
+            echo "has_findings=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_findings=false" >> "$GITHUB_OUTPUT"
           fi
 
   # ---------------------------------------------------------------------------
