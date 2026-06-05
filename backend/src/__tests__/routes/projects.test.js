@@ -113,12 +113,15 @@ describe('Project Routes', () => {
   });
 
   describe('POST /api/projects', () => {
-    test('should create new project with all fields', async () => {
+    test('should create new project with all fields including client_id', async () => {
       const newProject = { name: 'New Project', description: 'Desc', client_id: 1, start_date: '2024-03-01', status: 'active' };
       const created = { id: 1, ...newProject, client_name: 'Client A', created_at: '2024-01-01', updated_at: '2024-01-01' };
 
+      // First get verifies client ownership, then run inserts, then get retrieves
+      mockDb.get
+        .mockImplementationOnce((query, params, callback) => callback(null, { id: 1 }))
+        .mockImplementationOnce((query, params, callback) => callback(null, created));
       mockDbInsert(mockDb, 1);
-      mockDbGetResult(mockDb, created);
 
       const response = await request(app).post('/api/projects').send(newProject);
       expect(response.status).toBe(201);
@@ -126,13 +129,21 @@ describe('Project Routes', () => {
       expect(response.body.project.name).toBe('New Project');
     });
 
-    test('should create project with only name (minimal)', async () => {
+    test('should create project with only name (minimal, no client_id)', async () => {
       mockDbInsert(mockDb, 2);
       mockDbGetResult(mockDb, { id: 2, name: 'Minimal', description: null, client_id: null, start_date: null, status: 'active', client_name: null });
 
       const response = await request(app).post('/api/projects').send({ name: 'Minimal' });
       expect(response.status).toBe(201);
       expect(response.body.project.status).toBe('active');
+    });
+
+    test('should return 400 if client_id does not belong to user', async () => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => callback(null, null));
+
+      const response = await request(app).post('/api/projects').send({ name: 'Test', client_id: 999 });
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Client not found');
     });
 
     test('should return 400 for missing name', async () => {
@@ -208,6 +219,29 @@ describe('Project Routes', () => {
       const response = await request(app).put('/api/projects/1').send({ name: 'Updated' });
       expect(response.status).toBe(500);
       expect(response.body.error).toBe('Failed to update project');
+    });
+
+    test('should return 400 if updated client_id does not belong to user', async () => {
+      mockDb.get
+        .mockImplementationOnce((query, params, callback) => callback(null, { id: 1 }))
+        .mockImplementationOnce((query, params, callback) => callback(null, null));
+
+      const response = await request(app).put('/api/projects/1').send({ client_id: 999 });
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Client not found');
+    });
+
+    test('should update project with valid client_id', async () => {
+      const updatedProject = { id: 1, name: 'Proj', client_id: 2, client_name: 'Client B' };
+      mockDb.get
+        .mockImplementationOnce((query, params, callback) => callback(null, { id: 1 }))
+        .mockImplementationOnce((query, params, callback) => callback(null, { id: 2 }))
+        .mockImplementationOnce((query, params, callback) => callback(null, updatedProject));
+      mockDb.run.mockImplementation(function(query, params, callback) { callback.call(this, null); });
+
+      const response = await request(app).put('/api/projects/1').send({ client_id: 2 });
+      expect(response.status).toBe(200);
+      expect(response.body.project.client_id).toBe(2);
     });
   });
 
