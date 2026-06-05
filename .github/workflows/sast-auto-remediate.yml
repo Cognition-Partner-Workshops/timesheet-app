@@ -6,11 +6,6 @@ on:
     branches:
       - main
 
-permissions:
-  contents: read
-  pull-requests: write
-  packages: read
-
 jobs:
   # ---------------------------------------------------------------------------
   # Job 1: npm audit — scans frontend dependencies for HIGH/CRITICAL CVEs
@@ -19,6 +14,8 @@ jobs:
     name: npm audit (Dependency CVE Scan)
     if: github.event.pull_request.user.login != 'devin-ai-integration[bot]'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       has_findings: ${{ steps.aggregate.outputs.has_findings }}
       total_severe: ${{ steps.aggregate.outputs.total_severe }}
@@ -169,6 +166,8 @@ jobs:
     name: Trivy Container Scan
     if: github.event.pull_request.user.login != 'devin-ai-integration[bot]'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       has_findings: ${{ steps.trivy_check.outputs.has_findings }}
       total_severe: ${{ steps.trivy_check.outputs.total_severe }}
@@ -240,6 +239,9 @@ jobs:
   trigger-remediation:
     name: Trigger Devin Remediation
     needs: [npm-audit, trivy-scan]
+    permissions:
+      contents: read
+      pull-requests: write
     if: |
       always() &&
       github.event.pull_request.user.login != 'devin-ai-integration[bot]' &&
@@ -410,6 +412,9 @@ jobs:
   verify-fix:
     name: Verify Remediation (Re-scan)
     needs: [npm-audit, trivy-scan]
+    permissions:
+      contents: read
+      pull-requests: write
     if: |
       always() &&
       github.event.pull_request.user.login != 'devin-ai-integration[bot]' &&
