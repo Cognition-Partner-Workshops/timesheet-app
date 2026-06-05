@@ -1,0 +1,381 @@
+# ---------------------------------------------------------------------------
+# SAST Auto-Remediation Pipeline
+# ---------------------------------------------------------------------------
+# Runs npm audit + Trivy container scan on every non-bot PR.
+# When HIGH/CRITICAL findings are detected the workflow:
+#   1. Posts a detailed findings summary as a PR comment.
+#   2. Triggers a Devin session via the v3 API to remediate on the same branch.
+#   3. On subsequent pushes (synchronize) the scan re-runs and posts a
+#      verification comment confirming whether the findings are resolved.
+# ---------------------------------------------------------------------------
+
+name: SAST Auto-Remediate
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: read
+
+concurrency:
+  group: sast-remediate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+# ── Scan ────────────────────────────────────────────────────────────────────
+jobs:
+  scan:
+    name: Security Scan (npm audit + Trivy)
+    if: github.event.pull_request.user.login != 'devin-ai-integration[bot]'
+    runs-on: ubuntu-latest
+    outputs:
+      has_findings: ${{ steps.summarize.outputs.has_findings }}
+      total_severe: ${{ steps.summarize.outputs.total_severe }}
+      npm_high: ${{ steps.npm.outputs.high }}
+      npm_critical: ${{ steps.npm.outputs.critical }}
+      npm_details: ${{ steps.npm.outputs.details }}
+      trivy_high: ${{ steps.trivy_parse.outputs.high }}
+      trivy_critical: ${{ steps.trivy_parse.outputs.critical }}
+      trivy_details: ${{ steps.trivy_parse.outputs.details }}
+      findings_summary: ${{ steps.summarize.outputs.findings_summary }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # ── npm audit (frontend + backend) ──────────────────────────────────
+      - name: Run npm audit
+        id: npm
+        run: |
+          set +e
+          TOTAL_HIGH=0
+          TOTAL_CRIT=0
+          ALL_DETAILS=""
+
+          for dir in frontend backend; do
+            echo "::group::npm audit ($dir)"
+            (cd "$dir" && npm ci --silent) >/dev/null 2>&1
+
+            AUDIT=$(cd "$dir" && npm audit --json 2>/dev/null || true)
+            echo "$AUDIT" > "/tmp/npm-audit-${dir}.json"
+
+            H=$(echo "$AUDIT" | jq -r '.metadata.vulnerabilities.high // 0')
+            C=$(echo "$AUDIT" | jq -r '.metadata.vulnerabilities.critical // 0')
+            TOTAL_HIGH=$((TOTAL_HIGH + H))
+            TOTAL_CRIT=$((TOTAL_CRIT + C))
+
+            D=$(echo "$AUDIT" | jq -r --arg d "$dir" '
+              .vulnerabilities // {} | to_entries[]
+              | select(.value.severity == "high" or .value.severity == "critical")
+              | "- [\(.value.severity | ascii_upcase)] \($d)/\(.key)@\(.value.range): \(.value.via | if type == "array" then (map(if type == "object" then .title // .url else . end) | join(", ")) else . end)"
+            ' 2>/dev/null || true)
+
+            if [ -n "$D" ]; then
+              ALL_DETAILS="${ALL_DETAILS}${D}"$'\n'
+            fi
+            echo "::endgroup::"
+          done
+
+          echo "high=${TOTAL_HIGH}" >> "$GITHUB_OUTPUT"
+          echo "critical=${TOTAL_CRIT}" >> "$GITHUB_OUTPUT"
+          {
+            echo "details<<NPM_EOF"
+            echo "$ALL_DETAILS"
+            echo "NPM_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      # ── Trivy container scan ────────────────────────────────────────────
+      - name: Build Docker image for scanning
+        run: docker build -f docker/Dockerfile -t timesheet-app:scan .
+
+      - name: Run Trivy container scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: image
+          image-ref: timesheet-app:scan
+          format: json
+          output: trivy-results.json
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+
+      - name: Parse Trivy results
+        id: trivy_parse
+        run: |
+          H=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' trivy-results.json)
+          C=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' trivy-results.json)
+          echo "high=${H}" >> "$GITHUB_OUTPUT"
+          echo "critical=${C}" >> "$GITHUB_OUTPUT"
+
+          DETAILS=$(jq -r '
+            [.Results[]? | . as $r | (.Vulnerabilities // [])[]
+              | select(.Severity == "HIGH" or .Severity == "CRITICAL")
+              | "- [\(.Severity)] \(.PkgName) \(.InstalledVersion) -> \(.FixedVersion // "no fix") (\(.VulnerabilityID))"]
+            | unique | .[]
+          ' trivy-results.json 2>/dev/null || true)
+
+          {
+            echo "details<<TRIVY_EOF"
+            echo "$DETAILS"
+            echo "TRIVY_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      # ── Aggregate ───────────────────────────────────────────────────────
+      - name: Summarize findings
+        id: summarize
+        run: |
+          NPM_SEV=$(( ${{ steps.npm.outputs.high }} + ${{ steps.npm.outputs.critical }} ))
+          TRIVY_SEV=$(( ${{ steps.trivy_parse.outputs.high }} + ${{ steps.trivy_parse.outputs.critical }} ))
+          TOTAL=$((NPM_SEV + TRIVY_SEV))
+
+          echo "total_severe=${TOTAL}" >> "$GITHUB_OUTPUT"
+
+          if [ "$TOTAL" -gt 0 ]; then
+            echo "has_findings=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_findings=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Build a markdown summary for reuse
+          {
+            echo "findings_summary<<SUMMARY_EOF"
+            echo "### npm audit"
+            echo ""
+            echo "| Severity | Count |"
+            echo "|----------|-------|"
+            echo "| HIGH     | ${{ steps.npm.outputs.high }} |"
+            echo "| CRITICAL | ${{ steps.npm.outputs.critical }} |"
+            echo ""
+            if [ -n "${{ steps.npm.outputs.details }}" ]; then
+              echo "#### Details"
+              echo ""
+              echo "${{ steps.npm.outputs.details }}"
+              echo ""
+            fi
+            echo "### Trivy Container Scan"
+            echo ""
+            echo "| Severity | Count |"
+            echo "|----------|-------|"
+            echo "| HIGH     | ${{ steps.trivy_parse.outputs.high }} |"
+            echo "| CRITICAL | ${{ steps.trivy_parse.outputs.critical }} |"
+            echo ""
+            if [ -n "${{ steps.trivy_parse.outputs.details }}" ]; then
+              echo "#### Details"
+              echo ""
+              echo "${{ steps.trivy_parse.outputs.details }}"
+              echo ""
+            fi
+            echo "SUMMARY_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+  # ── Remediate ───────────────────────────────────────────────────────────
+  remediate:
+    name: Trigger Devin Remediation
+    needs: [scan]
+    if: |
+      needs.scan.outputs.has_findings == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Guard – skip if Devin already attempted or if bot-authored
+        id: guard
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # One-time guard: skip if Devin has already been triggered
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          DEVIN_COMMENTS=$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+            --paginate \
+            --jq '[.[] | select(.body | contains("SAST Auto-Remediate"))] | length')
+
+          if [ "$DEVIN_COMMENTS" -gt 0 ]; then
+            echo "Devin has already been triggered on this PR. Skipping."
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Post findings comment on PR
+        if: steps.guard.outputs.should_run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          TOTAL=${{ needs.scan.outputs.total_severe }}
+
+          COMMENT=$(cat <<'COMMENT_EOF'
+          ## SAST Auto-Remediate — Findings Detected
+
+          **${{ needs.scan.outputs.total_severe }}** HIGH/CRITICAL finding(s) across npm audit and Trivy container scan.
+
+          ${{ needs.scan.outputs.findings_summary }}
+
+          A Devin session will be triggered to auto-remediate these findings on this branch.
+          COMMENT_EOF
+          )
+
+          gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+            -f body="$COMMENT"
+
+      - name: Invoke Devin v3 API to remediate
+        if: steps.guard.outputs.should_run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
+          DEVIN_ORG_ID: ${{ secrets.DEVIN_ORG_ID }}
+          CREATE_AS_USER_ID: ${{ secrets.DEVIN_CREATE_AS_USER_ID }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          REPO: ${{ github.repository }}
+          TOTAL_SEVERE: ${{ needs.scan.outputs.total_severe }}
+          NPM_DETAILS: ${{ needs.scan.outputs.npm_details }}
+          TRIVY_DETAILS: ${{ needs.scan.outputs.trivy_details }}
+        run: |
+          PROMPT=$(cat <<PROMPT_END
+          The SAST auto-remediation pipeline on PR #${PR_NUMBER} in repository ${REPO} on branch '${PR_BRANCH}' found ${TOTAL_SEVERE} HIGH/CRITICAL security finding(s).
+
+          ## npm audit findings
+          ${NPM_DETAILS}
+
+          ## Trivy container scan findings
+          ${TRIVY_DETAILS}
+
+          Instructions:
+          1. Clone the repository ${REPO} and checkout branch '${PR_BRANCH}'.
+          2. For npm audit CVEs in frontend/ and backend/:
+             - Upgrade affected packages to patched versions.
+             - Run npm audit to confirm the fix.
+          3. For Trivy container findings:
+             - Update base images or OS packages in docker/Dockerfile.
+             - Pin versions to patched releases where available.
+          4. Run npm run build in frontend/ to verify nothing is broken.
+          5. Run npm test in backend/ and frontend/ to verify existing tests pass.
+          6. Commit the fix with message: "fix: remediate SAST findings on PR #${PR_NUMBER}"
+          7. Push to branch '${PR_BRANCH}'.
+
+          Constraints:
+          - Only fix the security findings — do not refactor unrelated code.
+          - Maintain the same functionality — replace insecure patterns with secure equivalents.
+          - This is a ONE-TIME remediation attempt. Make it count.
+          PROMPT_END
+          )
+
+          ESCAPED_PROMPT=$(echo "$PROMPT" | jq -Rs .)
+
+          REQUEST_BODY=$(jq -n \
+            --argjson prompt "$ESCAPED_PROMPT" \
+            --arg title "Remediate SAST findings on PR #${PR_NUMBER}" \
+            --arg repo "$REPO" \
+            --arg user_id "${CREATE_AS_USER_ID}" \
+            '{
+              prompt: $prompt,
+              title: $title,
+              repos: [$repo],
+              create_as_user_id: $user_id,
+              tags: ["sast-fix", "npm-audit", "trivy", "security", "automated"]
+            }')
+
+          HTTP_RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST \
+            -H "Authorization: Bearer ${DEVIN_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "$REQUEST_BODY" \
+            "https://api.devin.ai/v3/organizations/${DEVIN_ORG_ID}/sessions")
+
+          HTTP_BODY=$(echo "$HTTP_RESPONSE" | sed '/^HTTP_STATUS:/d')
+          HTTP_CODE=$(echo "$HTTP_RESPONSE" | grep '^HTTP_STATUS:' | cut -d: -f2)
+
+          if [ "$HTTP_CODE" -eq 200 ]; then
+            SESSION_URL=$(echo "$HTTP_BODY" | jq -r '.url')
+            SESSION_ID=$(echo "$HTTP_BODY" | jq -r '.session_id')
+            echo "Devin session created: ${SESSION_URL}"
+
+            {
+              echo "## Devin SAST Auto-Remediate Triggered"
+              echo ""
+              echo "Found ${TOTAL_SEVERE} HIGH/CRITICAL finding(s) on PR #${PR_NUMBER}."
+              echo "A Devin session has been created for a one-time remediation attempt."
+              echo ""
+              echo "**Session:** ${SESSION_URL}"
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            COMMENT=$(cat <<EOF
+          ## SAST Auto-Remediate — Devin Remediation In Progress
+
+          A Devin session has been automatically created to remediate **${TOTAL_SEVERE}** HIGH/CRITICAL finding(s) from npm audit and Trivy.
+
+          **Devin Session:** ${SESSION_URL}
+
+          Devin will commit the fix directly to branch \`${PR_BRANCH}\`. The scan will re-run automatically once the fix is pushed.
+          EOF
+            )
+
+            gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" -f body="$COMMENT"
+          else
+            echo "::error::Failed to create Devin session (HTTP ${HTTP_CODE})"
+            echo "$HTTP_BODY"
+            exit 1
+          fi
+
+  # ── Verify (re-scan) ───────────────────────────────────────────────────
+  verify:
+    name: Verify Remediation
+    needs: [scan]
+    if: |
+      github.event.action == 'synchronize'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check if remediation was previously triggered
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          DEVIN_COMMENTS=$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+            --paginate \
+            --jq '[.[] | select(.body | contains("SAST Auto-Remediate"))] | length')
+
+          if [ "$DEVIN_COMMENTS" -gt 0 ]; then
+            echo "Prior remediation found — will post verification."
+            echo "should_verify=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No prior remediation comment found. Skipping verification."
+            echo "should_verify=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Post verification comment
+        if: steps.check.outputs.should_verify == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HAS_FINDINGS: ${{ needs.scan.outputs.has_findings }}
+          TOTAL_SEVERE: ${{ needs.scan.outputs.total_severe }}
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+
+          if [ "$HAS_FINDINGS" = "true" ]; then
+            ICON="warning"
+            STATUS="Still Failing"
+            BODY="Re-scan found **${TOTAL_SEVERE}** remaining HIGH/CRITICAL finding(s). Manual intervention may be required."
+            BODY="${BODY}"$'\n\n'"${{ needs.scan.outputs.findings_summary }}"
+          else
+            ICON="white_check_mark"
+            STATUS="Passed"
+            BODY="Re-scan confirms **all HIGH/CRITICAL findings have been resolved**. The remediation was successful."
+          fi
+
+          COMMENT=$(cat <<EOF
+          ## :${ICON}: SAST Auto-Remediate — Verification ${STATUS}
+
+          ${BODY}
+          EOF
+          )
+
+          gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+            -f body="$COMMENT"
