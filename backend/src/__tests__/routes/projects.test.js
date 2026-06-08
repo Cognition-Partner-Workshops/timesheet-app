@@ -320,7 +320,7 @@ describe('Project Routes', () => {
         .send({ name: 'Updated' });
 
       expect(response.status).toBe(500);
-      expect(response.body).toEqual({ error: 'Internal server error' });
+      expect(response.body).toEqual({ error: 'Failed to update project' });
     });
   });
 
