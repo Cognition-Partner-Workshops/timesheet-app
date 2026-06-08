@@ -24,7 +24,7 @@ router.get('/', (req, res) => {
   const params = [req.userEmail];
   
   if (clientId) {
-    const clientIdNum = parseInt(clientId);
+    const clientIdNum = parseInt(clientId, 10);
     if (isNaN(clientIdNum)) {
       return res.status(400).json({ error: 'Invalid client ID' });
     }
@@ -46,7 +46,7 @@ router.get('/', (req, res) => {
 
 // Get specific work entry
 router.get('/:id', (req, res) => {
-  const workEntryId = parseInt(req.params.id);
+  const workEntryId = parseInt(req.params.id, 10);
   
   if (isNaN(workEntryId)) {
     return res.status(400).json({ error: 'Invalid work entry ID' });
@@ -143,7 +143,7 @@ router.post('/', (req, res, next) => {
 // Update work entry
 router.put('/:id', (req, res, next) => {
   try {
-    const workEntryId = parseInt(req.params.id);
+    const workEntryId = parseInt(req.params.id, 10);
     
     if (isNaN(workEntryId)) {
       return res.status(400).json({ error: 'Invalid work entry ID' });
@@ -259,7 +259,7 @@ router.put('/:id', (req, res, next) => {
 
 // Delete work entry
 router.delete('/:id', (req, res) => {
-  const workEntryId = parseInt(req.params.id);
+  const workEntryId = parseInt(req.params.id, 10);
   
   if (isNaN(workEntryId)) {
     return res.status(400).json({ error: 'Invalid work entry ID' });
