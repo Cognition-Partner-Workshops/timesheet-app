@@ -13,7 +13,7 @@ router.use(authenticateUser);
 
 // Get hourly report for specific client
 router.get('/client/:clientId', (req, res) => {
-  const clientId = parseInt(req.params.clientId, 10);
+  const clientId = parseInt(req.params.clientId);
   
   if (isNaN(clientId)) {
     return res.status(400).json({ error: 'Invalid client ID' });
@@ -65,7 +65,7 @@ router.get('/client/:clientId', (req, res) => {
 
 // Export client report as CSV
 router.get('/export/csv/:clientId', (req, res) => {
-  const clientId = parseInt(req.params.clientId, 10);
+  const clientId = parseInt(req.params.clientId);
   
   if (isNaN(clientId)) {
     return res.status(400).json({ error: 'Invalid client ID' });
@@ -148,7 +148,7 @@ router.get('/export/csv/:clientId', (req, res) => {
 
 // Export client report as PDF
 router.get('/export/pdf/:clientId', (req, res) => {
-  const clientId = parseInt(req.params.clientId, 10);
+  const clientId = parseInt(req.params.clientId);
   
   if (isNaN(clientId)) {
     return res.status(400).json({ error: 'Invalid client ID' });
