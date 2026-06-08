@@ -432,8 +432,18 @@ describe('Report Routes', () => {
     return PDFDocument;
   }
 
-  function getLastPdfInstance(PDFDocument) {
-    return PDFDocument.mock.results[PDFDocument.mock.results.length - 1].value;
+  function setupCsvMock() {
+    const csvWriter = require('csv-writer');
+    const mockWriteRecords = jest.fn().mockRejectedValue(new Error('Write failed'));
+    csvWriter.createObjectCsvWriter.mockReturnValue({ writeRecords: mockWriteRecords });
+    return { csvWriter, mockWriteRecords };
+  }
+
+  async function requestPdfAndGetMock(client, entries, yPosition = 100) {
+    setupClientAndEntries(client, entries);
+    const PDFDocument = setupPdfMock(yPosition);
+    const response = await request(app).get('/api/reports/export/pdf/1');
+    return { pdf: PDFDocument.mock.results[PDFDocument.mock.results.length - 1].value, response };
   }
 
   describe('CSV Export Success - Download and Cleanup', () => {
@@ -443,10 +453,7 @@ describe('Report Routes', () => {
         { date: '2024-01-02', hours: 3, description: 'Work 2', created_at: '2024-01-02' }
       ];
       setupClientAndEntries({ id: 1, name: 'Test Client' }, mockWorkEntries);
-
-      const csvWriter = require('csv-writer');
-      const mockWriteRecords = jest.fn().mockRejectedValue(new Error('Write failed'));
-      csvWriter.createObjectCsvWriter.mockReturnValue({ writeRecords: mockWriteRecords });
+      const { mockWriteRecords } = setupCsvMock();
 
       await request(app).get('/api/reports/export/csv/1');
 
@@ -455,11 +462,7 @@ describe('Report Routes', () => {
 
     test('should configure CSV writer with correct headers and filename pattern', async () => {
       setupClientAndEntries({ id: 1, name: 'Acme Corp' }, []);
-
-      const csvWriter = require('csv-writer');
-      csvWriter.createObjectCsvWriter.mockReturnValue({
-        writeRecords: jest.fn().mockRejectedValue(new Error('Write failed'))
-      });
+      const { csvWriter } = setupCsvMock();
 
       await request(app).get('/api/reports/export/csv/1');
 
@@ -479,18 +482,14 @@ describe('Report Routes', () => {
 
   describe('PDF Export Success Path', () => {
     test('should generate PDF with correct content for client with entries', async () => {
-      setupClientAndEntries(
+      const { pdf, response } = await requestPdfAndGetMock(
         { id: 1, name: 'Test Client' },
         [
           { date: '2024-01-01', hours: 5.5, description: 'Development', created_at: '2024-01-01' },
           { date: '2024-01-02', hours: 3.0, description: null, created_at: '2024-01-02' }
         ]
       );
-      const PDFDocument = setupPdfMock();
 
-      const response = await request(app).get('/api/reports/export/pdf/1');
-
-      const pdf = getLastPdfInstance(PDFDocument);
       expect(pdf.pipe).toHaveBeenCalled();
       expect(pdf.end).toHaveBeenCalled();
       expect(pdf.fontSize).toHaveBeenCalled();
@@ -502,26 +501,20 @@ describe('Report Routes', () => {
     });
 
     test('should generate PDF with no entries and zero total hours', async () => {
-      setupClientAndEntries({ id: 1, name: 'Empty Client' }, []);
-      const PDFDocument = setupPdfMock();
+      const { pdf } = await requestPdfAndGetMock({ id: 1, name: 'Empty Client' }, []);
 
-      await request(app).get('/api/reports/export/pdf/1');
-
-      const pdf = getLastPdfInstance(PDFDocument);
       expect(pdf.text).toHaveBeenCalledWith('Total Hours: 0.00');
       expect(pdf.text).toHaveBeenCalledWith('Total Entries: 0');
     });
 
     test('should add new page when y position exceeds 700', async () => {
-      setupClientAndEntries(
+      const { pdf } = await requestPdfAndGetMock(
         { id: 1, name: 'Test Client' },
-        [{ date: '2024-01-01', hours: 5, description: 'Work', created_at: '2024-01-01' }]
+        [{ date: '2024-01-01', hours: 5, description: 'Work', created_at: '2024-01-01' }],
+        750
       );
-      const PDFDocument = setupPdfMock(750);
 
-      await request(app).get('/api/reports/export/pdf/1');
-
-      expect(getLastPdfInstance(PDFDocument).addPage).toHaveBeenCalled();
+      expect(pdf.addPage).toHaveBeenCalled();
     });
 
     test('should render separator line every 5 entries', async () => {
@@ -529,25 +522,19 @@ describe('Report Routes', () => {
         date: `2024-01-0${i + 1}`, hours: 2,
         description: `Entry ${i + 1}`, created_at: `2024-01-0${i + 1}`
       }));
-      setupClientAndEntries({ id: 1, name: 'Test Client' }, entries);
-      const PDFDocument = setupPdfMock();
-
-      await request(app).get('/api/reports/export/pdf/1');
+      const { pdf } = await requestPdfAndGetMock({ id: 1, name: 'Test Client' }, entries);
 
       // Header line + separator after entry 5 = at least 2 stroke calls
-      expect(getLastPdfInstance(PDFDocument).stroke.mock.calls.length).toBeGreaterThanOrEqual(2);
+      expect(pdf.stroke.mock.calls.length).toBeGreaterThanOrEqual(2);
     });
 
     test('should handle null descriptions in PDF entries', async () => {
-      setupClientAndEntries(
+      const { pdf } = await requestPdfAndGetMock(
         { id: 1, name: 'Test Client' },
         [{ date: '2024-01-01', hours: 4, description: null, created_at: '2024-01-01' }]
       );
-      const PDFDocument = setupPdfMock();
 
-      await request(app).get('/api/reports/export/pdf/1');
-
-      expect(getLastPdfInstance(PDFDocument).text).toHaveBeenCalledWith('No description', 230, 100, { width: 300 });
+      expect(pdf.text).toHaveBeenCalledWith('No description', 230, 100, { width: 300 });
     });
 
     test('should handle database error when fetching work entries for PDF', async () => {
