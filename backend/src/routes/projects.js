@@ -8,6 +8,18 @@ const router = express.Router();
 // All routes require authentication
 router.use(authenticateUser);
 
+// Normalize a Joi-validated date (Date object) or empty value to a YYYY-MM-DD string
+function normalizeStartDate(startDate) {
+  if (!startDate) {
+    return null;
+  }
+  const date = startDate instanceof Date ? startDate : new Date(startDate);
+  if (isNaN(date.getTime())) {
+    return null;
+  }
+  return date.toISOString().split('T')[0];
+}
+
 const SELECT_PROJECT = `
   SELECT p.id, p.name, p.description, p.client_id, p.start_date, p.status,
          p.created_at, p.updated_at, c.name as client_name
@@ -74,7 +86,7 @@ router.post('/', (req, res, next) => {
 
     db.run(
       'INSERT INTO projects (name, description, client_id, start_date, status, user_email) VALUES (?, ?, ?, ?, ?, ?)',
-      [name, description || null, clientId || null, startDate || null, status || 'active', req.userEmail],
+      [name, description || null, clientId || null, normalizeStartDate(startDate), status || 'active', req.userEmail],
       function(err) {
         if (err) {
           console.error('Database error:', err);
@@ -155,7 +167,7 @@ router.put('/:id', (req, res, next) => {
 
         if (value.startDate !== undefined) {
           updates.push('start_date = ?');
-          values.push(value.startDate || null);
+          values.push(normalizeStartDate(value.startDate));
         }
 
         if (value.status !== undefined) {

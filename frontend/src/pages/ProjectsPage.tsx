@@ -55,6 +55,15 @@ const STATUS_COLORS: Record<ProjectStatus, 'success' | 'default' | 'warning'> = 
 const statusLabel = (status: ProjectStatus) =>
   STATUS_OPTIONS.find((option) => option.value === status)?.label || status;
 
+// Convert any stored date value into a YYYY-MM-DD string for the date input
+const toDateInputValue = (value: string | null): string => {
+  if (!value) {
+    return '';
+  }
+  const date = new Date(value);
+  return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
+};
+
 const ProjectsPage: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -136,7 +145,7 @@ const ProjectsPage: React.FC = () => {
         name: project.name,
         description: project.description || '',
         clientId: project.client_id ?? '',
-        startDate: project.start_date ? project.start_date.split('T')[0] : '',
+        startDate: toDateInputValue(project.start_date),
         status: project.status,
       });
     } else {
