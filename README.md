@@ -171,6 +171,14 @@ Frontend will be running at `http://localhost:5173`
 - `PUT /api/clients/:id` - Update client
 - `DELETE /api/clients/:id` - Delete client
 
+### Projects
+- `GET /api/projects` - Get all projects
+- `POST /api/projects` - Create new project
+- `GET /api/projects/:id` - Get specific project
+- `PUT /api/projects/:id` - Update project
+- `DELETE /api/projects/:id` - Delete project
+- `DELETE /api/projects` - Delete all projects
+
 ### Work Entries
 - `GET /api/work-entries` - Get all work entries (optional ?clientId filter)
 - `POST /api/work-entries` - Create new work entry
