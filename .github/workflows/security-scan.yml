@@ -9,9 +9,9 @@ on:
     branches:
       - main
 
+# Least-privilege default; jobs that need more request it explicitly.
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   dependency-review:
@@ -19,6 +19,9 @@ jobs:
     # The dependency-review action requires a PR diff, so it only runs on
     # pull_request events.
     if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -32,6 +35,8 @@ jobs:
 
   sbom:
     name: SBOM Generation (CycloneDX)
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -66,6 +71,8 @@ jobs:
 
   trivy-container-scan:
     name: Trivy Container Scan
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
