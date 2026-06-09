@@ -586,26 +586,14 @@ describe('Work Entry Routes', () => {
     });
   });
 
-  describe('POST /api/work-entries - Synchronous Exception', () => {
-    test('should handle synchronous exception from getDatabase()', async () => {
+  describe('Synchronous getDatabase() exceptions', () => {
+    test.each([
+      ['POST', '/api/work-entries', { clientId: 1, hours: 5, description: 'Work', date: '2024-01-15' }],
+      ['PUT', '/api/work-entries/1', { hours: 8 }],
+    ])('%s %s should return 500 when getDatabase throws', async (method, url, body) => {
       getDatabase.mockImplementation(() => { throw new Error('DB unavailable'); });
 
-      const response = await request(app)
-        .post('/api/work-entries')
-        .send({ clientId: 1, hours: 5, description: 'Work', date: '2024-01-15' });
-
-      expect(response.status).toBe(500);
-    });
-  });
-
-  describe('PUT /api/work-entries/:id - Synchronous Exception', () => {
-    test('should handle synchronous exception from getDatabase()', async () => {
-      getDatabase.mockImplementation(() => { throw new Error('DB unavailable'); });
-
-      const response = await request(app)
-        .put('/api/work-entries/1')
-        .send({ hours: 8 });
-
+      const response = await request(app)[method.toLowerCase()](url).send(body);
       expect(response.status).toBe(500);
     });
   });
