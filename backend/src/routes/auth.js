@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const { getDatabase } = require('../database/init');
 const { emailSchema, loginSchema, registerSchema } = require('../validation/schemas');
 const { authenticateUser } = require('../middleware/auth');
+const { requireRole } = require('../middleware/rbac');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production-min-32-chars';
@@ -154,13 +155,16 @@ router.post('/login', async (req, res, next) => {
       const { email } = value;
       const db = getDatabase();
 
-      db.get('SELECT email, role, created_at FROM users WHERE email = ?', [email], (err, row) => {
+      db.get('SELECT email, role, password_hash, created_at FROM users WHERE email = ?', [email], (err, row) => {
         if (err) {
           console.error('Database error:', err);
           return res.status(500).json({ error: 'Internal server error' });
         }
 
         if (row) {
+          if (row.password_hash) {
+            return res.status(401).json({ error: 'This account requires password authentication. Please provide a password.' });
+          }
           const token = jwt.sign({ email: row.email, role: row.role }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
           return res.json({
             message: 'Login successful',
@@ -231,6 +235,47 @@ router.get('/me', authenticateUser, (req, res) => {
         createdAt: row.created_at,
       },
     });
+  });
+});
+
+/**
+ * @openapi
+ * /api/auth/promote:
+ *   post:
+ *     summary: Promote a user to admin (admin-only)
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email: { type: string, format: email }
+ *     responses:
+ *       200: { description: User promoted to admin }
+ *       403: { description: Admin access required }
+ *       404: { description: User not found }
+ */
+router.post('/promote', authenticateUser, requireRole('admin'), (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
+  const db = getDatabase();
+  db.run('UPDATE users SET role = ? WHERE email = ?', ['admin', email], function (err) {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+    if (this.changes === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({ message: `User ${email} promoted to admin` });
   });
 });
 

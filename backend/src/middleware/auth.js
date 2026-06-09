@@ -32,7 +32,7 @@ function authenticateUser(req, res, next) {
 
   const db = getDatabase();
 
-  db.get('SELECT email FROM users WHERE email = ?', [userEmail], (err, row) => {
+  db.get('SELECT email, role, password_hash FROM users WHERE email = ?', [userEmail], (err, row) => {
     if (err) {
       console.error('Database error:', err);
       return res.status(500).json({ error: 'Internal server error' });
@@ -50,6 +50,9 @@ function authenticateUser(req, res, next) {
         next();
       });
     } else {
+      if (row.password_hash) {
+        return res.status(401).json({ error: 'This account requires password authentication. Use Bearer token instead.' });
+      }
       req.userEmail = row.email;
       req.userRole = row.role || 'user';
       next();

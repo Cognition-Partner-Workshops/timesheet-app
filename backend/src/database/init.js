@@ -92,6 +92,15 @@ async function initializeDatabase() {
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_user_email ON work_entries (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_date ON work_entries (date)`);
 
+      // Seed first admin user from env var if set
+      const adminEmail = process.env.ADMIN_EMAIL;
+      if (adminEmail) {
+        database.run(
+          'INSERT OR IGNORE INTO users (email, role) VALUES (?, ?)',
+          [adminEmail, 'admin']
+        );
+      }
+
       console.log('Database tables created successfully');
       resolve();
     });
