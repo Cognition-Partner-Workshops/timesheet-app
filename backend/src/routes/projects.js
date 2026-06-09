@@ -13,6 +13,11 @@ const PROJECT_SELECT = `
   FROM projects p
   LEFT JOIN clients c ON p.client_id = c.id`;
 
+function toDateString(value) {
+  if (!value) return null;
+  return value instanceof Date ? value.toISOString().slice(0, 10) : value;
+}
+
 async function verifyClientOwnership(clientId, userEmail) {
   if (!clientId) return true;
   const row = await dbGet(
@@ -70,7 +75,7 @@ router.post('/', async (req, res, next) => {
 
     const { lastID } = await dbRun(
       'INSERT INTO projects (name, description, client_id, start_date, status, user_email) VALUES (?, ?, ?, ?, ?, ?)',
-      [name, description || null, clientId || null, startDate || null, status || 'active', req.userEmail]
+      [name, description || null, clientId || null, toDateString(startDate), status || 'active', req.userEmail]
     );
 
     const row = await dbGet(`${PROJECT_SELECT} WHERE p.id = ?`, [lastID]);
@@ -106,7 +111,7 @@ router.put('/:id', async (req, res, next) => {
     if (value.name !== undefined) fields.name = value.name;
     if (value.description !== undefined) fields.description = value.description || null;
     if (value.clientId !== undefined) fields.client_id = value.clientId || null;
-    if (value.startDate !== undefined) fields.start_date = value.startDate || null;
+    if (value.startDate !== undefined) fields.start_date = toDateString(value.startDate);
     if (value.status !== undefined) fields.status = value.status;
 
     const { query, values } = buildDynamicUpdate('projects', fields, projectId, req.userEmail);
