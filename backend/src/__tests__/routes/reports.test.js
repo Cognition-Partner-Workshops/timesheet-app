@@ -56,17 +56,11 @@ function createCsvDownloadApp(downloadErr) {
 function createPdfApp(mockDocOverrides) {
   const PDFDocument = require('pdfkit');
   let pipeTarget = null;
+  const baseMock = new PDFDocument();
   const mockDoc = {
-    fontSize: jest.fn().mockReturnThis(),
-    text: jest.fn().mockReturnThis(),
-    moveDown: jest.fn().mockReturnThis(),
-    moveTo: jest.fn().mockReturnThis(),
-    lineTo: jest.fn().mockReturnThis(),
-    stroke: jest.fn().mockReturnThis(),
-    addPage: jest.fn().mockReturnThis(),
+    ...baseMock,
     pipe: jest.fn((target) => { pipeTarget = target; }),
     end: jest.fn(() => { if (pipeTarget) pipeTarget.end(); }),
-    y: 100,
     ...mockDocOverrides
   };
   PDFDocument.mockImplementation(() => mockDoc);
