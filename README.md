@@ -125,6 +125,14 @@ Authenticated endpoints accept either `Authorization: Bearer <token>` or the leg
 - Input validation with Joi schemas
 - SQL injection protection with parameterized queries
 
+### Admin Setup
+
+Set `ADMIN_EMAIL` to seed an admin user on first startup:
+```bash
+ADMIN_EMAIL=admin@example.com npm start
+```
+**Important:** The seeded admin has no password initially and is accessible via legacy email-only login. Immediately call `POST /api/auth/set-password` to secure the account after first login. Once a password is set, the legacy email-only login path is blocked for that account.
+
 ## Data Persistence
 
 The database defaults to **file-based SQLite** at `backend/data/timesheet.db`. Data persists across server restarts.

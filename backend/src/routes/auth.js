@@ -342,11 +342,12 @@ router.post('/set-password', authenticateUser, async (req, res, next) => {
  *       403: { description: Admin access required }
  *       404: { description: User not found }
  */
-router.post('/promote', authLimiter, authenticateUser, requireRole('admin'), (req, res) => {
-  const { email } = req.body;
-  if (!email) {
-    return res.status(400).json({ error: 'Email is required' });
+router.post('/promote', authLimiter, authenticateUser, requireRole('admin'), (req, res, next) => {
+  const { error, value } = emailSchema.validate(req.body);
+  if (error) {
+    return next(error);
   }
+  const { email } = value;
 
   const db = getDatabase();
   db.run('UPDATE users SET role = ? WHERE email = ?', ['admin', email], function (err) {
