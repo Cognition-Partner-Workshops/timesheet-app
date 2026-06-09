@@ -1,12 +1,21 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 const { getDatabase } = require('../database/init');
 const { emailSchema, loginSchema, registerSchema } = require('../validation/schemas');
 const { authenticateUser } = require('../middleware/auth');
 const { requireRole } = require('../middleware/rbac');
 
 const router = express.Router();
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many authentication attempts. Please try again later.' },
+});
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production-min-32-chars';
 const JWT_EXPIRY = '24h';
 const SALT_ROUNDS = 10;
@@ -31,7 +40,7 @@ const SALT_ROUNDS = 10;
  *       201: { description: User registered successfully }
  *       409: { description: User already exists }
  */
-router.post('/register', async (req, res, next) => {
+router.post('/register', authLimiter, async (req, res, next) => {
   try {
     const { error, value } = registerSchema.validate(req.body);
     if (error) {
@@ -47,34 +56,39 @@ router.post('/register', async (req, res, next) => {
         return res.status(500).json({ error: 'Internal server error' });
       }
 
-      if (row) {
-        return res.status(409).json({ error: 'User already exists' });
-      }
-
-      const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-
-      db.run(
-        'INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)',
-        [email, passwordHash, 'user'],
-        function (err) {
-          if (err) {
-            console.error('Error creating user:', err);
-            return res.status(500).json({ error: 'Failed to create user' });
-          }
-
-          const token = jwt.sign({ email, role: 'user' }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
-
-          res.status(201).json({
-            message: 'User registered successfully',
-            token,
-            user: {
-              email,
-              role: 'user',
-              createdAt: new Date().toISOString(),
-            },
-          });
+      try {
+        if (row) {
+          return res.status(409).json({ error: 'User already exists' });
         }
-      );
+
+        const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+
+        db.run(
+          'INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)',
+          [email, passwordHash, 'user'],
+          function (err) {
+            if (err) {
+              console.error('Error creating user:', err);
+              return res.status(500).json({ error: 'Failed to create user' });
+            }
+
+            const token = jwt.sign({ email, role: 'user' }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
+
+            res.status(201).json({
+              message: 'User registered successfully',
+              token,
+              user: {
+                email,
+                role: 'user',
+                createdAt: new Date().toISOString(),
+              },
+            });
+          }
+        );
+      } catch (e) {
+        console.error('Error in register:', e);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
     });
   } catch (error) {
     next(error);
@@ -102,7 +116,7 @@ router.post('/register', async (req, res, next) => {
  *       201: { description: New user created and logged in (legacy mode) }
  *       401: { description: Invalid credentials }
  */
-router.post('/login', async (req, res, next) => {
+router.post('/login', authLimiter, async (req, res, next) => {
   try {
     // If password is provided, use password-based auth
     if (req.body.password) {
@@ -120,30 +134,35 @@ router.post('/login', async (req, res, next) => {
           return res.status(500).json({ error: 'Internal server error' });
         }
 
-        if (!row) {
-          return res.status(401).json({ error: 'Invalid email or password' });
+        try {
+          if (!row) {
+            return res.status(401).json({ error: 'Invalid email or password' });
+          }
+
+          if (!row.password_hash) {
+            return res.status(401).json({ error: 'Account requires password setup. Please register first.' });
+          }
+
+          const isValidPassword = await bcrypt.compare(password, row.password_hash);
+          if (!isValidPassword) {
+            return res.status(401).json({ error: 'Invalid email or password' });
+          }
+
+          const token = jwt.sign({ email: row.email, role: row.role }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
+
+          return res.json({
+            message: 'Login successful',
+            token,
+            user: {
+              email: row.email,
+              role: row.role,
+              createdAt: row.created_at,
+            },
+          });
+        } catch (e) {
+          console.error('Error in login:', e);
+          return res.status(500).json({ error: 'Internal server error' });
         }
-
-        if (!row.password_hash) {
-          return res.status(401).json({ error: 'Account requires password setup. Please register first.' });
-        }
-
-        const isValidPassword = await bcrypt.compare(password, row.password_hash);
-        if (!isValidPassword) {
-          return res.status(401).json({ error: 'Invalid email or password' });
-        }
-
-        const token = jwt.sign({ email: row.email, role: row.role }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
-
-        return res.json({
-          message: 'Login successful',
-          token,
-          user: {
-            email: row.email,
-            role: row.role,
-            createdAt: row.created_at,
-          },
-        });
       });
     } else {
       // Legacy email-only login for backward compatibility
@@ -260,7 +279,7 @@ router.get('/me', authenticateUser, (req, res) => {
  *       403: { description: Admin access required }
  *       404: { description: User not found }
  */
-router.post('/promote', authenticateUser, requireRole('admin'), (req, res) => {
+router.post('/promote', authLimiter, authenticateUser, requireRole('admin'), (req, res) => {
   const { email } = req.body;
   if (!email) {
     return res.status(400).json({ error: 'Email is required' });

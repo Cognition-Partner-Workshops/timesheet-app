@@ -57,15 +57,6 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Auth-specific rate limiting (stricter)
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 15,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many authentication attempts. Please try again later.' },
-});
-
 // Structured request logging via winston
 app.use((req, res, next) => {
   const start = Date.now();
@@ -117,8 +108,8 @@ app.get('/ready', (req, res) => {
   });
 });
 
-// Routes
-app.use('/api/auth', authLimiter, authRoutes);
+// Routes — auth rate limiter only on mutation endpoints, not GET /me
+app.use('/api/auth', authRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/work-entries', workEntryRoutes);
 app.use('/api/reports', reportRoutes);
