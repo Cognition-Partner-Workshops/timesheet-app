@@ -83,6 +83,36 @@ describe('Validation Schemas', () => {
       const { value } = clientSchema.validate(client);
       expect(value.name).toBe('Test Client');
     });
+
+    test('should accept department field as optional', () => {
+      const client = { name: 'Test', department: 'Engineering' };
+      const { error } = clientSchema.validate(client);
+      expect(error).toBeUndefined();
+    });
+
+    test('should accept valid email field', () => {
+      const client = { name: 'Test', email: 'client@example.com' };
+      const { error } = clientSchema.validate(client);
+      expect(error).toBeUndefined();
+    });
+
+    test('should reject invalid email format', () => {
+      const client = { name: 'Test', email: 'not-an-email' };
+      const { error } = clientSchema.validate(client);
+      expect(error).toBeDefined();
+    });
+
+    test('should reject department longer than 255 characters', () => {
+      const client = { name: 'Test', department: 'a'.repeat(256) };
+      const { error } = clientSchema.validate(client);
+      expect(error).toBeDefined();
+    });
+
+    test('should reject email longer than 255 characters', () => {
+      const client = { name: 'Test', email: 'a'.repeat(246) + '@test.com' };
+      const { error } = clientSchema.validate(client);
+      expect(error).toBeDefined();
+    });
   });
 
   describe('workEntrySchema', () => {
@@ -287,6 +317,24 @@ describe('Validation Schemas', () => {
 
       const { error } = updateClientSchema.validate(update);
       expect(error).toBeUndefined();
+    });
+
+    test('should validate department update', () => {
+      const update = { department: 'Engineering' };
+      const { error } = updateClientSchema.validate(update);
+      expect(error).toBeUndefined();
+    });
+
+    test('should validate email update', () => {
+      const update = { email: 'updated@example.com' };
+      const { error } = updateClientSchema.validate(update);
+      expect(error).toBeUndefined();
+    });
+
+    test('should reject invalid email in update', () => {
+      const update = { email: 'not-valid-email' };
+      const { error } = updateClientSchema.validate(update);
+      expect(error).toBeDefined();
     });
   });
 

@@ -585,4 +585,28 @@ describe('Work Entry Routes', () => {
       expect(response.body.message).toBe('Work entry updated successfully');
     });
   });
+
+  describe('POST /api/work-entries - Synchronous Exception', () => {
+    test('should handle synchronous exception from getDatabase()', async () => {
+      getDatabase.mockImplementation(() => { throw new Error('DB unavailable'); });
+
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: 5, description: 'Work', date: '2024-01-15' });
+
+      expect(response.status).toBe(500);
+    });
+  });
+
+  describe('PUT /api/work-entries/:id - Synchronous Exception', () => {
+    test('should handle synchronous exception from getDatabase()', async () => {
+      getDatabase.mockImplementation(() => { throw new Error('DB unavailable'); });
+
+      const response = await request(app)
+        .put('/api/work-entries/1')
+        .send({ hours: 8 });
+
+      expect(response.status).toBe(500);
+    });
+  });
 });

@@ -116,30 +116,95 @@ describe('Database Initialization', () => {
   });
 
   describe('closeDatabase', () => {
-    test('should close database connection', () => {
+    test('should close database connection', async () => {
       const db = getDatabase();
-      closeDatabase();
+      await closeDatabase();
 
       expect(db.close).toHaveBeenCalled();
       expect(consoleLogSpy).toHaveBeenCalledWith('Database connection closed');
     });
 
-    test('should handle close error gracefully', () => {
+    test('should handle close error gracefully', async () => {
       const db = getDatabase();
       db.close.mockImplementation((callback) => callback(new Error('Close error')));
 
-      closeDatabase();
+      await closeDatabase();
 
       expect(consoleErrorSpy).toHaveBeenCalledWith('Error closing database:', expect.any(Error));
     });
 
-    test('should handle multiple close calls safely', () => {
-      const db = getDatabase();
-      // Reset close mock to default behavior (no error)
-      db.close.mockImplementation((callback) => callback(null));
-      closeDatabase();
-      closeDatabase(); // Second call should not throw
+    test('should resolve immediately when already closed (isClosed path)', async () => {
+      jest.resetModules();
+      jest.doMock('sqlite3', () => {
+        const mockDb = {
+          serialize: jest.fn((cb) => cb()),
+          run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
+          close: jest.fn((cb) => cb(null))
+        };
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((p, cb) => { cb(null); return mockDb; })
+          }))
+        };
+      });
 
+      const { getDatabase: gdb, closeDatabase: cdb } = require('../../database/init');
+      gdb();
+      await cdb();
+      // Second call hits the isClosed branch
+      await cdb();
+      expect(consoleLogSpy).toHaveBeenCalledWith('Database connection closed');
+    });
+
+    test('should wait when concurrent close is in progress (isClosing path)', async () => {
+      jest.resetModules();
+      let closeCb;
+      jest.doMock('sqlite3', () => {
+        const mockDb = {
+          serialize: jest.fn((cb) => cb()),
+          run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
+          close: jest.fn((cb) => { closeCb = cb; })
+        };
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((p, cb) => { cb(null); return mockDb; })
+          }))
+        };
+      });
+
+      const { getDatabase: gdb, closeDatabase: cdb } = require('../../database/init');
+      gdb();
+
+      // Start first close — it will hang because closeCb is captured
+      const first = cdb();
+      // Start second close — hits isClosing interval path
+      const second = cdb();
+
+      // Wait for at least one interval tick (10ms) where isClosed is still false
+      await new Promise(resolve => setTimeout(resolve, 25));
+
+      // Now resolve the first close
+      closeCb(null);
+
+      await first;
+      await second;
+      expect(consoleLogSpy).toHaveBeenCalledWith('Database connection closed');
+    });
+
+    test('should resolve immediately when no db exists (!db path)', async () => {
+      jest.resetModules();
+      jest.doMock('sqlite3', () => {
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((p, cb) => { cb(null); return {}; })
+          }))
+        };
+      });
+
+      const { closeDatabase: cdb } = require('../../database/init');
+      // Never called getDatabase, so db is null
+      await cdb();
+      // Should resolve without error
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
   });
