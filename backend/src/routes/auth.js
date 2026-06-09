@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const { getDatabase } = require('../database/init');
-const { emailSchema, loginSchema, registerSchema } = require('../validation/schemas');
+const { emailSchema, loginSchema, registerSchema, setPasswordSchema } = require('../validation/schemas');
 const { authenticateUser } = require('../middleware/auth');
 const { requireRole } = require('../middleware/rbac');
 
@@ -282,11 +282,12 @@ router.get('/me', authenticateUser, (req, res) => {
  *       200: { description: Password set successfully }
  *       400: { description: Account already has a password }
  */
-router.post('/set-password', authenticateUser, async (req, res) => {
-  const { password } = req.body;
-  if (!password || password.length < 8) {
-    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+router.post('/set-password', authenticateUser, async (req, res, next) => {
+  const { error, value } = setPasswordSchema.validate(req.body);
+  if (error) {
+    return next(error);
   }
+  const { password } = value;
 
   const db = getDatabase();
   db.get('SELECT password_hash FROM users WHERE email = ?', [req.userEmail], async (err, row) => {
