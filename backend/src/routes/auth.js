@@ -68,6 +68,9 @@ router.post('/register', authLimiter, async (req, res, next) => {
           [email, passwordHash, 'user'],
           function (err) {
             if (err) {
+              if (err.code === 'SQLITE_CONSTRAINT') {
+                return res.status(409).json({ error: 'User already exists' });
+              }
               console.error('Error creating user:', err);
               return res.status(500).json({ error: 'Failed to create user' });
             }
@@ -140,7 +143,7 @@ router.post('/login', authLimiter, async (req, res, next) => {
           }
 
           if (!row.password_hash) {
-            return res.status(401).json({ error: 'Account requires password setup. Please register first.' });
+            return res.status(401).json({ error: 'Invalid email or password' });
           }
 
           const isValidPassword = await bcrypt.compare(password, row.password_hash);
@@ -254,6 +257,65 @@ router.get('/me', authenticateUser, (req, res) => {
         createdAt: row.created_at,
       },
     });
+  });
+});
+
+/**
+ * @openapi
+ * /api/auth/set-password:
+ *   post:
+ *     summary: Set password for a legacy (email-only) account
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *       - emailHeader: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [password]
+ *             properties:
+ *               password: { type: string, minLength: 8 }
+ *     responses:
+ *       200: { description: Password set successfully }
+ *       400: { description: Account already has a password }
+ */
+router.post('/set-password', authenticateUser, async (req, res) => {
+  const { password } = req.body;
+  if (!password || password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
+
+  const db = getDatabase();
+  db.get('SELECT password_hash FROM users WHERE email = ?', [req.userEmail], async (err, row) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
+    if (!row) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (row.password_hash) {
+      return res.status(400).json({ error: 'Account already has a password set' });
+    }
+
+    try {
+      const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+      db.run('UPDATE users SET password_hash = ? WHERE email = ?', [passwordHash, req.userEmail], function (err) {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ error: 'Internal server error' });
+        }
+        res.json({ message: 'Password set successfully. Use POST /api/auth/login with email and password.' });
+      });
+    } catch (e) {
+      console.error('Error setting password:', e);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
   });
 });
 
