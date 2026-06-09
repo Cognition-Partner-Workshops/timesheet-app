@@ -29,6 +29,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
 import { type Client } from '../types/api';
+import { isValidEmail, isWithinLength } from '../utils/validation';
 
 const ClientsPage: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -123,6 +124,31 @@ const ClientsPage: React.FC = () => {
 
     if (!formData.name.trim()) {
       setError('Client name is required');
+      return;
+    }
+
+    if (!isWithinLength(formData.name, 255)) {
+      setError('Client name must be 255 characters or less');
+      return;
+    }
+
+    if (!isWithinLength(formData.description, 1000)) {
+      setError('Description must be 1000 characters or less');
+      return;
+    }
+
+    if (!isWithinLength(formData.department, 255)) {
+      setError('Department must be 255 characters or less');
+      return;
+    }
+
+    if (formData.email && !isValidEmail(formData.email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    if (formData.email && !isWithinLength(formData.email, 255)) {
+      setError('Email must be 255 characters or less');
       return;
     }
 
@@ -292,6 +318,7 @@ const ClientsPage: React.FC = () => {
               label="Client Name"
               fullWidth
               required
+              inputProps={{ maxLength: 255 }}
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               disabled={createMutation.isPending || updateMutation.isPending}
@@ -300,6 +327,7 @@ const ClientsPage: React.FC = () => {
               margin="dense"
               label="Department"
               fullWidth
+              inputProps={{ maxLength: 255 }}
               value={formData.department}
               onChange={(e) => setFormData({ ...formData, department: e.target.value })}
               disabled={createMutation.isPending || updateMutation.isPending}
@@ -309,6 +337,7 @@ const ClientsPage: React.FC = () => {
               label="Email"
               fullWidth
               type="email"
+              inputProps={{ maxLength: 255 }}
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               disabled={createMutation.isPending || updateMutation.isPending}
@@ -319,6 +348,8 @@ const ClientsPage: React.FC = () => {
               fullWidth
               multiline
               rows={3}
+              inputProps={{ maxLength: 1000 }}
+              helperText={`${formData.description.length}/1000`}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               disabled={createMutation.isPending || updateMutation.isPending}
