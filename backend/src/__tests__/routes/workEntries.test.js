@@ -585,4 +585,16 @@ describe('Work Entry Routes', () => {
       expect(response.body.message).toBe('Work entry updated successfully');
     });
   });
+
+  describe('Synchronous getDatabase() exceptions', () => {
+    test.each([
+      ['POST', '/api/work-entries', { clientId: 1, hours: 5, description: 'Work', date: '2024-01-15' }],
+      ['PUT', '/api/work-entries/1', { hours: 8 }],
+    ])('%s %s should return 500 when getDatabase throws', async (method, url, body) => {
+      getDatabase.mockImplementation(() => { throw new Error('DB unavailable'); });
+
+      const response = await request(app)[method.toLowerCase()](url).send(body);
+      expect(response.status).toBe(500);
+    });
+  });
 });
