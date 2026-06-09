@@ -347,49 +347,34 @@ describe('Report Routes', () => {
   });
 
   describe('CSV Export Success Path', () => {
-    test('should handle CSV write error', async () => {
-      const mockClient = { id: 1, name: 'Test Client' };
-      const mockWorkEntries = [
-        { date: '2024-01-01', hours: 5, description: 'Work 1', created_at: '2024-01-01' }
-      ];
+    const CSV_ENTRY = { date: '2024-01-01', hours: 5, description: 'Work 1', created_at: '2024-01-01' };
 
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, mockWorkEntries);
-      });
-
+    function setupCsvFailMocks(entries = [CSV_ENTRY]) {
+      setupClientAndEntries({ id: 1, name: 'Test Client' }, entries);
       const csvWriter = require('csv-writer');
       csvWriter.createObjectCsvWriter.mockReturnValue({
         writeRecords: jest.fn().mockRejectedValue(new Error('Write failed'))
       });
+    }
 
+    function setupCsvSuccessMocks() {
+      setupClientAndEntries({ id: 1, name: 'Test Client' }, [CSV_ENTRY]);
+      const csvWriter = require('csv-writer');
+      csvWriter.createObjectCsvWriter.mockReturnValue({
+        writeRecords: jest.fn().mockResolvedValue(undefined)
+      });
+    }
+
+    test('should handle CSV write error', async () => {
+      setupCsvFailMocks();
       const response = await request(app).get('/api/reports/export/csv/1');
-
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ error: 'Failed to generate CSV report' });
     });
 
     test('should verify CSV export calls correct database queries', async () => {
-      const mockClient = { id: 1, name: 'Test Client' };
-
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, []);
-      });
-
-      const csvWriter = require('csv-writer');
-      csvWriter.createObjectCsvWriter.mockReturnValue({
-        writeRecords: jest.fn().mockRejectedValue(new Error('Write failed'))
-      });
-
+      setupCsvFailMocks([]);
       await request(app).get('/api/reports/export/csv/1');
-
       expect(mockDb.get).toHaveBeenCalledWith(
         expect.stringContaining('SELECT id, name FROM clients'),
         expect.arrayContaining([1, 'test@example.com']),
@@ -398,85 +383,36 @@ describe('Report Routes', () => {
     });
 
     test('should create temp directory if it does not exist', async () => {
-      const mockClient = { id: 1, name: 'Test Client' };
-      const mockWorkEntries = [
-        { date: '2024-01-01', hours: 5, description: 'Work 1', created_at: '2024-01-01' }
-      ];
-
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, mockWorkEntries);
-      });
-
       fs.existsSync.mockReturnValue(false);
-
-      const csvWriter = require('csv-writer');
-      csvWriter.createObjectCsvWriter.mockReturnValue({
-        writeRecords: jest.fn().mockRejectedValue(new Error('Write failed'))
-      });
-
+      setupCsvFailMocks();
       await request(app).get('/api/reports/export/csv/1');
-
       expect(fs.mkdirSync).toHaveBeenCalledWith(expect.any(String), { recursive: true });
     });
 
     test('should not create temp directory if it exists', async () => {
-      const mockClient = { id: 1, name: 'Test Client' };
-      const mockWorkEntries = [];
-
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, mockWorkEntries);
-      });
-
-      fs.existsSync.mockReturnValue(true);
-
-      const csvWriter = require('csv-writer');
-      csvWriter.createObjectCsvWriter.mockReturnValue({
-        writeRecords: jest.fn().mockRejectedValue(new Error('Write failed'))
-      });
-
+      setupCsvFailMocks([]);
       await request(app).get('/api/reports/export/csv/1');
-
       expect(fs.mkdirSync).not.toHaveBeenCalled();
     });
 
-    function setupCsvDownloadMocks() {
-      setupClientAndEntries({ id: 1, name: 'Test Client' },
-        [{ date: '2024-01-01', hours: 5, description: 'Work 1', created_at: '2024-01-01' }]);
-      const csvWriter = require('csv-writer');
-      csvWriter.createObjectCsvWriter.mockReturnValue({
-        writeRecords: jest.fn().mockResolvedValue(undefined)
-      });
-    }
-
     test('should download CSV successfully and clean up temp file', async () => {
-      setupCsvDownloadMocks();
-      const testApp = createCsvDownloadApp(null);
-      const response = await request(testApp).get('/api/reports/export/csv/1');
+      setupCsvSuccessMocks();
+      const response = await request(createCsvDownloadApp(null)).get('/api/reports/export/csv/1');
       expect(response.status).toBe(200);
       expect(fs.unlink).toHaveBeenCalled();
     });
 
     test('should handle res.download error and still clean up', async () => {
-      setupCsvDownloadMocks();
-      const testApp = createCsvDownloadApp(new Error('Download failed'));
-      const response = await request(testApp).get('/api/reports/export/csv/1');
+      setupCsvSuccessMocks();
+      const response = await request(createCsvDownloadApp(new Error('Download failed'))).get('/api/reports/export/csv/1');
       expect(response.status).toBe(200);
       expect(fs.unlink).toHaveBeenCalled();
     });
 
     test('should handle fs.unlink error during cleanup', async () => {
       fs.unlink.mockImplementation((p, cb) => cb(new Error('Unlink failed')));
-      setupCsvDownloadMocks();
-      const testApp = createCsvDownloadApp(null);
-      const response = await request(testApp).get('/api/reports/export/csv/1');
+      setupCsvSuccessMocks();
+      const response = await request(createCsvDownloadApp(null)).get('/api/reports/export/csv/1');
       expect(response.status).toBe(200);
       expect(fs.unlink).toHaveBeenCalled();
     });
