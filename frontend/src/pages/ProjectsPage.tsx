@@ -1,16 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Box,
   Typography,
   Button,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  IconButton,
+  Card,
+  CardContent,
+  CardActions,
+  Grid,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -25,34 +21,34 @@ import {
   InputLabel,
   type SelectChangeEvent,
 } from '@mui/material';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-} from '@mui/icons-material';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
 import { type Project, type Client } from '../types/api';
+import { useCrudOperations } from '../hooks/useCrudOperations';
 
-const statusColors: Record<string, 'success' | 'default' | 'warning'> = {
-  active: 'success',
-  completed: 'default',
-  'on-hold': 'warning',
+type ProjectStatus = 'active' | 'completed' | 'on-hold';
+
+const STATUS_CONFIG: Record<ProjectStatus, { color: 'success' | 'default' | 'warning'; label: string }> = {
+  active: { color: 'success', label: 'Active' },
+  completed: { color: 'default', label: 'Completed' },
+  'on-hold': { color: 'warning', label: 'On Hold' },
 };
 
-const ProjectsPage: React.FC = () => {
-  const [open, setOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    clientId: '' as string,
-    startDate: '',
-    status: 'active' as string,
-  });
-  const [error, setError] = useState('');
+interface ProjectFormState {
+  name: string;
+  description: string;
+  clientId: string;
+  startDate: string;
+  status: ProjectStatus;
+}
 
-  const queryClient = useQueryClient();
+const INITIAL_FORM: ProjectFormState = { name: '', description: '', clientId: '', startDate: '', status: 'active' };
+
+const ProjectsPage: React.FC = () => {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Project | null>(null);
+  const [form, setForm] = useState<ProjectFormState>(INITIAL_FORM);
 
   const { data: projectsData, isLoading } = useQuery({
     queryKey: ['projects'],
@@ -64,50 +60,23 @@ const ProjectsPage: React.FC = () => {
     queryFn: () => apiClient.getClients(),
   });
 
-  const createMutation = useMutation({
-    mutationFn: (projectData: { name: string; description?: string; clientId?: number | null; startDate?: string | null; status?: string }) =>
-      apiClient.createProject(projectData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      handleClose();
-    },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to create project');
-    },
-  });
+  type CreatePayload = { name: string; description?: string; clientId?: number | null; startDate?: string | null; status?: string };
+  type UpdatePayload = { name?: string; description?: string; clientId?: number | null; startDate?: string | null; status?: string };
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { name?: string; description?: string; clientId?: number | null; startDate?: string | null; status?: string } }) =>
-      apiClient.updateProject(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      handleClose();
-    },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to update project');
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiClient.deleteProject(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-    },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to delete project');
-    },
+  const crud = useCrudOperations<CreatePayload, UpdatePayload>({
+    queryKey: 'projects',
+    createFn: (data) => apiClient.createProject(data),
+    updateFn: (id, data) => apiClient.updateProject(id, data),
+    deleteFn: (id) => apiClient.deleteProject(id),
   });
 
   const projects: Project[] = projectsData?.projects || [];
   const clients: Client[] = clientsData?.clients || [];
 
-  const handleOpen = (project?: Project) => {
+  const openDialog = useCallback((project?: Project) => {
     if (project) {
-      setEditingProject(project);
-      setFormData({
+      setEditTarget(project);
+      setForm({
         name: project.name,
         description: project.description || '',
         clientId: project.client_id ? String(project.client_id) : '',
@@ -115,53 +84,55 @@ const ProjectsPage: React.FC = () => {
         status: project.status,
       });
     } else {
-      setEditingProject(null);
-      setFormData({ name: '', description: '', clientId: '', startDate: '', status: 'active' });
+      setEditTarget(null);
+      setForm(INITIAL_FORM);
     }
-    setError('');
-    setOpen(true);
-  };
+    crud.setError('');
+    setDialogOpen(true);
+  }, [crud]);
 
-  const handleClose = () => {
-    setOpen(false);
-    setEditingProject(null);
-    setFormData({ name: '', description: '', clientId: '', startDate: '', status: 'active' });
-    setError('');
-  };
+  const closeDialog = useCallback(() => {
+    setDialogOpen(false);
+    setEditTarget(null);
+    setForm(INITIAL_FORM);
+    crud.setError('');
+  }, [crud]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-
-    if (!formData.name.trim()) {
-      setError('Project name is required');
+    crud.setError('');
+    if (!form.name.trim()) {
+      crud.setError('Project name is required');
       return;
     }
 
     const payload = {
-      name: formData.name,
-      description: formData.description || undefined,
-      clientId: formData.clientId ? parseInt(formData.clientId) : null,
-      startDate: formData.startDate || null,
-      status: formData.status,
+      name: form.name,
+      description: form.description || undefined,
+      clientId: form.clientId ? parseInt(form.clientId) : null,
+      startDate: form.startDate || null,
+      status: form.status,
     };
 
-    if (editingProject) {
-      updateMutation.mutate({ id: editingProject.id, data: payload });
-    } else {
-      createMutation.mutate(payload);
-    }
+    const mutation = editTarget
+      ? crud.updateMutation.mutateAsync({ id: editTarget.id, data: payload })
+      : crud.createMutation.mutateAsync(payload);
+
+    mutation.then(closeDialog).catch(() => {});
   };
 
-  const handleDelete = (project: Project) => {
+  const confirmDelete = (project: Project) => {
     if (window.confirm(`Are you sure you want to delete "${project.name}"?`)) {
-      deleteMutation.mutate(project.id);
+      crud.deleteMutation.mutate(project.id);
     }
   };
 
-  const handleSelectChange = (e: SelectChangeEvent) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name as string]: value }));
+  const updateField = (field: keyof ProjectFormState) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  };
+
+  const updateSelect = (e: SelectChangeEvent) => {
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   if (isLoading) {
@@ -176,96 +147,79 @@ const ProjectsPage: React.FC = () => {
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4">Projects</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpen()}
-        >
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => openDialog()}>
           Add Project
         </Button>
       </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-          {error}
+      {crud.error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => crud.setError('')}>
+          {crud.error}
         </Alert>
       )}
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Description</TableCell>
-              <TableCell>Client</TableCell>
-              <TableCell>Start Date</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell align="right">Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {projects.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} align="center">
-                  <Typography variant="body2" color="text.secondary" sx={{ py: 4 }}>
-                    No projects yet. Click "Add Project" to create one.
-                  </Typography>
-                </TableCell>
-              </TableRow>
-            ) : (
-              projects.map((project) => (
-                <TableRow key={project.id}>
-                  <TableCell>{project.name}</TableCell>
-                  <TableCell>{project.description || '-'}</TableCell>
-                  <TableCell>{project.client_name || '-'}</TableCell>
-                  <TableCell>{project.start_date || '-'}</TableCell>
-                  <TableCell>
-                    <Chip
-                      label={project.status}
-                      color={statusColors[project.status] || 'default'}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell align="right">
-                    <IconButton
-                      size="small"
-                      color="primary"
-                      onClick={() => handleOpen(project)}
-                    >
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => handleDelete(project)}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+      {projects.length === 0 ? (
+        <Typography variant="body1" color="text.secondary" textAlign="center" sx={{ py: 6 }}>
+          No projects yet. Click &quot;Add Project&quot; to create one.
+        </Typography>
+      ) : (
+        <Grid container spacing={2}>
+          {projects.map((project) => {
+            const statusCfg = STATUS_CONFIG[project.status] || STATUS_CONFIG.active;
+            return (
+              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={project.id}>
+                <Card variant="outlined" sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                  <CardContent sx={{ flexGrow: 1 }}>
+                    <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
+                      <Typography variant="h6" component="div" noWrap sx={{ maxWidth: '70%' }}>
+                        {project.name}
+                      </Typography>
+                      <Chip label={statusCfg.label} color={statusCfg.color} size="small" />
+                    </Box>
+                    {project.description && (
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        {project.description}
+                      </Typography>
+                    )}
+                    {project.client_name && (
+                      <Typography variant="body2">
+                        <strong>Client:</strong> {project.client_name}
+                      </Typography>
+                    )}
+                    {project.start_date && (
+                      <Typography variant="body2">
+                        <strong>Start:</strong> {project.start_date}
+                      </Typography>
+                    )}
+                  </CardContent>
+                  <CardActions>
+                    <Button size="small" startIcon={<EditIcon />} onClick={() => openDialog(project)}>
+                      Edit
+                    </Button>
+                    <Button size="small" color="error" startIcon={<DeleteIcon />} onClick={() => confirmDelete(project)}>
+                      Delete
+                    </Button>
+                  </CardActions>
+                </Card>
+              </Grid>
+            );
+          })}
+        </Grid>
+      )}
 
-      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-        <form onSubmit={handleSubmit}>
-          <DialogTitle>{editingProject ? 'Edit Project' : 'Add Project'}</DialogTitle>
+      <Dialog open={dialogOpen} onClose={closeDialog} maxWidth="sm" fullWidth>
+        <form onSubmit={onSubmit}>
+          <DialogTitle>{editTarget ? 'Edit Project' : 'Add Project'}</DialogTitle>
           <DialogContent>
-            {error && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {error}
-              </Alert>
-            )}
+            {crud.error && <Alert severity="error" sx={{ mb: 2 }}>{crud.error}</Alert>}
             <TextField
               autoFocus
               margin="dense"
               label="Project Name"
               fullWidth
               required
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              value={form.name}
+              onChange={updateField('name')}
             />
             <TextField
               margin="dense"
@@ -273,25 +227,21 @@ const ProjectsPage: React.FC = () => {
               fullWidth
               multiline
               rows={3}
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              value={form.description}
+              onChange={updateField('description')}
             />
             <FormControl fullWidth margin="dense">
-              <InputLabel id="client-select-label">Client</InputLabel>
+              <InputLabel id="project-client-label">Client</InputLabel>
               <Select
-                labelId="client-select-label"
+                labelId="project-client-label"
                 name="clientId"
-                value={formData.clientId}
+                value={form.clientId}
                 label="Client"
-                onChange={handleSelectChange}
+                onChange={updateSelect}
               >
-                <MenuItem value="">
-                  <em>None</em>
-                </MenuItem>
-                {clients.map((client) => (
-                  <MenuItem key={client.id} value={String(client.id)}>
-                    {client.name}
-                  </MenuItem>
+                <MenuItem value=""><em>None</em></MenuItem>
+                {clients.map((c) => (
+                  <MenuItem key={c.id} value={String(c.id)}>{c.name}</MenuItem>
                 ))}
               </Select>
             </FormControl>
@@ -301,17 +251,17 @@ const ProjectsPage: React.FC = () => {
               type="date"
               fullWidth
               InputLabelProps={{ shrink: true }}
-              value={formData.startDate}
-              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+              value={form.startDate}
+              onChange={updateField('startDate')}
             />
             <FormControl fullWidth margin="dense">
-              <InputLabel id="status-select-label">Status</InputLabel>
+              <InputLabel id="project-status-label">Status</InputLabel>
               <Select
-                labelId="status-select-label"
+                labelId="project-status-label"
                 name="status"
-                value={formData.status}
+                value={form.status}
                 label="Status"
-                onChange={handleSelectChange}
+                onChange={updateSelect}
               >
                 <MenuItem value="active">Active</MenuItem>
                 <MenuItem value="completed">Completed</MenuItem>
@@ -320,13 +270,9 @@ const ProjectsPage: React.FC = () => {
             </FormControl>
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleClose}>Cancel</Button>
-            <Button
-              type="submit"
-              variant="contained"
-              disabled={createMutation.isPending || updateMutation.isPending}
-            >
-              {editingProject ? 'Update' : 'Create'}
+            <Button onClick={closeDialog}>Cancel</Button>
+            <Button type="submit" variant="contained" disabled={crud.isSaving}>
+              {editTarget ? 'Update' : 'Create'}
             </Button>
           </DialogActions>
         </form>
