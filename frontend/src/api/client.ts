@@ -133,6 +133,32 @@ class ApiClient {
     return response.data;
   }
 
+  // Notes endpoints
+  async getNotes(params?: { tag?: string; search?: string }) {
+    const response = await this.client.get('/api/notes', { params });
+    return response.data;
+  }
+
+  async getNote(id: string) {
+    const response = await this.client.get(`/api/notes/${id}`);
+    return response.data;
+  }
+
+  async createNote(noteData: { title: string; content?: string; tags?: string[]; category?: string; pinned?: boolean }) {
+    const response = await this.client.post('/api/notes', noteData);
+    return response.data;
+  }
+
+  async updateNote(id: string, noteData: { title?: string; content?: string; tags?: string[]; category?: string; pinned?: boolean }) {
+    const response = await this.client.put(`/api/notes/${id}`, noteData);
+    return response.data;
+  }
+
+  async deleteNote(id: string) {
+    const response = await this.client.delete(`/api/notes/${id}`);
+    return response.data;
+  }
+
   // Health check
   async healthCheck() {
     const response = await this.client.get('/health');
