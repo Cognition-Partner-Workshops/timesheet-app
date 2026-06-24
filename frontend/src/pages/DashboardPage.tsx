@@ -65,7 +65,7 @@ const DashboardPage: React.FC = () => {
       map.set(name, (map.get(name) || 0) + entry.hours);
     });
     return Array.from(map.entries())
-      .map(([name, hours]) => ({ name, hours: parseFloat(hours.toFixed(2)) }))
+      .map(([name, hours]) => ({ name, hours: Number.parseFloat(hours.toFixed(2)) }))
       .sort((a, b) => b.hours - a.hours);
   }, [workEntries]);
 
@@ -87,7 +87,7 @@ const DashboardPage: React.FC = () => {
       map.set(dateStr, (map.get(dateStr) || 0) + entry.hours);
     });
     return Array.from(map.entries())
-      .map(([date, hours]) => ({ date, hours: parseFloat(hours.toFixed(2)) }))
+      .map(([date, hours]) => ({ date, hours: Number.parseFloat(hours.toFixed(2)) }))
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(-30);
   }, [workEntries]);
@@ -97,11 +97,11 @@ const DashboardPage: React.FC = () => {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const totals = [0, 0, 0, 0, 0, 0, 0];
     workEntries.forEach((entry) => {
-      const d = typeof entry.date === 'number' ? new Date(entry.date) : new Date(entry.date);
+      const d = new Date(entry.date);
       const day = d.getDay();
       totals[day] += entry.hours;
     });
-    return days.map((name, i) => ({ name, hours: parseFloat(totals[i].toFixed(2)) }));
+    return days.map((name, i) => ({ name, hours: Number.parseFloat(totals[i].toFixed(2)) }));
   }, [workEntries]);
 
   // Client distribution (pie chart)
@@ -112,7 +112,7 @@ const DashboardPage: React.FC = () => {
       map.set(name, (map.get(name) || 0) + entry.hours);
     });
     return Array.from(map.entries())
-      .map(([name, value]) => ({ name, value: parseFloat(value.toFixed(2)) }))
+      .map(([name, value]) => ({ name, value: Number.parseFloat(value.toFixed(2)) }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 8);
   }, [workEntries]);
@@ -153,8 +153,8 @@ const DashboardPage: React.FC = () => {
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        {statsCards.map((stat, index) => (
-          <Grid size={{ xs: 12, sm: 6, md: 4 }} key={index}>
+        {statsCards.map((stat) => (
+          <Grid size={{ xs: 12, sm: 6, md: 4 }} key={stat.title}>
             <Card
               sx={{
                 cursor: 'pointer',
@@ -234,7 +234,7 @@ const DashboardPage: React.FC = () => {
                     tick={{ fill: chartTextColor, fontSize: 11 }}
                     tickFormatter={(val: string) => {
                       const parts = val.split('-');
-                      if (parts.length === 3) return `${parseInt(parts[1])}/${parseInt(parts[2])}`;
+                      if (parts.length === 3) return `${Number.parseInt(parts[1], 10)}/${Number.parseInt(parts[2], 10)}`;
                       return val;
                     }}
                   />
@@ -248,7 +248,7 @@ const DashboardPage: React.FC = () => {
                     labelFormatter={(label: string) => {
                       const parts = label.split('-');
                       if (parts.length === 3) {
-                        return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])).toLocaleDateString();
+                        return new Date(Number.parseInt(parts[0], 10), Number.parseInt(parts[1], 10) - 1, Number.parseInt(parts[2], 10)).toLocaleDateString();
                       }
                       return label;
                     }}
@@ -285,9 +285,9 @@ const DashboardPage: React.FC = () => {
                     }}
                   />
                   <Bar dataKey="hours" radius={[4, 4, 0, 0]}>
-                    {hoursByDayOfWeek.map((_entry, index) => (
+                    {hoursByDayOfWeek.map((dayEntry, index) => (
                       <Cell
-                        key={`cell-${index}`}
+                        key={dayEntry.name}
                         fill={index >= 1 && index <= 5 ? theme.palette.info.main : theme.palette.grey[400]}
                       />
                     ))}
@@ -314,8 +314,8 @@ const DashboardPage: React.FC = () => {
                     outerRadius={100}
                     dataKey="value"
                   >
-                    {clientDistribution.map((_entry, index) => (
-                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    {clientDistribution.map((clientEntry, index) => (
+                      <Cell key={clientEntry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip
