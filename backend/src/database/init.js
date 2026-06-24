@@ -22,79 +22,57 @@ function getDatabase() {
   return db;
 }
 
+function runCreateTable(database, name, columns, constraints) {
+  const parts = constraints ? [...columns, ...constraints] : columns;
+  database.run(`CREATE TABLE IF NOT EXISTS ${name} (${parts.join(', ')})`);
+}
+
+const TIMESTAMPS = ['created_at DATETIME DEFAULT CURRENT_TIMESTAMP', 'updated_at DATETIME DEFAULT CURRENT_TIMESTAMP'];
+const userEmailFK = 'FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE';
+
 async function initializeDatabase() {
   const database = getDatabase();
-  
+
   return new Promise((resolve, reject) => {
     database.serialize(() => {
-      // Create users table
-      database.run(`
-        CREATE TABLE IF NOT EXISTS users (
-          email TEXT PRIMARY KEY,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
+      runCreateTable(database, 'users', [
+        'email TEXT PRIMARY KEY', 'created_at DATETIME DEFAULT CURRENT_TIMESTAMP'
+      ]);
 
-      // Create clients table
-      database.run(`
-        CREATE TABLE IF NOT EXISTS clients (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          description TEXT,
-          department TEXT,
-          email TEXT,
-          user_email TEXT NOT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
-        )
-      `);
+      runCreateTable(database, 'clients', [
+        'id INTEGER PRIMARY KEY AUTOINCREMENT', 'name TEXT NOT NULL', 'description TEXT',
+        'department TEXT', 'email TEXT', 'user_email TEXT NOT NULL', ...TIMESTAMPS
+      ], [userEmailFK]);
 
-      // Create projects table
-      database.run(`
-        CREATE TABLE IF NOT EXISTS projects (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          description TEXT,
-          client_id INTEGER NOT NULL,
-          start_date DATE,
-          end_date DATE,
-          status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'completed', 'on-hold')),
-          budget_hours DECIMAL(10,2),
-          user_email TEXT NOT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE,
-          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
-        )
-      `);
+      runCreateTable(database, 'projects', [
+        'id INTEGER PRIMARY KEY AUTOINCREMENT', 'name TEXT NOT NULL', 'description TEXT',
+        'client_id INTEGER NOT NULL', 'start_date DATE', 'end_date DATE',
+        "status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'completed', 'on-hold'))",
+        'budget_hours DECIMAL(10,2)', 'user_email TEXT NOT NULL', ...TIMESTAMPS
+      ], ['FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE', userEmailFK]);
 
-      // Create work_entries table
-      database.run(`
-        CREATE TABLE IF NOT EXISTS work_entries (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          client_id INTEGER NOT NULL,
-          project_id INTEGER,
-          user_email TEXT NOT NULL,
-          hours DECIMAL(5,2) NOT NULL,
-          description TEXT,
-          date DATE NOT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE,
-          FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE SET NULL,
-          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
-        )
-      `);
+      runCreateTable(database, 'work_entries', [
+        'id INTEGER PRIMARY KEY AUTOINCREMENT', 'client_id INTEGER NOT NULL', 'project_id INTEGER',
+        'user_email TEXT NOT NULL', 'hours DECIMAL(5,2) NOT NULL', 'description TEXT',
+        'date DATE NOT NULL', ...TIMESTAMPS
+      ], [
+        'FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE',
+        'FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE SET NULL',
+        userEmailFK
+      ]);
 
-      // Create indexes for better performance
-      database.run(`CREATE INDEX IF NOT EXISTS idx_clients_user_email ON clients (user_email)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_projects_client_id ON projects (client_id)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_projects_user_email ON projects (user_email)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_client_id ON work_entries (client_id)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_project_id ON work_entries (project_id)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_user_email ON work_entries (user_email)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_date ON work_entries (date)`);
+      const indexes = [
+        ['idx_clients_user_email', 'clients', 'user_email'],
+        ['idx_projects_client_id', 'projects', 'client_id'],
+        ['idx_projects_user_email', 'projects', 'user_email'],
+        ['idx_work_entries_client_id', 'work_entries', 'client_id'],
+        ['idx_work_entries_project_id', 'work_entries', 'project_id'],
+        ['idx_work_entries_user_email', 'work_entries', 'user_email'],
+        ['idx_work_entries_date', 'work_entries', 'date'],
+      ];
+      for (const [idx, tbl, col] of indexes) {
+        database.run(`CREATE INDEX IF NOT EXISTS ${idx} ON ${tbl} (${col})`);
+      }
 
       console.log('Database tables created successfully');
       resolve();
