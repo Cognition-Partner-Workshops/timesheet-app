@@ -12,6 +12,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import apiClient from '../api/client';
 import { type Project } from '../types/api';
+import { extractApiError } from '../utils/apiError';
 
 const STATUS_CHIPS: Record<string, 'success' | 'default' | 'warning'> = {
   active: 'success', completed: 'default', 'on-hold': 'warning',
@@ -22,11 +23,6 @@ const EMPTY_FORM = {
   startDate: null as Date | null, endDate: null as Date | null,
   status: 'active' as string, budgetHours: '',
 };
-
-function extractApiError(err: unknown, fallback: string): string {
-  const typed = err as { response?: { data?: { error?: string } } };
-  return typed.response?.data?.error || fallback;
-}
 
 function formatDateField(d: Date | null): string | undefined {
   return d ? d.toISOString().split('T')[0] : undefined;
