@@ -105,39 +105,59 @@ router.post('/', (req, res, next) => {
           return res.status(400).json({ error: 'Client not found or does not belong to user' });
         }
 
-        // Create work entry
-        db.run(
-          'INSERT INTO work_entries (client_id, project_id, user_email, hours, description, date) VALUES (?, ?, ?, ?, ?, ?)',
-          [clientId, projectId || null, req.userEmail, hours, description || null, date],
-          function(err) {
-            if (err) {
-              console.error('Database error:', err);
-              return res.status(500).json({ error: 'Failed to create work entry' });
-            }
-
-            db.get(
-              `SELECT we.id, we.client_id, we.project_id, we.hours, we.description, we.date, 
-                      we.created_at, we.updated_at, c.name as client_name,
-                      p.name as project_name
-               FROM work_entries we
-               JOIN clients c ON we.client_id = c.id
-               LEFT JOIN projects p ON we.project_id = p.id
-               WHERE we.id = ?`,
-              [this.lastID],
-              (err, row) => {
-                if (err) {
-                  console.error('Database error:', err);
-                  return res.status(500).json({ error: 'Work entry created but failed to retrieve' });
-                }
-
-                res.status(201).json({
-                  message: 'Work entry created successfully',
-                  workEntry: row
-                });
+        const insertEntry = () => {
+          db.run(
+            'INSERT INTO work_entries (client_id, project_id, user_email, hours, description, date) VALUES (?, ?, ?, ?, ?, ?)',
+            [clientId, projectId || null, req.userEmail, hours, description || null, date],
+            function(err) {
+              if (err) {
+                console.error('Database error:', err);
+                return res.status(500).json({ error: 'Failed to create work entry' });
               }
-            );
-          }
-        );
+
+              db.get(
+                `SELECT we.id, we.client_id, we.project_id, we.hours, we.description, we.date, 
+                        we.created_at, we.updated_at, c.name as client_name,
+                        p.name as project_name
+                 FROM work_entries we
+                 JOIN clients c ON we.client_id = c.id
+                 LEFT JOIN projects p ON we.project_id = p.id
+                 WHERE we.id = ?`,
+                [this.lastID],
+                (err, row) => {
+                  if (err) {
+                    console.error('Database error:', err);
+                    return res.status(500).json({ error: 'Work entry created but failed to retrieve' });
+                  }
+
+                  res.status(201).json({
+                    message: 'Work entry created successfully',
+                    workEntry: row
+                  });
+                }
+              );
+            }
+          );
+        };
+
+        if (projectId) {
+          db.get(
+            'SELECT id FROM projects WHERE id = ? AND client_id = ? AND user_email = ?',
+            [projectId, clientId, req.userEmail],
+            (err, projectRow) => {
+              if (err) {
+                console.error('Database error:', err);
+                return res.status(500).json({ error: 'Internal server error' });
+              }
+              if (!projectRow) {
+                return res.status(400).json({ error: 'Project not found or does not belong to selected client' });
+              }
+              insertEntry();
+            }
+          );
+        } else {
+          insertEntry();
+        }
       }
     );
   } catch (error) {
@@ -163,7 +183,7 @@ router.put('/:id', (req, res, next) => {
 
     // Check if work entry exists and belongs to user
     db.get(
-      'SELECT id FROM work_entries WHERE id = ? AND user_email = ?',
+      'SELECT id, client_id FROM work_entries WHERE id = ? AND user_email = ?',
       [workEntryId, req.userEmail],
       (err, row) => {
         if (err) {
@@ -174,6 +194,27 @@ router.put('/:id', (req, res, next) => {
         if (!row) {
           return res.status(404).json({ error: 'Work entry not found' });
         }
+
+        const afterClientCheck = (effectiveClientId) => {
+          if (value.projectId) {
+            db.get(
+              'SELECT id FROM projects WHERE id = ? AND client_id = ? AND user_email = ?',
+              [value.projectId, effectiveClientId, req.userEmail],
+              (err, projectRow) => {
+                if (err) {
+                  console.error('Database error:', err);
+                  return res.status(500).json({ error: 'Internal server error' });
+                }
+                if (!projectRow) {
+                  return res.status(400).json({ error: 'Project not found or does not belong to selected client' });
+                }
+                performUpdate();
+              }
+            );
+          } else {
+            performUpdate();
+          }
+        };
 
         // If clientId is being updated, verify it belongs to user
         if (value.clientId) {
@@ -190,11 +231,11 @@ router.put('/:id', (req, res, next) => {
                 return res.status(400).json({ error: 'Client not found or does not belong to user' });
               }
 
-              performUpdate();
+              afterClientCheck(value.clientId);
             }
           );
         } else {
-          performUpdate();
+          afterClientCheck(row.client_id);
         }
 
         function performUpdate() {

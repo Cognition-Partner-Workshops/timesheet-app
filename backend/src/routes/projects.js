@@ -9,7 +9,7 @@ router.use(authenticateUser);
 
 function parseId(req, res, label) {
   const id = parseInt(req.params.id);
-  if (isNaN(id)) { res.status(400).json({ error: `Invalid ${label} ID` }); return null; }
+  if (isNaN(id) || id <= 0) { res.status(400).json({ error: `Invalid ${label} ID` }); return null; }
   return id;
 }
 

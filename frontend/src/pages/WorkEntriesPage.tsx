@@ -14,12 +14,12 @@ import apiClient from '../api/client';
 import { type WorkEntry } from '../types/api';
 import { extractApiError } from '../utils/apiError';
 
-const EMPTY_FORM = { clientId: 0, projectId: 0, hours: '', description: '', date: new Date() };
+const getEmptyForm = () => ({ clientId: 0, projectId: 0, hours: '', description: '', date: new Date() });
 
 const WorkEntriesPage: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<WorkEntry | null>(null);
-  const [formData, setFormData] = useState({ ...EMPTY_FORM });
+  const [formData, setFormData] = useState(getEmptyForm());
   const [error, setError] = useState('');
   const queryClient = useQueryClient();
 
@@ -33,7 +33,7 @@ const WorkEntriesPage: React.FC = () => {
     queryKey: ['projects'], queryFn: () => apiClient.getProjects(),
   });
 
-  const resetForm = () => { setOpen(false); setEditingEntry(null); setFormData({ ...EMPTY_FORM }); setError(''); };
+  const resetForm = () => { setOpen(false); setEditingEntry(null); setFormData(getEmptyForm()); setError(''); };
   const invalidateEntries = { onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['workEntries'] }); resetForm(); } };
 
   const createMutation = useMutation({
@@ -66,7 +66,7 @@ const WorkEntriesPage: React.FC = () => {
       clientId: entry.client_id, projectId: entry.project_id || 0,
       hours: entry.hours.toString(), description: entry.description || '',
       date: new Date(entry.date),
-    } : { ...EMPTY_FORM });
+    } : getEmptyForm());
     setError('');
     setOpen(true);
   };
@@ -93,7 +93,8 @@ const WorkEntriesPage: React.FC = () => {
     }
   };
 
-  const updateField = <K extends keyof typeof EMPTY_FORM>(key: K, val: (typeof EMPTY_FORM)[K]) =>
+  type FormType = ReturnType<typeof getEmptyForm>;
+  const updateField = <K extends keyof FormType>(key: K, val: FormType[K]) =>
     setFormData(prev => ({ ...prev, [key]: val }));
 
   if (entriesLoading || clientsLoading) {
@@ -169,7 +170,7 @@ const WorkEntriesPage: React.FC = () => {
             <DialogContent>
               <FormControl fullWidth margin="dense" required>
                 <InputLabel>Client</InputLabel>
-                <Select value={formData.clientId} onChange={e => updateField('clientId', Number(e.target.value))} disabled={saving}>
+                <Select value={formData.clientId} onChange={e => { updateField('clientId', Number(e.target.value)); updateField('projectId', 0); }} disabled={saving}>
                   {clients.map((c: { id: number; name: string }) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
                 </Select>
               </FormControl>
