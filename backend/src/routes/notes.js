@@ -7,6 +7,10 @@ const router = express.Router();
 
 router.use(authenticateUser);
 
+function escapeRegExp(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // Get all notes for authenticated user
 router.get('/', async (req, res) => {
   try {
@@ -20,9 +24,10 @@ router.get('/', async (req, res) => {
     }
 
     if (search) {
+      const sanitized = escapeRegExp(String(search));
       query.$or = [
-        { title: new RegExp(search, 'i') },
-        { content: new RegExp(search, 'i') }
+        { title: new RegExp(sanitized, 'i') },
+        { content: new RegExp(sanitized, 'i') }
       ];
     }
 
