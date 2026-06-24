@@ -1,0 +1,10 @@
+AFTER FIX - CSV Export shows proper human-readable dates:
+=========================================================
+
+Date,Hours,Description,Created At
+2026-06-24,8,Frontend development - implemented login page,2026-06-24 14:08:29
+2026-06-23,4.5,API integration and testing,2026-06-24 14:08:29
+
+=========================================================
+The "Date" column now correctly shows ISO date strings (2026-06-24)
+making the exported reports usable for billing and invoicing.
