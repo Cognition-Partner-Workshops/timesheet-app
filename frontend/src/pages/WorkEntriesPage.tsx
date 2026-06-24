@@ -35,7 +35,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import apiClient from '../api/client';
 import { type WorkEntry } from '../types/api';
-import { formatDateString } from '../utils/dateFormat';
+import { formatDateString, parseLocalDate } from '../utils/dateFormat';
 
 const WorkEntriesPage: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -107,7 +107,7 @@ const WorkEntriesPage: React.FC = () => {
         clientId: entry.client_id,
         hours: entry.hours.toString(),
         description: entry.description || '',
-        date: (() => { const d = new Date(entry.date); return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()); })(),
+        date: parseLocalDate(entry.date),
       });
     } else {
       setEditingEntry(null);
