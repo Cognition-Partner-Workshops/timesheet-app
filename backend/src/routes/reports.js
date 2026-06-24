@@ -10,8 +10,8 @@ const router = express.Router();
 
 // Helper to format date values stored as Unix timestamps (ms) into YYYY-MM-DD
 function formatDate(dateValue) {
-  if (!dateValue) return '';
-  const d = new Date(typeof dateValue === 'number' ? dateValue : dateValue);
+  if (!dateValue && dateValue !== 0) return '';
+  const d = new Date(dateValue);
   if (isNaN(d.getTime())) return String(dateValue);
   return d.toISOString().split('T')[0];
 }
