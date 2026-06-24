@@ -24,8 +24,9 @@ function authenticateUser(req, res, next) {
     }
     
     if (!row) {
-      // Create new user
-      db.run('INSERT INTO users (email) VALUES (?)', [userEmail], (err) => {
+      // Create new user using INSERT OR IGNORE to handle race conditions
+      // when multiple concurrent requests arrive for the same new user
+      db.run('INSERT OR IGNORE INTO users (email) VALUES (?)', [userEmail], (err) => {
         if (err) {
           console.error('Error creating user:', err);
           return res.status(500).json({ error: 'Failed to create user' });

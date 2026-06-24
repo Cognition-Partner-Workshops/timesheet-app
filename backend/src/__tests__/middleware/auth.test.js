@@ -118,7 +118,7 @@ describe('Authentication Middleware', () => {
 
       setImmediate(() => {
         expect(mockDb.run).toHaveBeenCalledWith(
-          'INSERT INTO users (email) VALUES (?)',
+          'INSERT OR IGNORE INTO users (email) VALUES (?)',
           ['newuser@example.com'],
           expect.any(Function)
         );
