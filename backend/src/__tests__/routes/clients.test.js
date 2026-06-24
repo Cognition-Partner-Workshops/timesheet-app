@@ -29,7 +29,8 @@ describe('Client Routes', () => {
     mockDb = {
       all: jest.fn(),
       get: jest.fn(),
-      run: jest.fn()
+      run: jest.fn(),
+      serialize: jest.fn((fn) => fn())
     };
     getDatabase.mockReturnValue(mockDb);
   });

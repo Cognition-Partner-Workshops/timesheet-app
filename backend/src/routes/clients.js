@@ -190,21 +190,34 @@ router.put('/:id', (req, res, next) => {
 router.delete('/', (req, res) => {
   const db = getDatabase();
   
-  db.run(
-    'DELETE FROM clients WHERE user_email = ?',
-    [req.userEmail],
-    function(err) {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ error: 'Failed to delete clients' });
+  db.serialize(() => {
+    // Explicitly delete associated work entries first
+    db.run(
+      'DELETE FROM work_entries WHERE user_email = ?',
+      [req.userEmail],
+      (err) => {
+        if (err) {
+          console.error('Database error deleting work entries:', err);
+        }
       }
-      
-      res.json({ 
-        message: 'All clients deleted successfully',
-        deletedCount: this.changes
-      });
-    }
-  );
+    );
+
+    db.run(
+      'DELETE FROM clients WHERE user_email = ?',
+      [req.userEmail],
+      function(err) {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ error: 'Failed to delete clients' });
+        }
+        
+        res.json({ 
+          message: 'All clients deleted successfully',
+          deletedCount: this.changes
+        });
+      }
+    );
+  });
 });
 
 // Delete client
@@ -231,19 +244,32 @@ router.delete('/:id', (req, res) => {
         return res.status(404).json({ error: 'Client not found' });
       }
       
-      // Delete client (work entries will be deleted due to CASCADE)
-      db.run(
-        'DELETE FROM clients WHERE id = ? AND user_email = ?',
-        [clientId, req.userEmail],
-        function(err) {
-          if (err) {
-            console.error('Database error:', err);
-            return res.status(500).json({ error: 'Failed to delete client' });
+      db.serialize(() => {
+        // Explicitly delete associated work entries first
+        db.run(
+          'DELETE FROM work_entries WHERE client_id = ? AND user_email = ?',
+          [clientId, req.userEmail],
+          (err) => {
+            if (err) {
+              console.error('Database error deleting work entries:', err);
+            }
           }
-          
-          res.json({ message: 'Client deleted successfully' });
-        }
-      );
+        );
+
+        // Delete client (CASCADE also handles this, but explicit delete above is defensive)
+        db.run(
+          'DELETE FROM clients WHERE id = ? AND user_email = ?',
+          [clientId, req.userEmail],
+          function(err) {
+            if (err) {
+              console.error('Database error:', err);
+              return res.status(500).json({ error: 'Failed to delete client' });
+            }
+            
+            res.json({ message: 'Client deleted successfully' });
+          }
+        );
+      });
     }
   );
 });
