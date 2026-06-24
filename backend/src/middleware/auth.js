@@ -24,8 +24,7 @@ function authenticateUser(req, res, next) {
     }
     
     if (!row) {
-      // Create new user using INSERT OR IGNORE to handle race conditions
-      // when multiple concurrent requests arrive for the same new user
+      // INSERT OR IGNORE avoids race condition when concurrent requests create the same user
       db.run('INSERT OR IGNORE INTO users (email) VALUES (?)', [userEmail], (err) => {
         if (err) {
           console.error('Error creating user:', err);
