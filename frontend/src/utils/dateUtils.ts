@@ -1,18 +1,6 @@
 /**
- * Format a date string (YYYY-MM-DD) for display, avoiding timezone shifts.
- * Parses the date parts directly to prevent UTC-to-local conversion issues.
- */
-export function formatDate(dateStr: string | number): string {
-  if (typeof dateStr === 'number') {
-    return new Date(dateStr).toLocaleDateString('en-US', { timeZone: 'UTC' });
-  }
-  const [year, month, day] = dateStr.split('-').map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString();
-}
-
-/**
- * Parse a date string (YYYY-MM-DD) into a local Date object for date picker.
- * Avoids the off-by-one issue when parsing ISO date strings with new Date().
+ * Parse a date value (YYYY-MM-DD string or legacy timestamp) into a local Date,
+ * avoiding the off-by-one timezone issue caused by new Date("YYYY-MM-DD").
  */
 export function parseDateString(dateStr: string | number): Date {
   if (typeof dateStr === 'number') {
@@ -21,4 +9,11 @@ export function parseDateString(dateStr: string | number): Date {
   }
   const [year, month, day] = dateStr.split('-').map(Number);
   return new Date(year, month - 1, day);
+}
+
+/**
+ * Format a date value for display, avoiding timezone shifts.
+ */
+export function formatDate(dateStr: string | number): string {
+  return parseDateString(dateStr).toLocaleDateString();
 }
