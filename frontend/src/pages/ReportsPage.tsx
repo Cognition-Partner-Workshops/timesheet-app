@@ -28,7 +28,7 @@ import {
   Description as CsvIcon,
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
-import apiClient, { formatDate } from '../api/client';
+import apiClient from '../api/client';
 import { type ClientReport } from '../types/api';
 
 const ReportsPage: React.FC = () => {
@@ -232,7 +232,7 @@ const ReportsPage: React.FC = () => {
                           <TableRow key={entry.id}>
                             <TableCell>
                               <Typography variant="body2">
-                                {formatDate(entry.date)}
+                                {new Date(entry.date).toLocaleDateString(undefined, { timeZone: 'UTC' })}
                               </Typography>
                             </TableCell>
                             <TableCell>
@@ -253,7 +253,7 @@ const ReportsPage: React.FC = () => {
                             </TableCell>
                             <TableCell>
                               <Typography variant="body2" color="text.secondary">
-                                {formatDate(entry.created_at)}
+                                {new Date(entry.created_at).toLocaleDateString(undefined, { timeZone: 'UTC' })}
                               </Typography>
                             </TableCell>
                           </TableRow>

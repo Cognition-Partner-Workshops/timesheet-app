@@ -27,7 +27,7 @@ import {
   DeleteSweep as DeleteSweepIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import apiClient, { formatDate } from '../api/client';
+import apiClient from '../api/client';
 import { type Client } from '../types/api';
 
 const ClientsPage: React.FC = () => {
@@ -245,7 +245,7 @@ const ClientsPage: React.FC = () => {
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" color="text.secondary">
-                        {formatDate(client.created_at)}
+                        {new Date(client.created_at).toLocaleDateString(undefined, { timeZone: 'UTC' })}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
