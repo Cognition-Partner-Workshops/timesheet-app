@@ -147,7 +147,7 @@ jobs:
               .[]
               | select(.body | contains("<!-- REGRESSION_HEALER_DATA:"))
               | .body
-              | capture("<!-- REGRESSION_HEALER_DATA:(?<data>[^>]+)-->")
+              | capture("<!-- REGRESSION_HEALER_DATA:(?<data>.+?)-->")
               | .data
             ]' 2>/dev/null || echo "[]")
 
@@ -161,12 +161,14 @@ jobs:
           TRIPPED_TESTS="[]"
           TRIPPED="false"
 
-          for TEST_NAME in $(echo "$CURRENT_FAILURES" | jq -r '.[]' 2>/dev/null); do
+          while IFS= read -r TEST_NAME; do
+            [ -z "$TEST_NAME" ] && continue
             CONSECUTIVE_COUNT=0
 
-            # Count how many consecutive previous healer comments include this test
-            # Walk backwards through comments; stop counting when the test is NOT found
-            for DATA in $(echo "$HEALER_COMMENTS" | jq -r '.[] | @base64' 2>/dev/null); do
+            # Count how many consecutive recent healer comments include this test
+            # Walk newest-first; stop counting when the test is NOT found
+            while IFS= read -r DATA; do
+              [ -z "$DATA" ] && continue
               DECODED=$(echo "$DATA" | base64 -d 2>/dev/null || true)
               PARSED=$(echo "$DECODED" | jq -c '.' 2>/dev/null || echo "[]")
 
@@ -175,7 +177,7 @@ jobs:
               else
                 break
               fi
-            done
+            done < <(echo "$HEALER_COMMENTS" | jq -r '[.[] | @base64] | reverse | .[]' 2>/dev/null)
 
             # Current failure + previous consecutive = total consecutive failures
             TOTAL=$((CONSECUTIVE_COUNT + 1))
@@ -184,7 +186,7 @@ jobs:
               TRIPPED="true"
               TRIPPED_TESTS=$(echo "$TRIPPED_TESTS" | jq -c --arg name "$TEST_NAME" --argjson count "$TOTAL" '. + [{"test": $name, "count": $count}]')
             fi
-          done
+          done < <(echo "$CURRENT_FAILURES" | jq -r '.[]' 2>/dev/null)
 
           echo "tripped=${TRIPPED}" >> "$GITHUB_OUTPUT"
 
