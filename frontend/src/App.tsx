@@ -7,6 +7,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
 import { ThemeModeProvider } from './contexts/ThemeModeContext';
 import { useAuth } from './hooks/useAuth';
+import { useFeatureFlags } from './hooks/useFeatureFlags';
 import { useThemeMode } from './hooks/useThemeMode';
 import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
@@ -84,8 +85,9 @@ const AppContent: React.FC = () => {
 };
 
 const ThemedApp: React.FC = () => {
+  const { darkMode: darkModeEnabled } = useFeatureFlags();
   const { mode } = useThemeMode();
-  const theme = mode === 'dark' ? darkTheme : lightTheme;
+  const theme = (darkModeEnabled && mode === 'dark') ? darkTheme : lightTheme;
 
   return (
     <ThemeProvider theme={theme}>
