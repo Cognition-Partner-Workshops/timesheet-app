@@ -27,9 +27,8 @@ import {
   DeleteSweep as DeleteSweepIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import apiClient from '../api/client';
+import apiClient, { formatDate } from '../api/client';
 import { type Client } from '../types/api';
-import { formatDate } from '../utils/dates';
 
 const ClientsPage: React.FC = () => {
   const [open, setOpen] = useState(false);

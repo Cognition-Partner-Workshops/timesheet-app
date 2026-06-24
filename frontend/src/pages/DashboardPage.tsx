@@ -16,8 +16,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import apiClient from '../api/client';
-import { formatDate } from '../utils/dates';
+import apiClient, { formatDate } from '../api/client';
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();

@@ -33,9 +33,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import apiClient from '../api/client';
+import apiClient, { formatDate } from '../api/client';
 import { type WorkEntry } from '../types/api';
-import { formatDate } from '../utils/dates';
 
 const WorkEntriesPage: React.FC = () => {
   const [open, setOpen] = useState(false);

@@ -28,9 +28,8 @@ import {
   Description as CsvIcon,
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
-import apiClient from '../api/client';
+import apiClient, { formatDate } from '../api/client';
 import { type ClientReport } from '../types/api';
-import { formatDate } from '../utils/dates';
 
 const ReportsPage: React.FC = () => {
   const [selectedClientId, setSelectedClientId] = useState<number>(0);
