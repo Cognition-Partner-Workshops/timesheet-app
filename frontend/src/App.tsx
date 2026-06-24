@@ -4,7 +4,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AuthProvider } from './contexts/AuthContext';
+import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
+import { ThemeModeProvider } from './contexts/ThemeModeContext';
 import { useAuth } from './hooks/useAuth';
+import { useThemeMode } from './hooks/useThemeMode';
 import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -12,13 +15,26 @@ import ClientsPage from './pages/ClientsPage';
 import WorkEntriesPage from './pages/WorkEntriesPage';
 import ReportsPage from './pages/ReportsPage';
 
-const theme = createTheme({
+const lightTheme = createTheme({
   palette: {
+    mode: 'light',
     primary: {
       main: '#1976d2',
     },
     secondary: {
       main: '#dc004e',
+    },
+  },
+});
+
+const darkTheme = createTheme({
+  palette: {
+    mode: 'dark',
+    primary: {
+      main: '#90caf9',
+    },
+    secondary: {
+      main: '#f48fb1',
     },
   },
 });
@@ -67,15 +83,28 @@ const AppContent: React.FC = () => {
   );
 };
 
+const ThemedApp: React.FC = () => {
+  const { mode } = useThemeMode();
+  const theme = mode === 'dark' ? darkTheme : lightTheme;
+
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <AppContent />
+    </ThemeProvider>
+  );
+};
+
 const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <AuthProvider>
-          <AppContent />
-        </AuthProvider>
-      </ThemeProvider>
+      <FeatureFlagsProvider>
+        <ThemeModeProvider>
+          <AuthProvider>
+            <ThemedApp />
+          </AuthProvider>
+        </ThemeModeProvider>
+      </FeatureFlagsProvider>
     </QueryClientProvider>
   );
 };
