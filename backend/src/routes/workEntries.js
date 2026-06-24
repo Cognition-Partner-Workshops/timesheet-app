@@ -183,7 +183,7 @@ router.put('/:id', (req, res, next) => {
 
     // Check if work entry exists and belongs to user
     db.get(
-      'SELECT id, client_id FROM work_entries WHERE id = ? AND user_email = ?',
+      'SELECT id, client_id, project_id FROM work_entries WHERE id = ? AND user_email = ?',
       [workEntryId, req.userEmail],
       (err, row) => {
         if (err) {
@@ -195,7 +195,7 @@ router.put('/:id', (req, res, next) => {
           return res.status(404).json({ error: 'Work entry not found' });
         }
 
-        const afterClientCheck = (effectiveClientId) => {
+        const afterClientCheck = (effectiveClientId, clientChanged) => {
           if (value.projectId) {
             db.get(
               'SELECT id FROM projects WHERE id = ? AND client_id = ? AND user_email = ?',
@@ -212,6 +212,9 @@ router.put('/:id', (req, res, next) => {
               }
             );
           } else {
+            if (clientChanged && row.project_id && value.projectId === undefined) {
+              value.projectId = null;
+            }
             performUpdate();
           }
         };
@@ -231,11 +234,11 @@ router.put('/:id', (req, res, next) => {
                 return res.status(400).json({ error: 'Client not found or does not belong to user' });
               }
 
-              afterClientCheck(value.clientId);
+              afterClientCheck(value.clientId, value.clientId !== row.client_id);
             }
           );
         } else {
-          afterClientCheck(row.client_id);
+          afterClientCheck(row.client_id, false);
         }
 
         function performUpdate() {
