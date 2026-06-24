@@ -113,11 +113,13 @@ jobs:
         id: find_pr
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          REPO_OWNER: ${{ github.repository_owner }}
         run: |
           BRANCH="${GITHUB_REF#refs/heads/}"
           echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
 
-          PR_NUMBER=$(gh api "repos/${{ github.repository }}/pulls?head=${{ github.repository_owner }}:${BRANCH}&state=open" \
+          PR_NUMBER=$(gh api "repos/${REPO}/pulls?head=${REPO_OWNER}:${BRANCH}&state=open" \
             --jq '.[0].number // empty' 2>/dev/null || true)
 
           if [ -n "$PR_NUMBER" ]; then
@@ -134,12 +136,12 @@ jobs:
         if: steps.find_pr.outputs.has_pr == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
           FAILED_TEST_NAMES: ${{ needs.run-tests.outputs.failed_test_names }}
+          PR_NUMBER: ${{ steps.find_pr.outputs.pr_number }}
         run: |
-          PR_NUMBER="${{ steps.find_pr.outputs.pr_number }}"
-
           # Fetch all previous Regression Healer comments on this PR
-          HEALER_COMMENTS=$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+          HEALER_COMMENTS=$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" \
             --paginate --jq '[
               .[]
               | select(.body | contains("<!-- REGRESSION_HEALER_DATA:"))
@@ -159,7 +161,6 @@ jobs:
           TRIPPED="false"
 
           for TEST_NAME in $(echo "$CURRENT_FAILURES" | jq -r '.[]' 2>/dev/null); do
-            ESCAPED_NAME=$(echo "$TEST_NAME" | jq -Rs '.' | sed 's/^"//;s/"$//')
             CONSECUTIVE_COUNT=0
 
             # Count how many consecutive previous healer comments include this test
@@ -201,14 +202,15 @@ jobs:
         if: steps.find_pr.outputs.has_pr == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.find_pr.outputs.pr_number }}
+          BRANCH: ${{ steps.find_pr.outputs.branch }}
+          COMMIT_SHA: ${{ github.sha }}
           FAILED_TEST_NAMES: ${{ needs.run-tests.outputs.failed_test_names }}
           FAILURE_SUMMARY: ${{ needs.run-tests.outputs.failure_summary }}
           ERROR_LOG: ${{ needs.run-tests.outputs.error_log }}
           CIRCUIT_TRIPPED: ${{ steps.circuit_breaker.outputs.tripped }}
         run: |
-          PR_NUMBER="${{ steps.find_pr.outputs.pr_number }}"
-          BRANCH="${{ steps.find_pr.outputs.branch }}"
-          COMMIT_SHA="${{ github.sha }}"
           SHORT_SHA="${COMMIT_SHA:0:7}"
 
           # Build test list
@@ -253,19 +255,19 @@ jobs:
           EOF
           )
 
-          gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" -f body="$COMMENT"
+          gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" -f body="$COMMENT"
 
       - name: Escalate to GitHub Issue (circuit breaker)
         if: steps.circuit_breaker.outputs.tripped == 'true' && steps.find_pr.outputs.has_pr == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.find_pr.outputs.pr_number }}
+          BRANCH: ${{ steps.find_pr.outputs.branch }}
           TRIPPED_TESTS: ${{ steps.circuit_breaker.outputs.tripped_tests }}
           FAILURE_SUMMARY: ${{ needs.run-tests.outputs.failure_summary }}
           ERROR_LOG: ${{ needs.run-tests.outputs.error_log }}
         run: |
-          PR_NUMBER="${{ steps.find_pr.outputs.pr_number }}"
-          BRANCH="${{ steps.find_pr.outputs.branch }}"
-
           TEST_TABLE=$(echo "$TRIPPED_TESTS" | jq -r '.[] | "| `\(.test)` | \(.count) |"' 2>/dev/null || echo "| (unknown) | 3+ |")
 
           ISSUE_BODY=$(cat <<EOF
@@ -307,7 +309,7 @@ jobs:
           EOF
           )
 
-          gh api "repos/${{ github.repository }}/issues" \
+          gh api "repos/${REPO}/issues" \
             -f title="[Regression Healer] Circuit breaker tripped on PR #${PR_NUMBER}" \
             -f body="$ISSUE_BODY" \
             -f "labels[]=regression" \
@@ -322,15 +324,15 @@ jobs:
           DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
           DEVIN_ORG_ID: ${{ secrets.DEVIN_ORG_ID }}
           CREATE_AS_USER_ID: ${{ secrets.DEVIN_CREATE_AS_USER_ID }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.find_pr.outputs.pr_number }}
+          BRANCH: ${{ steps.find_pr.outputs.branch }}
           FAILED_TEST_NAMES: ${{ needs.run-tests.outputs.failed_test_names }}
           FAILURE_SUMMARY: ${{ needs.run-tests.outputs.failure_summary }}
           ERROR_LOG: ${{ needs.run-tests.outputs.error_log }}
         run: |
-          PR_NUMBER="${{ steps.find_pr.outputs.pr_number }}"
-          BRANCH="${{ steps.find_pr.outputs.branch }}"
-
           PROMPT=$(cat <<PROMPT_END
-          The backend test suite failed on PR #${PR_NUMBER} in repository ${{ github.repository }} on branch '${BRANCH}'.
+          The backend test suite failed on PR #${PR_NUMBER} in repository ${REPO} on branch '${BRANCH}'.
 
           Failed tests:
           ${FAILED_TEST_NAMES}
@@ -342,7 +344,7 @@ jobs:
           ${ERROR_LOG}
 
           Instructions:
-          1. Clone the repository ${{ github.repository }} and checkout branch '${BRANCH}'.
+          1. Clone the repository ${REPO} and checkout branch '${BRANCH}'.
           2. In the backend/ directory, run \`npm test\` to reproduce the failures.
           3. Analyze each failing test — the tests are the source of truth (TDD). Fix the source code, NOT the tests.
           4. Run \`npm test\` again to verify all tests pass.
@@ -361,7 +363,7 @@ jobs:
           REQUEST_BODY=$(jq -n \
             --argjson prompt "$ESCAPED_PROMPT" \
             --arg title "Fix test regression on PR #${PR_NUMBER}" \
-            --arg repo "${{ github.repository }}" \
+            --arg repo "${REPO}" \
             --arg user_id "${CREATE_AS_USER_ID}" \
             '{
               prompt: $prompt,
@@ -404,7 +406,7 @@ jobs:
           EOF
             )
 
-            gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" -f body="$COMMENT"
+            gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" -f body="$COMMENT"
           else
             echo "::error::Failed to create Devin session (HTTP ${HTTP_CODE})"
             echo "$HTTP_BODY"
