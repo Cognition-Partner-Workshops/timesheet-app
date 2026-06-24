@@ -5,17 +5,14 @@ on:
     branches:
       - '**'
 
-permissions:
-  contents: read
-  pull-requests: write
-  issues: write
-
 jobs:
   run-tests:
     name: Run Backend Test Suite
     # Prevent infinite loops: skip when Devin pushes a fix
     if: github.actor != 'devin-ai-integration[bot]'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       test_failed: ${{ steps.backend_test.outputs.test_failed }}
       failure_summary: ${{ steps.backend_test.outputs.failure_summary }}
@@ -104,6 +101,10 @@ jobs:
     needs: run-tests
     if: needs.run-tests.outputs.test_failed == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
     concurrency:
       group: regression-healer-${{ github.ref }}
       cancel-in-progress: true
