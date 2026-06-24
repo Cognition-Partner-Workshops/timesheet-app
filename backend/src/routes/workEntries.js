@@ -14,10 +14,12 @@ router.get('/', (req, res) => {
   const db = getDatabase();
   
   let query = `
-    SELECT we.id, we.client_id, we.hours, we.description, we.date, 
-           we.created_at, we.updated_at, c.name as client_name
+    SELECT we.id, we.client_id, we.project_id, we.hours, we.description, we.date, 
+           we.created_at, we.updated_at, c.name as client_name,
+           p.name as project_name
     FROM work_entries we
     JOIN clients c ON we.client_id = c.id
+    LEFT JOIN projects p ON we.project_id = p.id
     WHERE we.user_email = ?
   `;
   
@@ -55,10 +57,12 @@ router.get('/:id', (req, res) => {
   const db = getDatabase();
   
   db.get(
-    `SELECT we.id, we.client_id, we.hours, we.description, we.date, 
-            we.created_at, we.updated_at, c.name as client_name
+    `SELECT we.id, we.client_id, we.project_id, we.hours, we.description, we.date, 
+            we.created_at, we.updated_at, c.name as client_name,
+            p.name as project_name
      FROM work_entries we
      JOIN clients c ON we.client_id = c.id
+     LEFT JOIN projects p ON we.project_id = p.id
      WHERE we.id = ? AND we.user_email = ?`,
     [workEntryId, req.userEmail],
     (err, row) => {
@@ -84,7 +88,7 @@ router.post('/', (req, res, next) => {
       return next(error);
     }
 
-    const { clientId, hours, description, date } = value;
+    const { clientId, projectId, hours, description, date } = value;
     const db = getDatabase();
 
     // Verify client exists and belongs to user
@@ -103,20 +107,21 @@ router.post('/', (req, res, next) => {
 
         // Create work entry
         db.run(
-          'INSERT INTO work_entries (client_id, user_email, hours, description, date) VALUES (?, ?, ?, ?, ?)',
-          [clientId, req.userEmail, hours, description || null, date],
+          'INSERT INTO work_entries (client_id, project_id, user_email, hours, description, date) VALUES (?, ?, ?, ?, ?, ?)',
+          [clientId, projectId || null, req.userEmail, hours, description || null, date],
           function(err) {
             if (err) {
               console.error('Database error:', err);
               return res.status(500).json({ error: 'Failed to create work entry' });
             }
 
-            // Return the created work entry with client name
             db.get(
-              `SELECT we.id, we.client_id, we.hours, we.description, we.date, 
-                      we.created_at, we.updated_at, c.name as client_name
+              `SELECT we.id, we.client_id, we.project_id, we.hours, we.description, we.date, 
+                      we.created_at, we.updated_at, c.name as client_name,
+                      p.name as project_name
                FROM work_entries we
                JOIN clients c ON we.client_id = c.id
+               LEFT JOIN projects p ON we.project_id = p.id
                WHERE we.id = ?`,
               [this.lastID],
               (err, row) => {
@@ -202,6 +207,11 @@ router.put('/:id', (req, res, next) => {
             values.push(value.clientId);
           }
 
+          if (value.projectId !== undefined) {
+            updates.push('project_id = ?');
+            values.push(value.projectId || null);
+          }
+
           if (value.hours !== undefined) {
             updates.push('hours = ?');
             values.push(value.hours);
@@ -228,12 +238,13 @@ router.put('/:id', (req, res, next) => {
               return res.status(500).json({ error: 'Failed to update work entry' });
             }
 
-            // Return updated work entry with client name
             db.get(
-              `SELECT we.id, we.client_id, we.hours, we.description, we.date, 
-                      we.created_at, we.updated_at, c.name as client_name
+              `SELECT we.id, we.client_id, we.project_id, we.hours, we.description, we.date, 
+                      we.created_at, we.updated_at, c.name as client_name,
+                      p.name as project_name
                FROM work_entries we
                JOIN clients c ON we.client_id = c.id
+               LEFT JOIN projects p ON we.project_id = p.id
                WHERE we.id = ?`,
               [workEntryId],
               (err, row) => {
