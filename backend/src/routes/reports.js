@@ -121,7 +121,12 @@ router.get('/export/csv/:clientId', (req, res) => {
             ]
           });
           
-          csvWriter.writeRecords(workEntries)
+          const formattedEntries = workEntries.map(entry => ({
+            ...entry,
+            date: new Date(entry.date).toLocaleDateString('en-US'),
+          }));
+          
+          csvWriter.writeRecords(formattedEntries)
             .then(() => {
               // Send file and clean up
               res.download(tempPath, filename, (err) => {
@@ -224,7 +229,8 @@ router.get('/export/pdf/:clientId', (req, res) => {
               doc.addPage();
             }
             
-            doc.text(entry.date, 50, doc.y, { width: 100 });
+            const formattedDate = new Date(entry.date).toLocaleDateString('en-US');
+            doc.text(formattedDate, 50, doc.y, { width: 100 });
             doc.text(entry.hours.toString(), 150, y, { width: 80 });
             doc.text(entry.description || 'No description', 230, y, { width: 300 });
             doc.moveDown();
