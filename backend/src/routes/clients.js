@@ -8,6 +8,24 @@ const router = express.Router();
 // All routes require authentication
 router.use(authenticateUser);
 
+function deleteWorkEntriesAndClients(db, workEntryFilter, clientFilter, successResponse, res) {
+  db.serialize(() => {
+    db.run(workEntryFilter.query, workEntryFilter.params, (err) => {
+      if (err) {
+        console.error('Database error deleting work entries:', err);
+      }
+    });
+
+    db.run(clientFilter.query, clientFilter.params, function(err) {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: clientFilter.errorMsg });
+      }
+      successResponse(this);
+    });
+  });
+}
+
 // Get all clients for authenticated user
 router.get('/', (req, res) => {
   const db = getDatabase();
@@ -189,35 +207,14 @@ router.put('/:id', (req, res, next) => {
 // Delete all clients for authenticated user
 router.delete('/', (req, res) => {
   const db = getDatabase();
-  
-  db.serialize(() => {
-    // Explicitly delete associated work entries first
-    db.run(
-      'DELETE FROM work_entries WHERE user_email = ?',
-      [req.userEmail],
-      (err) => {
-        if (err) {
-          console.error('Database error deleting work entries:', err);
-        }
-      }
-    );
 
-    db.run(
-      'DELETE FROM clients WHERE user_email = ?',
-      [req.userEmail],
-      function(err) {
-        if (err) {
-          console.error('Database error:', err);
-          return res.status(500).json({ error: 'Failed to delete clients' });
-        }
-        
-        res.json({ 
-          message: 'All clients deleted successfully',
-          deletedCount: this.changes
-        });
-      }
-    );
-  });
+  deleteWorkEntriesAndClients(
+    db,
+    { query: 'DELETE FROM work_entries WHERE user_email = ?', params: [req.userEmail] },
+    { query: 'DELETE FROM clients WHERE user_email = ?', params: [req.userEmail], errorMsg: 'Failed to delete clients' },
+    (ctx) => res.json({ message: 'All clients deleted successfully', deletedCount: ctx.changes }),
+    res
+  );
 });
 
 // Delete client
@@ -244,32 +241,13 @@ router.delete('/:id', (req, res) => {
         return res.status(404).json({ error: 'Client not found' });
       }
       
-      db.serialize(() => {
-        // Explicitly delete associated work entries first
-        db.run(
-          'DELETE FROM work_entries WHERE client_id = ? AND user_email = ?',
-          [clientId, req.userEmail],
-          (err) => {
-            if (err) {
-              console.error('Database error deleting work entries:', err);
-            }
-          }
-        );
-
-        // Delete client (CASCADE also handles this, but explicit delete above is defensive)
-        db.run(
-          'DELETE FROM clients WHERE id = ? AND user_email = ?',
-          [clientId, req.userEmail],
-          function(err) {
-            if (err) {
-              console.error('Database error:', err);
-              return res.status(500).json({ error: 'Failed to delete client' });
-            }
-            
-            res.json({ message: 'Client deleted successfully' });
-          }
-        );
-      });
+      deleteWorkEntriesAndClients(
+        db,
+        { query: 'DELETE FROM work_entries WHERE client_id = ? AND user_email = ?', params: [clientId, req.userEmail] },
+        { query: 'DELETE FROM clients WHERE id = ? AND user_email = ?', params: [clientId, req.userEmail], errorMsg: 'Failed to delete client' },
+        () => res.json({ message: 'Client deleted successfully' }),
+        res
+      );
     }
   );
 });
