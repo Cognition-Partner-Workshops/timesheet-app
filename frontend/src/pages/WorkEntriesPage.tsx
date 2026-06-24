@@ -79,12 +79,16 @@ const WorkEntriesPage: React.FC = () => {
     if (!hours || hours <= 0 || hours > 24) { setError('Hours must be between 0 and 24'); return; }
     if (!formData.date) { setError('Please select a date'); return; }
 
-    const payload: { clientId: number; projectId?: number; hours: number; description?: string; date: string } = {
+    const payload: { clientId: number; projectId?: number | null; hours: number; description?: string; date: string } = {
       clientId: formData.clientId, hours,
       description: formData.description || undefined,
       date: formData.date.toISOString().split('T')[0],
     };
-    if (formData.projectId) payload.projectId = formData.projectId;
+    if (formData.projectId) {
+      payload.projectId = formData.projectId;
+    } else if (editingEntry?.project_id) {
+      payload.projectId = null;
+    }
 
     if (editingEntry) {
       updateMutation.mutate({ id: editingEntry.id, data: payload });
