@@ -152,6 +152,32 @@ describe('Work Entry Routes', () => {
       expect(response.body.message).toBe('Work entry created successfully');
     });
 
+    test('should persist date as a YYYY-MM-DD string, not an epoch timestamp', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        if (query.includes('clients')) {
+          callback(null, { id: 1 });
+        } else {
+          callback(null, { id: 1, client_name: 'Client A' });
+        }
+      });
+
+      let insertedDate;
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        if (query.includes('INSERT INTO work_entries')) {
+          insertedDate = params[4];
+        }
+        this.lastID = 1;
+        callback.call(this, null);
+      });
+
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: 5, date: '2024-01-15' });
+
+      expect(response.status).toBe(201);
+      expect(insertedDate).toBe('2024-01-15');
+    });
+
     test('should return 400 if client not found', async () => {
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(null, null); // Client doesn't exist
@@ -522,6 +548,31 @@ describe('Work Entry Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.message).toBe('Work entry updated successfully');
+    });
+
+    test('should persist updated date as a YYYY-MM-DD string, not an epoch timestamp', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        if (query.includes('work_entries we')) {
+          callback(null, { id: 1, date: '2024-02-01', client_name: 'Client A' });
+        } else {
+          callback(null, { id: 1 });
+        }
+      });
+
+      let updatedDate;
+      mockDb.run.mockImplementation((query, params, callback) => {
+        if (query.includes('UPDATE work_entries')) {
+          updatedDate = params[0];
+        }
+        callback(null);
+      });
+
+      const response = await request(app)
+        .put('/api/work-entries/1')
+        .send({ date: '2024-02-01' });
+
+      expect(response.status).toBe(200);
+      expect(updatedDate).toBe('2024-02-01');
     });
 
     test('should update work entry description', async () => {
