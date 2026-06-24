@@ -190,19 +190,34 @@ router.put('/:id', (req, res, next) => {
 router.delete('/', (req, res) => {
   const db = getDatabase();
   
+  // First delete all work entries for this user's clients (defense-in-depth alongside CASCADE)
   db.run(
-    'DELETE FROM clients WHERE user_email = ?',
+    'DELETE FROM work_entries WHERE user_email = ?',
     [req.userEmail],
     function(err) {
       if (err) {
         console.error('Database error:', err);
-        return res.status(500).json({ error: 'Failed to delete clients' });
+        return res.status(500).json({ error: 'Failed to delete work entries' });
       }
-      
-      res.json({ 
-        message: 'All clients deleted successfully',
-        deletedCount: this.changes
-      });
+
+      const deletedEntries = this.changes;
+
+      db.run(
+        'DELETE FROM clients WHERE user_email = ?',
+        [req.userEmail],
+        function(err) {
+          if (err) {
+            console.error('Database error:', err);
+            return res.status(500).json({ error: 'Failed to delete clients' });
+          }
+          
+          res.json({ 
+            message: 'All clients and associated work entries deleted successfully',
+            deletedCount: this.changes,
+            deletedEntries: deletedEntries
+          });
+        }
+      );
     }
   );
 });
