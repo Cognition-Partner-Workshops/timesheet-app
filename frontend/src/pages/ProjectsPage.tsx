@@ -35,34 +35,49 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
 import { type Project, type Client } from '../types/api';
 
+type ProjectStatus = 'active' | 'completed' | 'on-hold';
+
 interface ProjectFormData {
   name: string;
   description: string;
   clientId: string;
   startDate: string;
-  status: 'active' | 'completed' | 'on-hold';
+  status: ProjectStatus;
 }
 
-const initialFormData: ProjectFormData = {
-  name: '',
-  description: '',
-  clientId: '',
-  startDate: '',
-  status: 'active',
+const EMPTY_FORM: ProjectFormData = { name: '', description: '', clientId: '', startDate: '', status: 'active' };
+
+const STATUS_CONFIG: Record<ProjectStatus, { label: string; color: 'success' | 'default' | 'warning' }> = {
+  active: { label: 'Active', color: 'success' },
+  completed: { label: 'Completed', color: 'default' },
+  'on-hold': { label: 'On Hold', color: 'warning' },
 };
 
-const statusColors: Record<string, 'success' | 'default' | 'warning'> = {
-  active: 'success',
-  completed: 'default',
-  'on-hold': 'warning',
-};
+function formFromProject(project: Project): ProjectFormData {
+  return {
+    name: project.name,
+    description: project.description || '',
+    clientId: project.client_id ? String(project.client_id) : '',
+    startDate: project.start_date || '',
+    status: project.status,
+  };
+}
+
+function formToPayload(form: ProjectFormData) {
+  return {
+    name: form.name,
+    description: form.description || undefined,
+    clientId: form.clientId ? parseInt(form.clientId) : null,
+    startDate: form.startDate || null,
+    status: form.status,
+  };
+}
 
 const ProjectsPage: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [formData, setFormData] = useState<ProjectFormData>(initialFormData);
+  const [formData, setFormData] = useState<ProjectFormData>(EMPTY_FORM);
   const [error, setError] = useState('');
-
   const queryClient = useQueryClient();
 
   const { data: projectsData, isLoading } = useQuery({
@@ -75,71 +90,42 @@ const ProjectsPage: React.FC = () => {
     queryFn: () => apiClient.getClients(),
   });
 
+  const onMutationError = (err: unknown) => {
+    const e = err as { response?: { data?: { error?: string } } };
+    setError(e.response?.data?.error || 'Operation failed');
+  };
+
   const createMutation = useMutation({
-    mutationFn: (projectData: { name: string; description?: string; clientId?: number | null; startDate?: string | null; status?: string }) =>
-      apiClient.createProject(projectData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      handleClose();
-    },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to create project');
-    },
+    mutationFn: (data: ReturnType<typeof formToPayload>) => apiClient.createProject(data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['projects'] }); handleClose(); },
+    onError: onMutationError,
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { name?: string; description?: string; clientId?: number | null; startDate?: string | null; status?: string } }) =>
-      apiClient.updateProject(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      handleClose();
-    },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to update project');
-    },
+    mutationFn: ({ id, data }: { id: number; data: ReturnType<typeof formToPayload> }) => apiClient.updateProject(id, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['projects'] }); handleClose(); },
+    onError: onMutationError,
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiClient.deleteProject(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-    },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to delete project');
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['projects'] }); },
+    onError: onMutationError,
   });
 
   const deleteAllMutation = useMutation({
     mutationFn: () => apiClient.deleteAllProjects(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-    },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to delete all projects');
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['projects'] }); },
+    onError: onMutationError,
   });
 
-  const projects = projectsData?.projects || [];
+  const projects: Project[] = projectsData?.projects || [];
   const clients: Client[] = clientsData?.clients || [];
+  const isMutating = createMutation.isPending || updateMutation.isPending;
 
   const handleOpen = (project?: Project) => {
-    if (project) {
-      setEditingProject(project);
-      setFormData({
-        name: project.name,
-        description: project.description || '',
-        clientId: project.client_id ? String(project.client_id) : '',
-        startDate: project.start_date || '',
-        status: project.status,
-      });
-    } else {
-      setEditingProject(null);
-      setFormData(initialFormData);
-    }
+    setEditingProject(project || null);
+    setFormData(project ? formFromProject(project) : EMPTY_FORM);
     setError('');
     setOpen(true);
   };
@@ -147,55 +133,21 @@ const ProjectsPage: React.FC = () => {
   const handleClose = () => {
     setOpen(false);
     setEditingProject(null);
-    setFormData(initialFormData);
+    setFormData(EMPTY_FORM);
     setError('');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (!formData.name.trim()) { setError('Project name is required'); return; }
 
-    if (!formData.name.trim()) {
-      setError('Project name is required');
-      return;
-    }
-
-    const projectPayload = {
-      name: formData.name,
-      description: formData.description || undefined,
-      clientId: formData.clientId ? parseInt(formData.clientId) : null,
-      startDate: formData.startDate || null,
-      status: formData.status,
-    };
-
+    const payload = formToPayload(formData);
     if (editingProject) {
-      updateMutation.mutate({
-        id: editingProject.id,
-        data: projectPayload,
-      });
+      updateMutation.mutate({ id: editingProject.id, data: payload });
     } else {
-      createMutation.mutate(projectPayload);
+      createMutation.mutate(payload);
     }
-  };
-
-  const handleDelete = (project: Project) => {
-    if (window.confirm(`Are you sure you want to delete "${project.name}"?`)) {
-      deleteMutation.mutate(project.id);
-    }
-  };
-
-  const handleDeleteAll = () => {
-    if (window.confirm('Are you sure you want to delete ALL projects? This action cannot be undone.')) {
-      deleteAllMutation.mutate();
-    }
-  };
-
-  const handleStatusChange = (e: SelectChangeEvent) => {
-    setFormData({ ...formData, status: e.target.value as ProjectFormData['status'] });
-  };
-
-  const handleClientChange = (e: SelectChangeEvent) => {
-    setFormData({ ...formData, clientId: e.target.value });
   };
 
   if (isLoading) {
@@ -212,13 +164,9 @@ const ProjectsPage: React.FC = () => {
         <Typography variant="h4">Projects</Typography>
         <Box display="flex" gap={2}>
           {projects.length > 0 && (
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<DeleteSweepIcon />}
-              onClick={handleDeleteAll}
-              disabled={deleteAllMutation.isPending}
-            >
+            <Button variant="outlined" color="error" startIcon={<DeleteSweepIcon />}
+              onClick={() => { if (window.confirm('Delete ALL projects? This cannot be undone.')) deleteAllMutation.mutate(); }}
+              disabled={deleteAllMutation.isPending}>
               {deleteAllMutation.isPending ? 'Clearing...' : 'Clear All'}
             </Button>
           )}
@@ -228,11 +176,7 @@ const ProjectsPage: React.FC = () => {
         </Box>
       </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-          {error}
-        </Alert>
-      )}
+      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
       <Paper>
         <TableContainer>
@@ -248,72 +192,22 @@ const ProjectsPage: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {projects.length > 0 ? (
-                projects.map((project: Project) => (
-                  <TableRow key={project.id}>
-                    <TableCell>
-                      <Typography variant="subtitle1" fontWeight="medium">
-                        {project.name}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      {project.client_name ? (
-                        <Typography variant="body2" color="text.secondary">
-                          {project.client_name}
-                        </Typography>
-                      ) : (
-                        <Chip label="Unassigned" size="small" variant="outlined" />
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {project.start_date ? (
-                        <Typography variant="body2" color="text.secondary">
-                          {new Date(project.start_date).toLocaleDateString()}
-                        </Typography>
-                      ) : (
-                        <Chip label="-" size="small" variant="outlined" />
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={project.status}
-                        size="small"
-                        color={statusColors[project.status] || 'default'}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {project.description ? (
-                        <Typography variant="body2" color="text.secondary">
-                          {project.description}
-                        </Typography>
-                      ) : (
-                        <Chip label="No description" size="small" variant="outlined" />
-                      )}
-                    </TableCell>
-                    <TableCell align="right">
-                      <IconButton
-                        onClick={() => handleOpen(project)}
-                        color="primary"
-                        size="small"
-                      >
-                        <EditIcon />
-                      </IconButton>
-                      <IconButton
-                        onClick={() => handleDelete(project)}
-                        color="error"
-                        size="small"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
+              {projects.length > 0 ? projects.map((project: Project) => (
+                <TableRow key={project.id}>
+                  <TableCell><Typography variant="subtitle1" fontWeight="medium">{project.name}</Typography></TableCell>
+                  <TableCell>{project.client_name || <Chip label="Unassigned" size="small" variant="outlined" />}</TableCell>
+                  <TableCell>{project.start_date ? new Date(project.start_date).toLocaleDateString() : <Chip label="-" size="small" variant="outlined" />}</TableCell>
+                  <TableCell><Chip label={STATUS_CONFIG[project.status].label} size="small" color={STATUS_CONFIG[project.status].color} /></TableCell>
+                  <TableCell>{project.description || <Chip label="No description" size="small" variant="outlined" />}</TableCell>
+                  <TableCell align="right">
+                    <IconButton onClick={() => handleOpen(project)} color="primary" size="small"><EditIcon /></IconButton>
+                    <IconButton onClick={() => { if (window.confirm(`Delete "${project.name}"?`)) deleteMutation.mutate(project.id); }} color="error" size="small"><DeleteIcon /></IconButton>
+                  </TableCell>
+                </TableRow>
+              )) : (
                 <TableRow>
                   <TableCell colSpan={6} align="center">
-                    <Typography color="text.secondary" sx={{ py: 3 }}>
-                      No projects found. Create your first project to get started.
-                    </Typography>
+                    <Typography color="text.secondary" sx={{ py: 3 }}>No projects found. Create your first project to get started.</Typography>
                   </TableCell>
                 </TableRow>
               )}
@@ -323,89 +217,36 @@ const ProjectsPage: React.FC = () => {
       </Paper>
 
       <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {editingProject ? 'Edit Project' : 'Add New Project'}
-        </DialogTitle>
+        <DialogTitle>{editingProject ? 'Edit Project' : 'Add New Project'}</DialogTitle>
         <form onSubmit={handleSubmit}>
           <DialogContent>
-            <TextField
-              autoFocus
-              margin="dense"
-              label="Project Name"
-              fullWidth
-              required
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              disabled={createMutation.isPending || updateMutation.isPending}
-            />
+            <TextField autoFocus margin="dense" label="Project Name" fullWidth required
+              value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} disabled={isMutating} />
             <FormControl fullWidth margin="dense">
-              <InputLabel id="client-select-label">Client</InputLabel>
-              <Select
-                labelId="client-select-label"
-                value={formData.clientId}
-                label="Client"
-                onChange={handleClientChange}
-                disabled={createMutation.isPending || updateMutation.isPending}
-              >
-                <MenuItem value="">
-                  <em>None</em>
-                </MenuItem>
-                {clients.map((client: Client) => (
-                  <MenuItem key={client.id} value={String(client.id)}>
-                    {client.name}
-                  </MenuItem>
-                ))}
+              <InputLabel id="project-client-label">Client</InputLabel>
+              <Select labelId="project-client-label" value={formData.clientId} label="Client"
+                onChange={(e: SelectChangeEvent) => setFormData({ ...formData, clientId: e.target.value })} disabled={isMutating}>
+                <MenuItem value=""><em>None</em></MenuItem>
+                {clients.map((c) => <MenuItem key={c.id} value={String(c.id)}>{c.name}</MenuItem>)}
               </Select>
             </FormControl>
-            <TextField
-              margin="dense"
-              label="Start Date"
-              fullWidth
-              type="date"
-              value={formData.startDate}
-              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-              disabled={createMutation.isPending || updateMutation.isPending}
-              slotProps={{ inputLabel: { shrink: true } }}
-            />
+            <TextField margin="dense" label="Start Date" fullWidth type="date"
+              value={formData.startDate} onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+              disabled={isMutating} slotProps={{ inputLabel: { shrink: true } }} />
             <FormControl fullWidth margin="dense">
-              <InputLabel id="status-select-label">Status</InputLabel>
-              <Select
-                labelId="status-select-label"
-                value={formData.status}
-                label="Status"
-                onChange={handleStatusChange}
-                disabled={createMutation.isPending || updateMutation.isPending}
-              >
-                <MenuItem value="active">Active</MenuItem>
-                <MenuItem value="completed">Completed</MenuItem>
-                <MenuItem value="on-hold">On Hold</MenuItem>
+              <InputLabel id="project-status-label">Status</InputLabel>
+              <Select labelId="project-status-label" value={formData.status} label="Status"
+                onChange={(e: SelectChangeEvent) => setFormData({ ...formData, status: e.target.value as ProjectStatus })} disabled={isMutating}>
+                {Object.entries(STATUS_CONFIG).map(([val, cfg]) => <MenuItem key={val} value={val}>{cfg.label}</MenuItem>)}
               </Select>
             </FormControl>
-            <TextField
-              margin="dense"
-              label="Description"
-              fullWidth
-              multiline
-              rows={3}
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              disabled={createMutation.isPending || updateMutation.isPending}
-            />
+            <TextField margin="dense" label="Description" fullWidth multiline rows={3}
+              value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} disabled={isMutating} />
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="contained"
-              disabled={createMutation.isPending || updateMutation.isPending}
-            >
-              {createMutation.isPending || updateMutation.isPending ? (
-                <CircularProgress size={24} />
-              ) : (
-                editingProject ? 'Update' : 'Create'
-              )}
+            <Button onClick={handleClose} disabled={isMutating}>Cancel</Button>
+            <Button type="submit" variant="contained" disabled={isMutating}>
+              {isMutating ? <CircularProgress size={24} /> : (editingProject ? 'Update' : 'Create')}
             </Button>
           </DialogActions>
         </form>
