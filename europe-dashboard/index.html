@@ -43,6 +43,21 @@
             <div class="countries-grid" id="countries-grid"></div>
         </section>
 
+        <!-- Section: Country Detail (shown on click) -->
+        <section class="section country-detail-section" id="country-detail-section" style="display:none;">
+            <div class="section-header">
+                <div class="country-detail-header">
+                    <h2 id="country-detail-title">Cities in ...</h2>
+                    <button class="close-btn" id="close-country-detail" aria-label="Close">&times;</button>
+                </div>
+                <p id="country-detail-subtitle">Top 5 cities by population</p>
+            </div>
+            <div class="chart-container chart-container-sm">
+                <canvas id="countryCitiesChart"></canvas>
+            </div>
+            <div class="top-cities-container" id="country-cities-container"></div>
+        </section>
+
         <!-- Section: Biggest Cities Chart -->
         <section class="section" id="cities-chart-section">
             <div class="section-header">
@@ -92,6 +107,7 @@
     </div>
 
     <script src="data.js"></script>
+    <script src="country-cities.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

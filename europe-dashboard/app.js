@@ -260,9 +260,165 @@ function renderComparisonCharts() {
     });
 }
 
+// Country detail chart instance
+var countryChart = null;
+
+// Show country detail when a country card is clicked
+function showCountryDetail(countryName) {
+    var cities = countryCities[countryName];
+    if (!cities || cities.length === 0) return;
+
+    var section = document.getElementById('country-detail-section');
+    var title = document.getElementById('country-detail-title');
+    var subtitle = document.getElementById('country-detail-subtitle');
+    var container = document.getElementById('country-cities-container');
+    if (!section || !title || !subtitle || !container) return;
+
+    // Update header
+    title.textContent = 'Cities in ' + countryName;
+    subtitle.textContent = 'Top ' + cities.length + ' cities by population';
+
+    // Clear previous content
+    container.textContent = '';
+
+    // Destroy previous chart
+    if (countryChart) {
+        countryChart.destroy();
+        countryChart = null;
+    }
+
+    // Render chart
+    var canvas = document.getElementById('countryCitiesChart');
+    if (canvas) {
+        var ctx = canvas.getContext('2d');
+        if (ctx) {
+            var gradientColors = [
+                'rgba(245, 175, 25, 0.8)',
+                'rgba(192, 192, 192, 0.8)',
+                'rgba(205, 127, 50, 0.8)',
+                'rgba(102, 126, 234, 0.8)',
+                'rgba(17, 153, 142, 0.8)'
+            ];
+            countryChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: cities.map(function(c) { return c.name; }),
+                    datasets: [{
+                        label: 'Population (millions)',
+                        data: cities.map(function(c) { return c.population; }),
+                        backgroundColor: gradientColors,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#888', font: { size: 11 } },
+                            title: { display: true, text: 'Population (millions)', color: '#888' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#aaa', font: { size: 11 } }
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    // Render city cards
+    cities.forEach(function(city, index) {
+        var card = createElement('div', 'city-card');
+
+        var rank = createElement('div', 'city-rank city-rank-' + (index + 1), String(index + 1));
+
+        var details = createElement('div', 'city-details');
+        var nameRow = createElement('div', 'city-name-row');
+        nameRow.appendChild(createElement('span', 'city-title', city.name));
+        nameRow.appendChild(createElement('span', 'city-country', countryName));
+        details.appendChild(nameRow);
+
+        details.appendChild(createElement('p', 'city-description', city.description));
+
+        var landmarksDiv = createElement('div', 'city-tags');
+        city.landmarks.forEach(function(landmark) {
+            landmarksDiv.appendChild(createTag(landmark, 'city-tag city-tag-landmark'));
+        });
+        details.appendChild(landmarksDiv);
+
+        var stats = createElement('div', 'city-stats');
+        stats.appendChild(createStatRow('Population', city.population + 'M'));
+        stats.appendChild(createStatRow('Area', city.area));
+        stats.appendChild(createStatRow('Founded', city.founded));
+        stats.appendChild(createStatRow('GDP', city.gdp));
+        stats.appendChild(createStatRow('Avg Salary', city.avgSalary));
+
+        card.appendChild(rank);
+        card.appendChild(details);
+        card.appendChild(stats);
+        container.appendChild(card);
+    });
+
+    // Show section and scroll to it
+    section.style.display = 'block';
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // Highlight active card
+    var allCards = document.querySelectorAll('.country-card');
+    allCards.forEach(function(c) { c.classList.remove('active'); });
+    var activeCard = Array.from(allCards).find(function(c) {
+        var nameEl = c.querySelector('.country-name');
+        return nameEl && nameEl.textContent === countryName;
+    });
+    if (activeCard) activeCard.classList.add('active');
+}
+
+// Hide country detail
+function hideCountryDetail() {
+    var section = document.getElementById('country-detail-section');
+    if (section) section.style.display = 'none';
+    var allCards = document.querySelectorAll('.country-card');
+    allCards.forEach(function(c) { c.classList.remove('active'); });
+    if (countryChart) {
+        countryChart.destroy();
+        countryChart = null;
+    }
+}
+
+// Attach click handlers to country cards
+function attachCountryClickHandlers() {
+    var grid = document.getElementById('countries-grid');
+    if (!grid) return;
+    var cards = grid.querySelectorAll('.country-card');
+    cards.forEach(function(card) {
+        var nameEl = card.querySelector('.country-name');
+        if (!nameEl) return;
+        var name = nameEl.textContent;
+        if (countryCities[name]) {
+            card.addEventListener('click', function() {
+                showCountryDetail(name);
+            });
+        } else {
+            card.classList.add('no-data');
+        }
+    });
+
+    // Close button
+    var closeBtn = document.getElementById('close-country-detail');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', hideCountryDetail);
+    }
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
     renderCountries();
+    attachCountryClickHandlers();
     renderCitiesChart();
     renderTopCities();
     renderComparisonCharts();

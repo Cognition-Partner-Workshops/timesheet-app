@@ -117,6 +117,18 @@ body {
     background: rgba(102, 126, 234, 0.1);
     border-color: rgba(102, 126, 234, 0.3);
     transform: translateY(-2px);
+    cursor: pointer;
+}
+
+.country-card.active {
+    background: rgba(102, 126, 234, 0.2);
+    border-color: rgba(102, 126, 234, 0.5);
+    box-shadow: 0 0 12px rgba(102, 126, 234, 0.2);
+}
+
+.country-card.no-data {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .country-flag {
@@ -141,6 +153,46 @@ body {
     color: #888;
 }
 
+/* Country Detail Section */
+.country-detail-section {
+    animation: slideDown 0.3s ease;
+    background: rgba(102, 126, 234, 0.03);
+    border: 1px solid rgba(102, 126, 234, 0.15);
+    border-radius: 16px;
+    padding: 2rem;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.country-detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.close-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    font-size: 1.5rem;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.close-btn:hover {
+    background: rgba(255, 80, 80, 0.3);
+    border-color: rgba(255, 80, 80, 0.5);
+}
+
 /* Chart Container */
 .chart-container {
     background: rgba(255, 255, 255, 0.04);
@@ -148,6 +200,11 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.08);
     padding: 2rem;
     height: 400px;
+}
+
+.chart-container-sm {
+    height: 280px;
+    margin-bottom: 1.5rem;
 }
 
 .charts-row {
