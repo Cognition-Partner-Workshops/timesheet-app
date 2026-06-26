@@ -112,7 +112,15 @@ export default function PeopleSearch({ meta }: { meta: Meta | null }) {
             </thead>
             <tbody>
               {results.map((p) => (
-                <tr key={p.employee_id} onClick={() => openPerson(p.employee_id)}>
+                <tr
+                  key={p.employee_id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openPerson(p.employee_id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") openPerson(p.employee_id);
+                  }}
+                >
                   <td>
                     <strong>{p.name}</strong>
                     <div className="faint" style={{ fontSize: 11 }}>

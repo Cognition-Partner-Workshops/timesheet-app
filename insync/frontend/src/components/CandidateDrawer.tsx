@@ -53,7 +53,16 @@ export default function CandidateDrawer({
 
   return (
     <>
-      <div className="drawer-overlay" onClick={onClose} />
+      <div
+        className="drawer-overlay"
+        role="button"
+        tabIndex={0}
+        aria-label="Close candidate details"
+        onClick={onClose}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === "Escape" || e.key === " ") onClose();
+        }}
+      />
       <div className="drawer">
         <button className="drawer-close" onClick={onClose}>
           ×

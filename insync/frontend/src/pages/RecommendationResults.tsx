@@ -106,8 +106,13 @@ function OptionPanel({
                 <div
                   key={c.employee_id}
                   className="card"
+                  role="button"
+                  tabIndex={0}
                   style={{ background: "var(--navy-700)", cursor: "pointer" }}
                   onClick={() => onSelect(c, a.role_name, option.label)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") onSelect(c, a.role_name, option.label);
+                  }}
                 >
                   <div className="spread">
                     <strong>{c.name}</strong>

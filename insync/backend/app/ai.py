@@ -244,13 +244,13 @@ def _detect_start_window(text: str) -> int:
     low = text.lower()
     if "immediate" in low or "asap" in low or "now" in low or "right away" in low:
         return 0
-    m = re.search(r"(\d+)\s*(?:days?|day)", low)
+    m = re.search(r"(\d+)\s{0,3}days?", low)
     if m:
         return int(m.group(1))
-    m = re.search(r"(\d+)\s*weeks?", low)
+    m = re.search(r"(\d+)\s{0,3}weeks?", low)
     if m:
         return int(m.group(1)) * 7
-    m = re.search(r"(\d+)\s*months?", low)
+    m = re.search(r"(\d+)\s{0,3}months?", low)
     if m:
         return int(m.group(1)) * 30
     if "next month" in low:
@@ -294,7 +294,7 @@ def _parse_roles(text: str) -> list[dict]:
             # Look back up to ~20 chars for a count ("2 java", "two QA").
             prefix = low[max(0, span[0] - 20): span[0]]
             count = 1
-            num = re.search(r"(\d+|\b(?:a|an|one|two|three|four|five|six|seven|eight|nine|ten)\b)\s*[\w/ ]*$", prefix)
+            num = re.search(r"(\d+|\b(?:a|an|one|two|three|four|five|six|seven|eight|nine|ten)\b)[\w /]{0,40}$", prefix)
             if num:
                 token = num.group(1)
                 count = int(token) if token.isdigit() else _NUMBER_WORDS.get(token, 1)

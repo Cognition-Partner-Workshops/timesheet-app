@@ -206,7 +206,7 @@ def score_project_history(emp: dict, req: RoleRequirement) -> dict:
                 f"{hist.get('role')} on {hist.get('project_name')} "
                 f"({hist.get('domain')})."
             )
-    if best == 0.0:
+    if best < 1e-9:
         best = 0.2  # has history, just not directly relevant
         best_evidence = "Has delivery history, limited direct relevance."
     return {"score": round(best, 4), "evidence": best_evidence}
