@@ -15,11 +15,11 @@ function renderCountries() {
 
         const flag = createElement('span', 'country-flag', country.flag);
         const info = createElement('div', 'country-info');
-        const name = createElement('span', 'country-name', country.name);
+        const countryName = createElement('span', 'country-name', country.name);
         const capital = createElement('span', 'country-capital');
         capital.textContent = country.capital + ' \u2022 ' + country.population + 'M';
 
-        info.appendChild(name);
+        info.appendChild(countryName);
         info.appendChild(capital);
         card.appendChild(flag);
         card.appendChild(info);
@@ -27,13 +27,16 @@ function renderCountries() {
     });
 }
 
+// Store chart instances for lifecycle management
+var charts = [];
+
 // Render Biggest Cities Bar Chart
 function renderCitiesChart() {
     const canvas = document.getElementById('citiesChart');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    new Chart(ctx, {
+    charts.push(new Chart(ctx, {
         type: 'bar',
         data: {
             labels: biggestCities.map(c => c.name),
@@ -106,7 +109,7 @@ function renderCitiesChart() {
                 }
             }
         }
-    });
+    }));
 }
 
 // Helper: create a stat row
@@ -120,9 +123,8 @@ function createStatRow(label, value) {
 }
 
 // Helper: create a tag element
-function createTag(text, className, style) {
+function createTag(text, className) {
     const tag = createElement('span', className || 'city-tag', text);
-    if (style) tag.setAttribute('style', style);
     return tag;
 }
 
@@ -155,14 +157,9 @@ function renderTopCities() {
         details.appendChild(tagsDiv);
 
         // Landmark tags
-        const landmarksDiv = createElement('div', 'city-tags');
-        landmarksDiv.style.marginTop = '0.5rem';
+        const landmarksDiv = createElement('div', 'city-tags city-tags-landmarks');
         city.landmarks.forEach(landmark => {
-            landmarksDiv.appendChild(createTag(
-                landmark,
-                'city-tag',
-                'background: rgba(17,153,142,0.15); color: #11998e; border-color: rgba(17,153,142,0.25);'
-            ));
+            landmarksDiv.appendChild(createTag(landmark, 'city-tag city-tag-landmark'));
         });
         details.appendChild(landmarksDiv);
 
@@ -187,7 +184,7 @@ function createChart(canvasId, config) {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    new Chart(ctx, config);
+    charts.push(new Chart(ctx, config));
 }
 
 // Render Comparison Charts

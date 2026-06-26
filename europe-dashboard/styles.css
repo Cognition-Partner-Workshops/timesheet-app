@@ -258,6 +258,16 @@ body {
     border: 1px solid rgba(102, 126, 234, 0.25);
 }
 
+.city-tag-landmark {
+    background: rgba(17, 153, 142, 0.15);
+    color: #11998e;
+    border-color: rgba(17, 153, 142, 0.25);
+}
+
+.city-tags-landmarks {
+    margin-top: 0.5rem;
+}
+
 .city-stats {
     display: grid;
     grid-template-columns: 1fr;
