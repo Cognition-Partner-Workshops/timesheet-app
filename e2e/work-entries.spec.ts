@@ -115,7 +115,10 @@ test.describe('Work Entries Workflow', () => {
     // Step 6: Delete the work entry
     page.on('dialog', (dialog) => dialog.accept());
     const updatedRow = page.getByRole('row').filter({ hasText: CLIENT_NAME });
-    await updatedRow.getByRole('button').filter({ has: page.locator('[data-testid="DeleteIcon"]') }).click();
+    await Promise.all([
+      page.waitForResponse((resp) => resp.url().includes('/api/work-entries') && resp.request().method() === 'DELETE'),
+      updatedRow.getByRole('button').filter({ has: page.locator('[data-testid="DeleteIcon"]') }).click(),
+    ]);
 
     // Verify entry is removed
     await expect(page.getByText('Updated E2E test entry')).toBeHidden();
