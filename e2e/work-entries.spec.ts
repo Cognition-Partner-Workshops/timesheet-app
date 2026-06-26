@@ -10,9 +10,22 @@ test.describe('Work Entries Workflow', () => {
     await request.post(`${API_URL}/api/auth/login`, {
       data: { email: TEST_EMAIL },
     });
+    // Delete all clients (and associated work entries via cascade or manual cleanup)
     await request.delete(`${API_URL}/api/clients`, {
       headers: { 'x-user-email': TEST_EMAIL },
     });
+    // Also delete any orphaned work entries directly
+    const entriesResp = await request.get(`${API_URL}/api/work-entries`, {
+      headers: { 'x-user-email': TEST_EMAIL },
+    });
+    if (entriesResp.ok()) {
+      const entries = (await entriesResp.json()).workEntries || [];
+      for (const entry of entries) {
+        await request.delete(`${API_URL}/api/work-entries/${entry.id}`, {
+          headers: { 'x-user-email': TEST_EMAIL },
+        });
+      }
+    }
 
     // Login via UI
     await page.goto('/login');
@@ -54,8 +67,11 @@ test.describe('Work Entries Workflow', () => {
     // Fill in description
     await page.getByLabel('Description').fill('Initial E2E test entry');
 
-    // Submit the form
-    await page.getByRole('button', { name: 'Create' }).click();
+    // Submit the form and wait for network response
+    await Promise.all([
+      page.waitForResponse((resp) => resp.url().includes('/api/work-entries') && resp.status() === 201),
+      page.getByRole('button', { name: 'Create' }).click(),
+    ]);
 
     // Wait for dialog to close
     await expect(page.getByRole('dialog')).toBeHidden();
@@ -82,8 +98,11 @@ test.describe('Work Entries Workflow', () => {
     await descriptionField.clear();
     await descriptionField.fill('Updated E2E test entry');
 
-    // Submit the edit
-    await page.getByRole('button', { name: 'Update' }).click();
+    // Submit the edit and wait for network response
+    await Promise.all([
+      page.waitForResponse((resp) => resp.url().includes('/api/work-entries') && resp.status() === 200),
+      page.getByRole('button', { name: 'Update' }).click(),
+    ]);
 
     // Wait for dialog to close
     await expect(page.getByRole('dialog')).toBeHidden();
