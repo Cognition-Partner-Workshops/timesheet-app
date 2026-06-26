@@ -43,7 +43,15 @@ export async function searchPeople(
   return (await api.get("/api/people", { params })).data;
 }
 
+// Employee identifiers are short alphanumeric codes (e.g. "EMP-001"). Validate
+// the value before putting it in the request path so untrusted input can never
+// be used to construct an arbitrary URL.
+const EMPLOYEE_ID_PATTERN = /^[A-Za-z0-9_-]{1,32}$/;
+
 export async function getPerson(id: string): Promise<PersonDetail> {
+  if (!EMPLOYEE_ID_PATTERN.test(id)) {
+    throw new Error(`Invalid employee id: ${id}`);
+  }
   return (await api.get(`/api/people/${encodeURIComponent(id)}`)).data;
 }
 
