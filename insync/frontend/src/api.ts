@@ -44,7 +44,7 @@ export async function searchPeople(
 }
 
 export async function getPerson(id: string): Promise<PersonDetail> {
-  return (await api.get(`/api/people/${id}`)).data;
+  return (await api.get(`/api/people/${encodeURIComponent(id)}`)).data;
 }
 
 export async function parseRequirement(text: string): Promise<ParsedRequirement> {

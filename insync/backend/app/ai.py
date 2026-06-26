@@ -240,19 +240,66 @@ def _detect_grade(text: str) -> Optional[str]:
     return None
 
 
+def _word_tokens(s: str) -> list[str]:
+    """Split a string into alphanumeric runs, breaking at letter/digit
+    boundaries (so "30days" -> ["30", "days"]).
+
+    Hand-rolled instead of a regex so there is no catastrophic-backtracking
+    surface when parsing arbitrary free-text input.
+    """
+    tokens: list[str] = []
+    cur = ""
+    cur_is_digit: bool | None = None
+    for ch in s:
+        if ch.isalnum():
+            is_digit = ch.isdigit()
+            if cur and is_digit != cur_is_digit:
+                tokens.append(cur)
+                cur = ""
+            cur += ch
+            cur_is_digit = is_digit
+        elif cur:
+            tokens.append(cur)
+            cur = ""
+            cur_is_digit = None
+    if cur:
+        tokens.append(cur)
+    return tokens
+
+
+def _count_in_prefix(prefix: str) -> int:
+    """Return the head-count that directly qualifies a role keyword.
+
+    A number (digits or a number-word) only counts when it is connected to the
+    keyword by word / space / slash characters; a comma or other punctuation
+    breaks the association. Implemented without a regex to avoid backtracking.
+    """
+    i = len(prefix) - 1
+    while i >= 0 and (prefix[i].isalnum() or prefix[i] in " /_"):
+        i -= 1
+    for tok in _word_tokens(prefix[i + 1:]):
+        if tok.isdigit():
+            return int(tok)
+        if tok in _NUMBER_WORDS:
+            return _NUMBER_WORDS[tok]
+    return 1
+
+
 def _detect_start_window(text: str) -> int:
     low = text.lower()
     if "immediate" in low or "asap" in low or "now" in low or "right away" in low:
         return 0
-    m = re.search(r"(\d+)\s{0,3}days?", low)
-    if m:
-        return int(m.group(1))
-    m = re.search(r"(\d+)\s{0,3}weeks?", low)
-    if m:
-        return int(m.group(1)) * 7
-    m = re.search(r"(\d+)\s{0,3}months?", low)
-    if m:
-        return int(m.group(1)) * 30
+    unit_days = {
+        "day": 1, "days": 1,
+        "week": 7, "weeks": 7,
+        "month": 30, "months": 30,
+    }
+    tokens = _word_tokens(low)
+    for idx, tok in enumerate(tokens):
+        if tok.isdigit():
+            for nxt in tokens[idx + 1: idx + 3]:
+                if nxt in unit_days:
+                    return int(tok) * unit_days[nxt]
     if "next month" in low:
         return 30
     if "next quarter" in low:
@@ -293,11 +340,7 @@ def _parse_roles(text: str) -> list[dict]:
                 continue
             # Look back up to ~20 chars for a count ("2 java", "two QA").
             prefix = low[max(0, span[0] - 20): span[0]]
-            count = 1
-            num = re.search(r"(\d+|\b(?:a|an|one|two|three|four|five|six|seven|eight|nine|ten)\b)[\w /]{0,40}$", prefix)
-            if num:
-                token = num.group(1)
-                count = int(token) if token.isdigit() else _NUMBER_WORDS.get(token, 1)
+            count = _count_in_prefix(prefix)
             lib = ROLE_LIBRARY[keyword]
             roles.append(
                 {
