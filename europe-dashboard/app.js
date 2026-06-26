@@ -1,23 +1,38 @@
+// Helper: create element with class and text
+function createElement(tag, className, textContent) {
+    const el = document.createElement(tag);
+    if (className) el.className = className;
+    if (textContent) el.textContent = textContent;
+    return el;
+}
+
 // Render European Countries Grid
 function renderCountries() {
     const grid = document.getElementById('countries-grid');
+    if (!grid) return;
     europeanCountries.forEach(country => {
-        const card = document.createElement('div');
-        card.className = 'country-card';
-        card.innerHTML = `
-            <span class="country-flag">${country.flag}</span>
-            <div class="country-info">
-                <span class="country-name">${country.name}</span>
-                <span class="country-capital">${country.capital} &bull; ${country.population}M</span>
-            </div>
-        `;
+        const card = createElement('div', 'country-card');
+
+        const flag = createElement('span', 'country-flag', country.flag);
+        const info = createElement('div', 'country-info');
+        const name = createElement('span', 'country-name', country.name);
+        const capital = createElement('span', 'country-capital');
+        capital.textContent = country.capital + ' \u2022 ' + country.population + 'M';
+
+        info.appendChild(name);
+        info.appendChild(capital);
+        card.appendChild(flag);
+        card.appendChild(info);
         grid.appendChild(card);
     });
 }
 
 // Render Biggest Cities Bar Chart
 function renderCitiesChart() {
-    const ctx = document.getElementById('citiesChart').getContext('2d');
+    const canvas = document.getElementById('citiesChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
     new Chart(ctx, {
         type: 'bar',
         data: {
@@ -64,7 +79,7 @@ function renderCitiesChart() {
                     callbacks: {
                         label: function(context) {
                             const city = biggestCities[context.dataIndex];
-                            return `${city.population}M - ${city.country}`;
+                            return city.population + 'M - ' + city.country;
                         }
                     }
                 }
@@ -82,8 +97,8 @@ function renderCitiesChart() {
                 },
                 x: {
                     grid: { display: false },
-                    ticks: { 
-                        color: '#aaa', 
+                    ticks: {
+                        color: '#aaa',
                         font: { size: 11 },
                         maxRotation: 45,
                         minRotation: 45
@@ -94,52 +109,85 @@ function renderCitiesChart() {
     });
 }
 
+// Helper: create a stat row
+function createStatRow(label, value) {
+    const row = createElement('div', 'city-stat');
+    const labelEl = createElement('span', 'city-stat-label', label);
+    const valueEl = createElement('span', 'city-stat-value', value);
+    row.appendChild(labelEl);
+    row.appendChild(valueEl);
+    return row;
+}
+
+// Helper: create a tag element
+function createTag(text, className, style) {
+    const tag = createElement('span', className || 'city-tag', text);
+    if (style) tag.setAttribute('style', style);
+    return tag;
+}
+
 // Render Top 5 Cities Detail Cards
 function renderTopCities() {
     const container = document.getElementById('top-cities-container');
+    if (!container) return;
+
     topFiveCities.forEach(city => {
-        const card = document.createElement('div');
-        card.className = 'city-card';
-        card.innerHTML = `
-            <div class="city-rank city-rank-${city.rank}">${city.rank}</div>
-            <div class="city-details">
-                <div class="city-name-row">
-                    <span class="city-title">${city.name}</span>
-                    <span class="city-country">${city.country}</span>
-                </div>
-                <p class="city-description">${city.description}</p>
-                <div class="city-tags">
-                    ${city.tags.map(tag => `<span class="city-tag">${tag}</span>`).join('')}
-                </div>
-                <div class="city-tags" style="margin-top: 0.5rem;">
-                    ${city.landmarks.map(l => `<span class="city-tag" style="background: rgba(17,153,142,0.15); color: #11998e; border-color: rgba(17,153,142,0.25);">${l}</span>`).join('')}
-                </div>
-            </div>
-            <div class="city-stats">
-                <div class="city-stat">
-                    <span class="city-stat-label">Population</span>
-                    <span class="city-stat-value">${city.population}</span>
-                </div>
-                <div class="city-stat">
-                    <span class="city-stat-label">Area</span>
-                    <span class="city-stat-value">${city.area}</span>
-                </div>
-                <div class="city-stat">
-                    <span class="city-stat-label">Founded</span>
-                    <span class="city-stat-value">${city.founded}</span>
-                </div>
-                <div class="city-stat">
-                    <span class="city-stat-label">GDP</span>
-                    <span class="city-stat-value">${city.gdp}</span>
-                </div>
-                <div class="city-stat">
-                    <span class="city-stat-label">Avg Salary</span>
-                    <span class="city-stat-value">${city.stats.avgSalary}</span>
-                </div>
-            </div>
-        `;
+        const card = createElement('div', 'city-card');
+
+        // Rank badge
+        const rank = createElement('div', 'city-rank city-rank-' + city.rank, String(city.rank));
+
+        // Details section
+        const details = createElement('div', 'city-details');
+
+        const nameRow = createElement('div', 'city-name-row');
+        nameRow.appendChild(createElement('span', 'city-title', city.name));
+        nameRow.appendChild(createElement('span', 'city-country', city.country));
+        details.appendChild(nameRow);
+
+        details.appendChild(createElement('p', 'city-description', city.description));
+
+        // Category tags
+        const tagsDiv = createElement('div', 'city-tags');
+        city.tags.forEach(tag => {
+            tagsDiv.appendChild(createTag(tag, 'city-tag'));
+        });
+        details.appendChild(tagsDiv);
+
+        // Landmark tags
+        const landmarksDiv = createElement('div', 'city-tags');
+        landmarksDiv.style.marginTop = '0.5rem';
+        city.landmarks.forEach(landmark => {
+            landmarksDiv.appendChild(createTag(
+                landmark,
+                'city-tag',
+                'background: rgba(17,153,142,0.15); color: #11998e; border-color: rgba(17,153,142,0.25);'
+            ));
+        });
+        details.appendChild(landmarksDiv);
+
+        // Stats section
+        const stats = createElement('div', 'city-stats');
+        stats.appendChild(createStatRow('Population', city.population));
+        stats.appendChild(createStatRow('Area', city.area));
+        stats.appendChild(createStatRow('Founded', city.founded));
+        stats.appendChild(createStatRow('GDP', city.gdp));
+        stats.appendChild(createStatRow('Avg Salary', city.stats.avgSalary));
+
+        card.appendChild(rank);
+        card.appendChild(details);
+        card.appendChild(stats);
         container.appendChild(card);
     });
+}
+
+// Helper: create a chart safely
+function createChart(canvasId, config) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    new Chart(ctx, config);
 }
 
 // Render Comparison Charts
@@ -173,7 +221,7 @@ function renderComparisonCharts() {
     };
 
     // GDP Chart
-    new Chart(document.getElementById('gdpChart').getContext('2d'), {
+    createChart('gdpChart', {
         type: 'bar',
         data: {
             labels: cities,
@@ -187,7 +235,7 @@ function renderComparisonCharts() {
     });
 
     // Cost of Living Chart
-    new Chart(document.getElementById('costChart').getContext('2d'), {
+    createChart('costChart', {
         type: 'bar',
         data: {
             labels: cities,
@@ -201,7 +249,7 @@ function renderComparisonCharts() {
     });
 
     // Tourists Chart
-    new Chart(document.getElementById('touristsChart').getContext('2d'), {
+    createChart('touristsChart', {
         type: 'bar',
         data: {
             labels: cities,
@@ -216,7 +264,7 @@ function renderComparisonCharts() {
 }
 
 // Initialize
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function() {
     renderCountries();
     renderCitiesChart();
     renderTopCities();
