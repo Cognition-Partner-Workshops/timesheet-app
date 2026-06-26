@@ -10,11 +10,7 @@ test.describe('Work Entries Workflow', () => {
     await request.post(`${API_URL}/api/auth/login`, {
       data: { email: TEST_EMAIL },
     });
-    // Delete all clients (and associated work entries via cascade or manual cleanup)
-    await request.delete(`${API_URL}/api/clients`, {
-      headers: { 'x-user-email': TEST_EMAIL },
-    });
-    // Also delete any orphaned work entries directly
+    // Delete work entries first (while clients still exist so the JOIN-based GET can find them)
     const entriesResp = await request.get(`${API_URL}/api/work-entries`, {
       headers: { 'x-user-email': TEST_EMAIL },
     });
@@ -26,6 +22,10 @@ test.describe('Work Entries Workflow', () => {
         });
       }
     }
+    // Then delete all clients
+    await request.delete(`${API_URL}/api/clients`, {
+      headers: { 'x-user-email': TEST_EMAIL },
+    });
 
     // Login via UI
     await page.goto('/login');
