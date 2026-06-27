@@ -17,6 +17,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
+import { formatDate } from '../utils/formatDate';
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -129,11 +130,7 @@ const DashboardPage: React.FC = () => {
                 <Box key={entry.id} sx={{ mb: 2, pb: 2, borderBottom: '1px solid #eee' }}>
                   <Typography variant="subtitle1">{entry.client_name}</Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {entry.hours} hours - {(() => {
-                      const d = typeof entry.date === 'string' ? entry.date : new Date(entry.date).toISOString().split('T')[0];
-                      const [year, month, day] = d.split('-');
-                      return `${parseInt(month)}/${parseInt(day)}/${year}`;
-                    })()}
+                    {entry.hours} hours - {formatDate(entry.date)}
                   </Typography>
                   {entry.description && (
                     <Typography variant="body2" sx={{ mt: 1 }}>

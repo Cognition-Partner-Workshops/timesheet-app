@@ -35,6 +35,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import apiClient from '../api/client';
 import { type WorkEntry } from '../types/api';
+import { formatDate } from '../utils/formatDate';
 
 const WorkEntriesPage: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -233,11 +234,7 @@ const WorkEntriesPage: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2">
-                            {(() => {
-                              const d = typeof entry.date === 'string' ? entry.date : new Date(entry.date).toISOString().split('T')[0];
-                              const [year, month, day] = d.split('-');
-                              return `${parseInt(month)}/${parseInt(day)}/${year}`;
-                            })()}
+                            {formatDate(entry.date)}
                           </Typography>
                         </TableCell>
                         <TableCell>

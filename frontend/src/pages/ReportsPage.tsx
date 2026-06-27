@@ -30,6 +30,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
 import { type ClientReport } from '../types/api';
+import { formatDate } from '../utils/formatDate';
 
 const ReportsPage: React.FC = () => {
   const [selectedClientId, setSelectedClientId] = useState<number>(0);
@@ -232,11 +233,7 @@ const ReportsPage: React.FC = () => {
                           <TableRow key={entry.id}>
                             <TableCell>
                               <Typography variant="body2">
-                                {(() => {
-                                  const d = typeof entry.date === 'string' ? entry.date : new Date(entry.date).toISOString().split('T')[0];
-                                  const [year, month, day] = d.split('-');
-                                  return `${parseInt(month)}/${parseInt(day)}/${year}`;
-                                })()}
+                                {formatDate(entry.date)}
                               </Typography>
                             </TableCell>
                             <TableCell>
