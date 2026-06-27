@@ -233,7 +233,11 @@ const WorkEntriesPage: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2">
-                            {new Date(entry.date).toLocaleDateString()}
+                            {(() => {
+                              const d = typeof entry.date === 'string' ? entry.date : new Date(entry.date).toISOString().split('T')[0];
+                              const [year, month, day] = d.split('-');
+                              return `${parseInt(month)}/${parseInt(day)}/${year}`;
+                            })()}
                           </Typography>
                         </TableCell>
                         <TableCell>

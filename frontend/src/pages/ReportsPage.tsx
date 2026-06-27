@@ -232,7 +232,11 @@ const ReportsPage: React.FC = () => {
                           <TableRow key={entry.id}>
                             <TableCell>
                               <Typography variant="body2">
-                                {new Date(entry.date).toLocaleDateString()}
+                                {(() => {
+                                  const d = typeof entry.date === 'string' ? entry.date : new Date(entry.date).toISOString().split('T')[0];
+                                  const [year, month, day] = d.split('-');
+                                  return `${parseInt(month)}/${parseInt(day)}/${year}`;
+                                })()}
                               </Typography>
                             </TableCell>
                             <TableCell>
@@ -253,7 +257,7 @@ const ReportsPage: React.FC = () => {
                             </TableCell>
                             <TableCell>
                               <Typography variant="body2" color="text.secondary">
-                                {new Date(entry.created_at).toLocaleDateString()}
+                                {new Date(entry.created_at + 'Z').toLocaleDateString()}
                               </Typography>
                             </TableCell>
                           </TableRow>
