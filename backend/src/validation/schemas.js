@@ -1,5 +1,8 @@
 const Joi = require('joi');
 
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const DATE_MESSAGES = { 'string.pattern.base': 'Date must be in YYYY-MM-DD format' };
+
 const clientSchema = Joi.object({
   name: Joi.string().trim().min(1).max(255).required(),
   description: Joi.string().trim().max(1000).optional().allow(''),
@@ -11,16 +14,14 @@ const workEntrySchema = Joi.object({
   clientId: Joi.number().integer().positive().required(),
   hours: Joi.number().positive().max(24).precision(2).required(),
   description: Joi.string().trim().max(1000).optional().allow(''),
-  date: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).required()
-    .messages({ 'string.pattern.base': 'Date must be in YYYY-MM-DD format' })
+  date: Joi.string().pattern(ISO_DATE_PATTERN).required().messages(DATE_MESSAGES)
 });
 
 const updateWorkEntrySchema = Joi.object({
   clientId: Joi.number().integer().positive().optional(),
   hours: Joi.number().positive().max(24).precision(2).optional(),
   description: Joi.string().trim().max(1000).optional().allow(''),
-  date: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).optional()
-    .messages({ 'string.pattern.base': 'Date must be in YYYY-MM-DD format' })
+  date: Joi.string().pattern(ISO_DATE_PATTERN).optional().messages(DATE_MESSAGES)
 }).min(1); // At least one field must be provided
 
 const updateClientSchema = Joi.object({
