@@ -5,9 +5,12 @@ import type {
   AuthUser,
   ChatMeta,
   ChatResponse,
+  CreateOpportunityPayload,
+  CreateOpportunityResult,
   DashboardData,
   EWARequest,
   Meta,
+  OpportunityFormOptions,
   ParsedRequirement,
   PersonDetail,
   PersonSummary,
@@ -120,6 +123,16 @@ export async function recommend(payload: {
   roles: ParsedRequirement["roles"];
 }): Promise<RecommendationResult> {
   return (await api.post("/api/recommend", payload)).data;
+}
+
+export async function getOpportunityFormOptions(): Promise<OpportunityFormOptions> {
+  return (await api.get("/api/opportunities/form-options")).data;
+}
+
+export async function createOpportunity(
+  payload: CreateOpportunityPayload
+): Promise<CreateOpportunityResult> {
+  return (await api.post("/api/opportunities", payload)).data;
 }
 
 export async function submitEWA(payload: {

@@ -5,6 +5,7 @@ import RecommendationResults from "./RecommendationResults";
 import CandidateDrawer from "../components/CandidateDrawer";
 import { CHAT_BRIEF_KEY } from "../components/Chatbot";
 import { useAuth } from "../auth";
+import CreateOpportunityForm from "./CreateOpportunityForm";
 
 const EXAMPLES = [
   "Need 2 Java developers, 1 QA engineer and 1 PM for a banking project in Pune starting in 30 days.",
@@ -69,10 +70,15 @@ export default function OpportunityIntake({ meta }: { meta: Meta | null }) {
     setParsed({ ...parsed, roles });
   }
 
+  // Client Partners get the structured, database-backed Create Opportunity form.
+  if (isClient) {
+    return <CreateOpportunityForm meta={meta} />;
+  }
+
   return (
     <>
       <div className="page-head">
-        <h1>{isClient ? "Create Opportunity" : "Opportunity Intake"}</h1>
+        <h1>Opportunity Intake</h1>
         <p>Describe an opportunity in plain English — TalentBridge structures it, then scores your people.</p>
       </div>
 

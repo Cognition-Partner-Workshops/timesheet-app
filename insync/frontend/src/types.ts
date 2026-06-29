@@ -134,6 +134,43 @@ export interface ParsedRequirement {
   parser: string;
 }
 
+export interface OpportunityFormOptions {
+  roles: string[];
+  grades: string[];
+  domains: string[];
+  regions: string[];
+  countries: string[];
+}
+
+export interface CreateOpportunityRole {
+  role_name: string;
+  count: number;
+  grade_preference?: string | null;
+  required_skills: string[];
+  location_preference?: string | null;
+}
+
+export interface CreateOpportunityPayload {
+  title: string;
+  region?: string | null;
+  country?: string | null;
+  city?: string | null;
+  domain?: string | null;
+  description?: string | null;
+  expected_start_date?: string | null;
+  duration_weeks?: number | null;
+  roles: CreateOpportunityRole[];
+}
+
+export interface CreateOpportunityResult {
+  success: boolean;
+  message: string;
+  project_id: string;
+  project_code: string;
+  roles_created: number;
+  persisted: boolean;
+}
+
 export interface AvailabilityDetail {
   score: number;
   available_fte_at_start: number;
