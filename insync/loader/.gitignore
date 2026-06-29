@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+vector_store/embeddings.npz
+vector_store/id_map.json
+vector_store/manifest.json

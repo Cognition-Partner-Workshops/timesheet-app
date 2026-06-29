@@ -4,12 +4,12 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import config
+from . import config, rag
 from .data_layer import get_store
-from .routers import dashboard, ewa, opportunities, people, recommend
+from .routers import auth, chat, dashboard, ewa, opportunities, people, recommend
 
 app = FastAPI(
-    title="InSync Workforce Planning Assistant",
+    title="TalentBridge Workforce Planning Assistant",
     description=(
         "AI-assisted workforce planning: evidence-backed staffing "
         "recommendations from a deterministic scoring engine. "
@@ -26,6 +26,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
+app.include_router(chat.router)
 app.include_router(dashboard.router)
 app.include_router(people.router)
 app.include_router(opportunities.router)
@@ -52,6 +54,7 @@ def meta() -> dict:
         "snapshot_date": store.snapshot_date.isoformat(),
         "ai_enabled": config.ai_enabled(),
         "ai_provider": config.AI_PROVIDER,
+        "retrieval_enabled": rag.retrieval_enabled(),
         "skills": store.skill_vocabulary(),
         "domains": sorted({e.get("primary_domain") for e in store.all_employees() if e.get("primary_domain")}),
         "regions": sorted({e.get("region") for e in store.all_employees() if e.get("region")}),

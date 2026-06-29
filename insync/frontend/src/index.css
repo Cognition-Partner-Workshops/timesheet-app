@@ -1,15 +1,17 @@
 /* ------------------------------------------------------------------ *
- * InSync theme — inspired by the Endava hackathon deck:               *
- * deep navy canvas, coral primary, sky-blue accent, light text.       *
+ * TalentBridge theme — Sunset Orange #FF5540 primary, Gable Green     *
+ * #192B37 dark canvas, white light canvas. Semantic surface variables *
+ * (--navy-*) are themable so the whole app supports dark & light.     *
  * ------------------------------------------------------------------ */
-:root {
-  --navy-900: #0f1c26;
-  --navy-800: #15212b;
-  --navy-700: #1b2c38;
-  --navy-600: #243643;
-  --line: #2c3f4d;
-  --coral: #ff4f35;
-  --coral-dim: #ff4f3522;
+:root,
+:root[data-theme="dark"] {
+  --navy-900: #0f1d26; /* canvas */
+  --navy-800: #16262f; /* surfaces / cards */
+  --navy-700: #1d3038; /* hover */
+  --navy-600: #274049; /* chips */
+  --line: #2c4651;
+  --coral: #ff5540;
+  --coral-dim: #ff554022;
   --blue: #4da9e8;
   --blue-dim: #4da9e822;
   --text: #eaf1f5;
@@ -19,10 +21,33 @@
   --amber: #f5b942;
   --red: #ff5b6e;
 
+  --canvas-grad: radial-gradient(1200px 600px at 80% -10%, #1d3340 0%, var(--navy-900) 55%);
   --radius: 12px;
   --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
   font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
   color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --navy-900: #eef2f5; /* canvas */
+  --navy-800: #ffffff; /* surfaces / cards */
+  --navy-700: #f1f5f8; /* hover */
+  --navy-600: #e6edf1; /* chips */
+  --line: #d4dee4;
+  --coral: #ff5540;
+  --coral-dim: #ff55401a;
+  --blue: #2b86c8;
+  --blue-dim: #2b86c81a;
+  --text: #192b37;
+  --text-dim: #4d6470;
+  --text-faint: #7c8c97;
+  --green: #1f9e6a;
+  --amber: #c98a1a;
+  --red: #d23b4d;
+
+  --canvas-grad: radial-gradient(1200px 600px at 80% -10%, #e3edf3 0%, var(--navy-900) 55%);
+  --shadow: 0 8px 30px rgba(25, 43, 55, 0.12);
+  color-scheme: light;
 }
 
 * {
@@ -31,7 +56,7 @@
 
 body {
   margin: 0;
-  background: radial-gradient(1200px 600px at 80% -10%, #1d2f3c 0%, var(--navy-900) 55%);
+  background: var(--canvas-grad);
   color: var(--text);
   min-height: 100vh;
 }
@@ -409,3 +434,186 @@ tbody tr:hover { background: var(--navy-700); cursor: pointer; }
   box-shadow: var(--shadow);
   z-index: 60;
 }
+
+/* ------- Top bar (theme toggle + user menu) ------- */
+.topbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.theme-toggle {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--navy-800);
+  font-size: 18px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+}
+.theme-toggle:hover { background: var(--navy-700); }
+
+.user-menu { position: relative; }
+.user-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--navy-800);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 6px 12px 6px 6px;
+  color: var(--text);
+}
+.user-button:hover { background: var(--navy-700); }
+.user-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--coral), #ff8a4a);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  display: grid;
+  place-items: center;
+}
+.user-meta { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.user-name { font-size: 13.5px; font-weight: 600; }
+.user-role { font-size: 10.5px; padding: 1px 8px; }
+.user-dropdown {
+  position: absolute;
+  top: 52px;
+  right: 0;
+  min-width: 220px;
+  z-index: 30;
+  font-size: 13px;
+}
+
+/* ------- Auth screens ------- */
+.auth-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: var(--canvas-grad);
+}
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--navy-800);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 32px 30px;
+  box-shadow: var(--shadow);
+}
+.auth-card .brand { padding: 0 0 18px; }
+.auth-title { font-size: 22px; margin-top: 6px; }
+.auth-sub { color: var(--text-dim); font-size: 13.5px; margin: 6px 0 20px; }
+.auth-form { display: flex; flex-direction: column; gap: 14px; }
+.auth-form label { margin-bottom: 5px; }
+.auth-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.auth-form .btn.primary { margin-top: 4px; }
+.auth-error {
+  background: #ff5b6e1c;
+  border: 1px solid #ff5b6e3a;
+  color: var(--red);
+  padding: 9px 12px;
+  border-radius: 9px;
+  font-size: 13px;
+}
+.auth-switch { text-align: center; font-size: 13.5px; color: var(--text-dim); margin-top: 18px; }
+.auth-demo {
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--text-faint);
+  line-height: 1.7;
+}
+.auth-demo-title {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+/* ------- Access restricted ------- */
+.restricted { display: grid; place-items: center; padding: 80px 20px; }
+.restricted-card { max-width: 460px; text-align: center; }
+.restricted-icon { font-size: 40px; margin-bottom: 10px; }
+.restricted-card h1 { font-size: 22px; margin-bottom: 10px; }
+.restricted-card .btn { margin-top: 18px; display: inline-block; }
+
+/* ------- Chatbot ------- */
+.chat-fab {
+  position: fixed;
+  bottom: 26px;
+  right: 26px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: var(--coral);
+  color: #fff;
+  font-size: 24px;
+  box-shadow: var(--shadow);
+  z-index: 70;
+}
+.chat-fab:hover { background: #ff6347; }
+.chat-panel {
+  position: fixed;
+  bottom: 94px;
+  right: 26px;
+  width: 400px;
+  max-width: 92vw;
+  height: 560px;
+  max-height: 78vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  z-index: 70;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.chat-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.chat-head .drawer-close { position: static; }
+.chat-mode { font-size: 11px; margin-top: 2px; }
+.chat-body { flex: 1; overflow-y: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+.chat-empty .chat-suggestions { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.chat-suggest {
+  text-align: left;
+  background: var(--navy-700);
+  border: 1px solid var(--line);
+  color: var(--text);
+  padding: 9px 12px;
+  border-radius: 9px;
+  font-size: 12.5px;
+}
+.chat-suggest:hover { background: var(--navy-600); }
+.chat-turn { display: flex; }
+.chat-turn.user { justify-content: flex-end; }
+.chat-bubble {
+  max-width: 88%;
+  background: var(--navy-700);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 13px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.chat-turn.user .chat-bubble { background: var(--coral-dim); border-color: #ff554044; }
+.chat-bubble p { margin: 0 0 4px; }
+.chat-bubble p:last-child { margin-bottom: 0; }
+.chat-sources { margin-top: 8px; font-size: 12px; }
+.chat-sources summary { cursor: pointer; color: var(--blue); }
+.chat-source { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.chat-input { display: flex; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--line); }
+.chat-input input { flex: 1; }

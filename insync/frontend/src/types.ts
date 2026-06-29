@@ -49,10 +49,54 @@ export interface PersonSummary {
   top_skills: string[];
 }
 
+export type Role = "workforce_planner" | "delivery_manager" | "client_manager";
+
+export interface AuthUser {
+  id: string;
+  full_name: string;
+  email: string;
+  role: Role;
+  role_label: string;
+  landing: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: AuthUser;
+}
+
+export interface RoleOption {
+  value: Role;
+  label: string;
+}
+
+export interface ChatSource {
+  document_key: string;
+  source_type: string;
+  score: number;
+  snippet: string;
+}
+
+export interface ChatResponse {
+  answer: string;
+  sources: ChatSource[];
+  retrieval: "pgvector" | "fallback" | "none";
+  used_ai: boolean;
+  restricted: boolean;
+  role: Role;
+}
+
+export interface ChatMeta {
+  retrieval_enabled: boolean;
+  suggestions: string[];
+  role: Role;
+}
+
 export interface Meta {
   snapshot_date: string;
   ai_enabled: boolean;
   ai_provider: string;
+  retrieval_enabled?: boolean;
   skills: string[];
   domains: string[];
   regions: string[];

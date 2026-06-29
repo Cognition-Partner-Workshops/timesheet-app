@@ -43,6 +43,22 @@ DATA_FILE: Path = _resolve_data_file()
 SNAPSHOT_DATE: date = _resolve_snapshot_date()
 FRONTEND_URL: str = os.getenv("INSYNC_FRONTEND_URL", "http://localhost:5173")
 
+# --------------------------------------------------------------------------- #
+# PostgreSQL + pgvector (used by the chatbot retrieval layer).                 #
+# When disabled or unreachable the app falls back to the in-memory workbook,   #
+# so it still runs end-to-end without a database.                              #
+# --------------------------------------------------------------------------- #
+PG_ENABLED: bool = (os.getenv("TB_PG_ENABLED", "true") or "true").lower() == "true"
+PG_HOST: str = os.getenv("PGHOST", "localhost")
+PG_PORT: int = int(os.getenv("PGPORT", "5432"))
+PG_DATABASE: str = os.getenv("PGDATABASE", "insync_wfp")
+PG_USER: str = os.getenv("PGUSER", "postgres")
+PG_PASSWORD: str = os.getenv("PGPASSWORD", "postgres")
+
+# Secret used to sign demo auth tokens. A random default is fine for a demo;
+# set TB_AUTH_SECRET in the environment for anything longer-lived.
+AUTH_SECRET: str = os.getenv("TB_AUTH_SECRET", "talentbridge-demo-secret-change-me")
+
 # AI provider selection: "mock" (default), "openai", or "azure".
 AI_PROVIDER: str = (os.getenv("INSYNC_AI_PROVIDER", "mock") or "mock").lower()
 

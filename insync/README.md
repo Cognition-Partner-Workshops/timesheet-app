@@ -1,10 +1,15 @@
-# InSync — Workforce Planning Assistant
+# TalentBridge — Workforce Planning Assistant
 
-> **Right People, Right Opportunity.** An AI-assisted workforce planning MVP that
+> **Right People. Right Opportunity.** An AI-assisted workforce planning app that
 > helps managers find available employees and recommend staffing options for new
 > opportunities. **AI surfaces evidence — people decide.**
 
-InSync turns a plain-English opportunity ("*Need 2 Java developers, 1 QA engineer
+> Evolved from the *InSync* MVP. TalentBridge adds **3-role authentication & RBAC**,
+> a **PostgreSQL + pgvector retrieval pipeline**, a **role-aware chatbot**, and a
+> **dark/light theme toggle** — while keeping the original deterministic scoring
+> engine and pandas data layer fully intact.
+
+TalentBridge turns a plain-English opportunity ("*Need 2 Java developers, 1 QA engineer
 and 1 PM for a banking project in Pune starting in 30 days*") into structured role
 demand, then a **deterministic Python scoring engine** ranks real employees from
 the dataset and produces **three distinct staffing options**. AI is used *only* to
@@ -65,6 +70,57 @@ insync/
 - **Best overall match** — highest weighted scores (may include constrained people).
 - **Fastest availability** — prioritises people who can start soonest.
 - **Lowest risk / balanced team** — penalises booked/partial/missing-skill risk.
+
+---
+
+## Authentication & roles (RBAC)
+
+Sign Up requires choosing one role; navigation, the landing page and chatbot scope
+adapt to it (requirement §5–§7).
+
+| Role | Lands on | Sees Dashboard? | Pages |
+| --- | --- | --- | --- |
+| **Workforce Planner** | Dashboard | ✅ | Dashboard · People Search · Opportunity Intake · EWA Approvals |
+| **Delivery Manager** | People Search | ❌ | People Search · Opportunity Intake · EWA Approvals |
+| **Client Manager** | Opportunity Intake | ❌ | People Search · Opportunity Intake · EWA Approvals |
+
+Non-planners who open `/dashboard` get an **Access restricted** page; the backend
+also enforces this (`/api/dashboard` returns 403). Auth uses PBKDF2 password
+hashing + stateless HMAC-signed tokens (12h TTL); the React app stores the token
+in `localStorage`. Three demo accounts are auto-seeded on startup (password
+`demo1234`):
+
+- `sarah@talentbridge.demo` — Workforce Planner
+- `raj@talentbridge.demo` — Delivery Manager
+- `jenny@talentbridge.demo` — Client Manager
+
+## RAG pipeline (PostgreSQL + pgvector)
+
+The chatbot retrieves evidence with pgvector before any explanation is generated
+(requirement §2, §18):
+
+```
+Excel → clean → mask names/clients/projects → PostgreSQL core tables
+      → retrieval documents → local embeddings (384-dim) → pgvector
+question → embedding → pgvector cosine search → top masked docs
+         → deterministic (or optional OpenAI) explanation
+```
+
+The ingestion code lives in `insync/loader/` (run its scripts to populate Postgres).
+The chatbot **degrades gracefully**: if Postgres/pgvector is unreachable it falls
+back to deterministic answers from the in-memory workbook, so the app always works.
+Embeddings are produced by a local, deterministic feature-hashing embedder — no
+paid embedding API or downloaded model required.
+
+### Database config
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `TB_PG_ENABLED` | `true` | Toggle pgvector retrieval on/off |
+| `PGHOST` / `PGPORT` | `localhost` / `5432` | Postgres connection |
+| `PGDATABASE` | `insync_wfp` | Database name |
+| `PGUSER` / `PGPASSWORD` | `postgres` / `postgres` | Credentials |
+| `TB_AUTH_SECRET` | demo default | Secret used to sign auth tokens |
 
 ---
 
@@ -131,8 +187,11 @@ Other settings:
 
 ---
 
-## Demo script (≈2 min)
+## Demo script (≈3 min)
 
+0. **Sign in** as `sarah@talentbridge.demo` / `demo1234` (Workforce Planner) — note
+   the role badge and that the Dashboard nav item is present. Toggle dark/light
+   with the ☀️/🌙 button (preference persists).
 1. **Dashboard** — show total/bench/partial/roll-off/allocated/booked KPIs, the
    12-week supply forecast and bench-risk breakdown.
 2. **People Search** — filter by skill = *Java*, availability = *Current Bench*;
@@ -144,6 +203,11 @@ Other settings:
 5. **Submit to EWA Approval** — shows "Recommendation sent to EWA for approval"
    and creates a mock request.
 6. **EWA Approvals** — the submitted (mock) request appears in the queue.
+7. **Chatbot** (💬, bottom-right) — ask *"Who is on the bench for a React role in
+   Banking?"*; the answer cites pgvector-retrieved evidence.
+8. **RBAC** — log out, sign in as `raj@talentbridge.demo` (Delivery Manager): the
+   Dashboard nav is gone, `/dashboard` shows *Access restricted*, and org-wide
+   bench analytics questions in the chatbot are redirected.
 
 ## Key API endpoints
 
@@ -155,4 +219,10 @@ Other settings:
 | POST | `/api/parse` | NL requirement → structured JSON |
 | POST | `/api/recommend` | Structured requirement → 3 staffing options |
 | POST | `/api/ewa` | Mock EWA submission (never books anyone) |
-| GET | `/api/meta` | Filter vocabularies + AI status |
+| GET | `/api/meta` | Filter vocabularies + AI/retrieval status |
+| GET | `/api/auth/roles` | List the three sign-up roles |
+| POST | `/api/auth/signup` | Create an account (`full_name`, `email`, `password`, `role`) |
+| POST | `/api/auth/signin` | Authenticate → token + user |
+| GET | `/api/auth/me` | Current user (bearer token) |
+| GET | `/api/chat` | Chatbot metadata + role-aware suggestions |
+| POST | `/api/chat` | Ask a question → answer + retrieved evidence (RBAC-scoped) |

@@ -8,8 +8,9 @@ from __future__ import annotations
 
 from collections import Counter
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from ..rbac import require_planner
 from ..data_layer import (
     CAT_ALLOCATED,
     CAT_BENCH,
@@ -23,7 +24,7 @@ from ..data_layer import (
 router = APIRouter(prefix="/api", tags=["dashboard"])
 
 
-@router.get("/dashboard")
+@router.get("/dashboard", dependencies=[Depends(require_planner)])
 def dashboard() -> dict:
     store = get_store()
     employees = store.all_employees()

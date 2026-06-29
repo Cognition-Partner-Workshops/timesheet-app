@@ -1,6 +1,10 @@
-// Thin Axios wrapper around the InSync backend API.
+// Thin Axios wrapper around the TalentBridge backend API.
 import axios from "axios";
 import type {
+  AuthResponse,
+  AuthUser,
+  ChatMeta,
+  ChatResponse,
   DashboardData,
   EWARequest,
   Meta,
@@ -8,11 +12,62 @@ import type {
   PersonDetail,
   PersonSummary,
   RecommendationResult,
+  Role,
+  RoleOption,
 } from "./types";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE || "",
 });
+
+const TOKEN_KEY = "tb_token";
+
+export function setToken(token: string | null): void {
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
+}
+
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+// Attach the bearer token (if any) to every request.
+api.interceptors.request.use((cfg) => {
+  const token = getToken();
+  if (token) cfg.headers.Authorization = `Bearer ${token}`;
+  return cfg;
+});
+
+// ----------------------------- Auth ----------------------------------- //
+export async function getRoles(): Promise<RoleOption[]> {
+  return (await api.get("/api/auth/roles")).data;
+}
+
+export async function signIn(email: string, password: string): Promise<AuthResponse> {
+  return (await api.post("/api/auth/signin", { email, password })).data;
+}
+
+export async function signUp(payload: {
+  full_name: string;
+  email: string;
+  password: string;
+  role: Role;
+}): Promise<AuthResponse> {
+  return (await api.post("/api/auth/signup", payload)).data;
+}
+
+export async function fetchMe(): Promise<AuthUser> {
+  return (await api.get("/api/auth/me")).data;
+}
+
+// ----------------------------- Chat ------------------------------------ //
+export async function getChatMeta(): Promise<ChatMeta> {
+  return (await api.get("/api/chat")).data;
+}
+
+export async function sendChat(message: string): Promise<ChatResponse> {
+  return (await api.post("/api/chat", { message })).data;
+}
 
 export async function getMeta(): Promise<Meta> {
   return (await api.get("/api/meta")).data;
