@@ -23,14 +23,23 @@ def pending_staffing(_user: User = Depends(require_roles(ROLE_PLANNER))) -> dict
 
 
 @router.get("/proposals")
-def list_proposals(user: User = Depends(get_current_user)) -> dict:
-    """Role-scoped proposal queue.
+def list_proposals(
+    scope: Optional[str] = None, user: User = Depends(get_current_user)
+) -> dict:
+    """Proposal queue.
 
+    Default (the role work queue):
     * Delivery Manager -> proposals awaiting delivery review.
     * Client Manager   -> proposals awaiting business approval (+ ready for EWA).
     * Workforce Planner -> all proposals they can track end-to-end.
+
+    ``scope=ewa`` (the EWA Approval queue): every submitted proposal across the
+    workflow, shown to all three roles so each can follow a request end-to-end.
+    Role-specific actions remain gated in the proposal review itself.
     """
-    if user.role == ROLE_DELIVERY:
+    if scope == "ewa":
+        items = workflow.all_proposals()
+    elif user.role == ROLE_DELIVERY:
         items = workflow.proposals_by_status([workflow.PENDING_DELIVERY])
     elif user.role == ROLE_CLIENT:
         items = workflow.proposals_by_status(

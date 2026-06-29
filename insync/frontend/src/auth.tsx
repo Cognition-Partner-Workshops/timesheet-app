@@ -79,5 +79,6 @@ export const ROLE_NAV: Record<Role, { to: string; label: string; icon: string }[
     { to: "/intake", label: "Create Opportunity", icon: "✦" },
     { to: "/work", label: "Business Approvals", icon: "✓" },
     { to: "/people", label: "People Search", icon: "◷" },
+    { to: "/ewa", label: "EWA Approvals", icon: "✓" },
   ],
 };

@@ -199,8 +199,10 @@ export async function getPendingStaffing(): Promise<{ opportunities: PendingOppo
   return (await api.get("/api/workflow/pending-staffing")).data;
 }
 
-export async function getProposals(): Promise<{ proposals: ProposalSummary[]; role: string }> {
-  return (await api.get("/api/workflow/proposals")).data;
+export async function getProposals(
+  scope?: "ewa"
+): Promise<{ proposals: ProposalSummary[]; role: string }> {
+  return (await api.get("/api/workflow/proposals", { params: scope ? { scope } : undefined })).data;
 }
 
 export async function getProposalDetail(id: string): Promise<ProposalDetail> {
