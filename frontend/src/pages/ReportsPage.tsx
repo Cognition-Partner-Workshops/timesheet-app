@@ -29,7 +29,7 @@ import {
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
-import { type ClientReport } from '../types/api';
+import { type ClientReport, type Client } from '../types/api';
 
 const ReportsPage: React.FC = () => {
   const [selectedClientId, setSelectedClientId] = useState<number>(0);
@@ -46,23 +46,32 @@ const ReportsPage: React.FC = () => {
     enabled: selectedClientId > 0,
   });
 
-  const clients = clientsData?.clients || [];
+  const clients: Client[] = clientsData?.clients || [];
   const report = reportData as ClientReport | undefined;
+
+  /** Triggers a browser download from an in-memory Blob. */
+  function downloadBlob(blob: Blob, filename: string) {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }
+
+  function buildExportFilename(extension: string): string {
+    const client = clients.find((c) => c.id === selectedClientId);
+    const safeName = client?.name?.replace(/[^a-zA-Z0-9]/g, '_') ?? 'report';
+    return `${safeName}_report_${new Date().toISOString().split('T')[0]}.${extension}`;
+  }
 
   const handleExportCsv = async () => {
     if (!selectedClientId) return;
-    
     try {
       const blob = await apiClient.exportClientReportCsv(selectedClientId);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const client = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
-      a.download = `${client?.name?.replace(/[^a-zA-Z0-9]/g, '_')}_report_${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      downloadBlob(blob, buildExportFilename('csv'));
     } catch (err: unknown) {
       setError('Failed to export CSV report');
       console.error('Export error:', err);
@@ -71,25 +80,16 @@ const ReportsPage: React.FC = () => {
 
   const handleExportPdf = async () => {
     if (!selectedClientId) return;
-
     try {
       const blob = await apiClient.exportClientReportPdf(selectedClientId);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const client = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
-      a.download = `${client?.name?.replace(/[^a-zA-Z0-9]/g, '_')}_report_${new Date().toISOString().split('T')[0]}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      downloadBlob(blob, buildExportFilename('pdf'));
     } catch (err: unknown) {
       setError('Failed to export PDF report');
       console.error('Export error:', err);
     }
   };
 
-  const selectedClient = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
+  const selectedClient = clients.find((c) => c.id === selectedClientId);
 
   if (clientsLoading) {
     return (
@@ -133,7 +133,7 @@ const ReportsPage: React.FC = () => {
                     label="Select Client"
                   >
                     <MenuItem value={0}>Choose a client...</MenuItem>
-                    {clients.map((c: { id: number; name: string }) => (
+                    {clients.map((c) => (
                       <MenuItem key={c.id} value={c.id}>
                         {c.name}
                       </MenuItem>
