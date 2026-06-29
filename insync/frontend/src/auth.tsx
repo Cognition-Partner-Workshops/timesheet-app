@@ -64,18 +64,20 @@ export function useAuth(): AuthState {
 export const ROLE_NAV: Record<Role, { to: string; label: string; icon: string }[]> = {
   workforce_planner: [
     { to: "/dashboard", label: "Dashboard", icon: "▣" },
+    { to: "/work", label: "Staffing Queue", icon: "✦" },
     { to: "/people", label: "People Search", icon: "◷" },
-    { to: "/intake", label: "Opportunity Intake", icon: "✦" },
+    { to: "/intake", label: "Opportunity Intake", icon: "✎" },
     { to: "/ewa", label: "EWA Approvals", icon: "✓" },
   ],
   delivery_manager: [
+    { to: "/work", label: "Delivery Reviews", icon: "✦" },
     { to: "/people", label: "People Search", icon: "◷" },
-    { to: "/intake", label: "Opportunity Intake", icon: "✦" },
+    { to: "/intake", label: "Opportunity Intake", icon: "✎" },
     { to: "/ewa", label: "EWA Approvals", icon: "✓" },
   ],
   client_manager: [
-    { to: "/people", label: "People Search", icon: "◷" },
     { to: "/intake", label: "Create Opportunity", icon: "✦" },
-    { to: "/ewa", label: "EWA Approvals", icon: "✓" },
+    { to: "/work", label: "Business Approvals", icon: "✓" },
+    { to: "/people", label: "People Search", icon: "◷" },
   ],
 };

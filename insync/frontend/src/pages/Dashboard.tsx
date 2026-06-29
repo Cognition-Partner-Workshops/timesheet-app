@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Area,
   AreaChart,
@@ -11,9 +12,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { getDashboard } from "../api";
-import type { DashboardData } from "../types";
-import { Spinner } from "../ui";
+import { getDashboard, getPendingStaffing } from "../api";
+import type { DashboardData, PendingOpportunity } from "../types";
+import { Pill, Spinner } from "../ui";
 
 const KPI_DEFS: { key: keyof DashboardData["metrics"]; label: string; hint: string; color: string }[] = [
   { key: "total_employees", label: "Total Employees", hint: "Across APAC, India & MENA", color: "var(--blue)" },
@@ -34,10 +35,15 @@ const RISK_COLORS: Record<string, string> = {
 };
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
+  const [pending, setPending] = useState<PendingOpportunity[]>([]);
 
   useEffect(() => {
     getDashboard().then(setData);
+    getPendingStaffing()
+      .then((r) => setPending(r.opportunities))
+      .catch(() => setPending([]));
   }, []);
 
   if (!data) return <Spinner />;
@@ -58,6 +64,50 @@ export default function Dashboard() {
           Current and upcoming supply across the region · snapshot {data.snapshot_date}
         </p>
       </div>
+
+      {pending.length > 0 && (
+        <div className="card" style={{ marginBottom: 22, borderColor: "var(--coral)" }}>
+          <div className="spread">
+            <h3 style={{ margin: 0 }}>
+              🔔 Pending Staffing Requests <span className="pill coral">{pending.length}</span>
+            </h3>
+            <button className="btn ghost sm" onClick={() => navigate("/work")}>
+              Open queue →
+            </button>
+          </div>
+          <div
+            className="grid"
+            style={{ gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12, marginTop: 12 }}
+          >
+            {pending.slice(0, 6).map((o) => (
+              <button
+                key={o.project_id}
+                className="card"
+                style={{ background: "var(--navy-700)", textAlign: "left", cursor: "pointer" }}
+                onClick={() => navigate(`/work?opportunity=${o.project_id}`)}
+              >
+                <div className="spread">
+                  <strong>{o.title}</strong>
+                  <Pill kind="amber">{o.status}</Pill>
+                </div>
+                <div className="faint" style={{ fontSize: 12, marginTop: 4 }}>
+                  {o.domain || "—"} · {o.region || "—"}
+                </div>
+                <div className="row wrap" style={{ gap: 6, marginTop: 8 }}>
+                  {o.roles.map((r) => (
+                    <span className="pill" key={r.role_name}>
+                      {r.count}× {r.role_name}
+                    </span>
+                  ))}
+                </div>
+                <div className="faint" style={{ fontSize: 12, marginTop: 8 }}>
+                  {o.expected_start_date ? `Start ${o.expected_start_date} · ` : ""}By {o.created_by || "—"}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="kpi-grid">
         {KPI_DEFS.map((k) => (

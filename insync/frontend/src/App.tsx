@@ -8,10 +8,12 @@ import Dashboard from "./pages/Dashboard";
 import PeopleSearch from "./pages/PeopleSearch";
 import OpportunityIntake from "./pages/OpportunityIntake";
 import EWAApprovals from "./pages/EWAApprovals";
+import WorkQueue from "./pages/WorkQueue";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import AccessRestricted from "./pages/AccessRestricted";
 import Chatbot from "./components/Chatbot";
+import NotificationBell from "./components/NotificationBell";
 import { BrandMark } from "./components/BrandMark";
 import { Spinner } from "./ui";
 
@@ -113,6 +115,7 @@ function Shell() {
 
       <main className="main">
         <div className="topbar">
+          <NotificationBell />
           <ThemeToggle />
           <UserMenu />
         </div>
@@ -126,6 +129,7 @@ function Shell() {
           />
           <Route path="/people" element={<PeopleSearch meta={meta} />} />
           <Route path="/intake" element={<OpportunityIntake meta={meta} />} />
+          <Route path="/work" element={<WorkQueue meta={meta} />} />
           <Route path="/ewa" element={<EWAApprovals />} />
           <Route path="*" element={<Navigate to={user.landing} replace />} />
         </Routes>

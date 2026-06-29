@@ -6,7 +6,17 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import config, rag
 from .data_layer import get_store
-from .routers import auth, chat, dashboard, ewa, opportunities, people, recommend
+from .routers import (
+    auth,
+    chat,
+    dashboard,
+    ewa,
+    notifications,
+    opportunities,
+    people,
+    recommend,
+    workflow,
+)
 
 app = FastAPI(
     title="TalentBridge Workforce Planning Assistant",
@@ -33,6 +43,8 @@ app.include_router(people.router)
 app.include_router(opportunities.router)
 app.include_router(recommend.router)
 app.include_router(ewa.router)
+app.include_router(workflow.router)
+app.include_router(notifications.router)
 
 
 @app.on_event("startup")

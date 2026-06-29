@@ -135,7 +135,7 @@ def create_opportunity(payload: dict[str, Any]) -> dict[str, Any]:
                     "OPPORTUNITY",
                     payload.get("expected_start_date"),
                     payload.get("duration_weeks"),
-                    "OPEN",
+                    "Pending Staffing",
                     _json({
                         "description": description,
                         "created_by": payload.get("created_by"),
@@ -170,6 +170,7 @@ def create_opportunity(payload: dict[str, Any]) -> dict[str, Any]:
                 )
                 created_roles += 1
         conn.commit()
+        _notify_planner(project_code, payload, str(project_id))
         return {
             "project_id": str(project_id),
             "project_code": project_code,
@@ -182,6 +183,28 @@ def create_opportunity(payload: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError(f"Could not save opportunity: {exc}") from exc
     finally:
         conn.close()
+
+
+def _notify_planner(project_code: str, payload: dict, project_id: str) -> None:
+    """Tell the Workforce Planner a new opportunity needs staffing (§2)."""
+    try:
+        from . import workflow
+        from .auth import ROLE_PLANNER
+
+        roles = payload.get("roles") or []
+        role_bits = ", ".join(
+            f"{r.get('count') or 1}× {r.get('role_name')}" for r in roles if r.get("role_name")
+        )
+        title = payload.get("title") or project_code
+        workflow.notify(
+            ROLE_PLANNER,
+            "New staffing request",
+            f"{title} ({project_code}) — {role_bits}" if role_bits else f"{title} ({project_code})",
+            "opportunity",
+            project_id,
+        )
+    except Exception as exc:  # pragma: no cover - notifications are best-effort
+        logger.warning("Could not notify planner of new opportunity: %s", exc)
 
 
 def _json(obj: dict) -> str:

@@ -301,3 +301,70 @@ export interface EWARequest {
   delivery_fit: ApprovalGate;
   business_fit: ApprovalGate;
 }
+
+// ----------------------- Workflow (staffing proposals) ----------------- //
+export interface PendingOpportunity {
+  project_id: string;
+  project_code: string;
+  title: string;
+  domain: string | null;
+  region: string | null;
+  country: string | null;
+  city: string | null;
+  status: string;
+  expected_start_date: string | null;
+  duration_weeks: number | null;
+  description: string | null;
+  created_by: string | null;
+  roles: {
+    role_name: string;
+    count: number;
+    grade_preference: string | null;
+    required_skills: string[];
+  }[];
+}
+
+export interface ProposalReviewRecord {
+  decision: string;
+  comment: string | null;
+  reviewed_at: string | null;
+}
+
+export interface ProposalSummary {
+  proposal_id: string;
+  project_id: string;
+  proposal_status: string;
+  ai_summary: string | null;
+  planner_note: string | null;
+  selected_option_label: string | null;
+  created_by: string | null;
+  created_at: string | null;
+  candidate_count: number;
+  project: PendingOpportunity;
+  reviews: Record<string, ProposalReviewRecord>;
+}
+
+export interface ProposalCandidateRecord {
+  candidate: Candidate;
+  role_name: string | null;
+  option_label: string | null;
+  proposed_start: string | null;
+  proposed_fte: number | null;
+  fit_score: number | null;
+  workflow_status: string | null;
+  ewa_status: string | null;
+}
+
+export interface ProposalDetail extends ProposalSummary {
+  candidates: ProposalCandidateRecord[];
+}
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  body: string | null;
+  link_type: string | null;
+  link_id: string | null;
+  is_read: boolean;
+  created_at: string | null;
+}

@@ -1,19 +1,6 @@
 import { useEffect, useState } from "react";
-import {
-  createOpportunity,
-  getOpportunityFormOptions,
-  recommend,
-} from "../api";
-import type {
-  Candidate,
-  CreateOpportunityResult,
-  Meta,
-  OpportunityFormOptions,
-  ParsedRole,
-  RecommendationResult,
-} from "../types";
-import RecommendationResults from "./RecommendationResults";
-import CandidateDrawer from "../components/CandidateDrawer";
+import { createOpportunity, getOpportunityFormOptions } from "../api";
+import type { CreateOpportunityResult, OpportunityFormOptions } from "../types";
 
 interface RoleRow {
   role_name: string;
@@ -38,7 +25,7 @@ function splitSkills(value: string): string[] {
     .filter(Boolean);
 }
 
-export default function CreateOpportunityForm({ meta }: { meta: Meta | null }) {
+export default function CreateOpportunityForm() {
   const [options, setOptions] = useState<OpportunityFormOptions | null>(null);
   const [title, setTitle] = useState("");
   const [region, setRegion] = useState("");
@@ -53,15 +40,6 @@ export default function CreateOpportunityForm({ meta }: { meta: Meta | null }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<CreateOpportunityResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const [scoring, setScoring] = useState(false);
-  const [result, setResult] = useState<RecommendationResult | null>(null);
-  const [selected, setSelected] = useState<{
-    candidate: Candidate;
-    role?: string;
-    option?: string;
-    start?: string | null;
-  } | null>(null);
 
   useEffect(() => {
     getOpportunityFormOptions()
@@ -117,42 +95,13 @@ export default function CreateOpportunityForm({ meta }: { meta: Meta | null }) {
     }
   }
 
-  async function handleRecommend() {
-    if (!canSubmit) return;
-    setScoring(true);
-    try {
-      const start = startDate || meta?.snapshot_date || new Date().toISOString().slice(0, 10);
-      const mappedRoles: ParsedRole[] = validRoles.map((r) => ({
-        role_name: r.role_name,
-        count: r.count,
-        required_skills: splitSkills(r.required_skills),
-        desired_skills: [],
-        domain: domain || null,
-        location_preference:
-          city ? `${city}${country ? ", " + country : ""}` : country || null,
-        grade_preference: r.grade_preference || null,
-        fte_required: r.fte_required,
-        start_window_days: 0,
-        start_date: start,
-      }));
-      const r = await recommend({
-        summary: title || "the requested roles",
-        start_date: start,
-        roles: mappedRoles,
-      });
-      setResult(r);
-    } finally {
-      setScoring(false);
-    }
-  }
-
   return (
     <>
       <div className="page-head">
         <h1>Create Opportunity</h1>
         <p>
           Capture a client opportunity with structured roles. Saving stores it in the
-          workforce database; you can then generate staffing options.
+          workforce database and notifies the Workforce Planner to build a staffing proposal.
         </p>
       </div>
 
@@ -329,7 +278,8 @@ export default function CreateOpportunityForm({ meta }: { meta: Meta | null }) {
           <div className="banner" style={{ marginTop: 14 }}>
             ✓ {saved.message} Saved to the database ({saved.roles_created} role
             {saved.roles_created === 1 ? "" : "s"}). Opportunity code{" "}
-            <strong>{saved.project_code}</strong>.
+            <strong>{saved.project_code}</strong>. Status: <strong>Pending Staffing</strong> —
+            the Workforce Planner has been notified.
           </div>
         )}
 
@@ -337,32 +287,8 @@ export default function CreateOpportunityForm({ meta }: { meta: Meta | null }) {
           <button className="btn primary" onClick={handleSave} disabled={!canSubmit || saving}>
             {saving ? "Saving…" : "Save opportunity"}
           </button>
-          <button className="btn" onClick={handleRecommend} disabled={!canSubmit || scoring}>
-            {scoring ? "Scoring candidates…" : "Generate staffing options →"}
-          </button>
         </div>
       </div>
-
-      {result && (
-        <RecommendationResults
-          result={result}
-          startDate={startDate || null}
-          onSelect={(candidate, role, option) =>
-            setSelected({ candidate, role, option, start: startDate || null })
-          }
-        />
-      )}
-
-      {selected && (
-        <CandidateDrawer
-          candidate={selected.candidate}
-          roleName={selected.role}
-          optionLabel={selected.option}
-          proposedStart={selected.start}
-          opportunitySummary={title}
-          onClose={() => setSelected(null)}
-        />
-      )}
     </>
   );
 }

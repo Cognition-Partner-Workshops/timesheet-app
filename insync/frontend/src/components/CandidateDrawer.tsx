@@ -20,6 +20,7 @@ interface Props {
   optionLabel?: string;
   proposedStart?: string | null;
   opportunitySummary?: string;
+  readOnly?: boolean;
   onClose: () => void;
 }
 
@@ -29,6 +30,7 @@ export default function CandidateDrawer({
   optionLabel,
   proposedStart,
   opportunitySummary,
+  readOnly = false,
   onClose,
 }: Props) {
   const c = candidate;
@@ -233,6 +235,7 @@ export default function CandidateDrawer({
           </ul>
         </div>
 
+        {!readOnly && (
         <div style={{ marginTop: 22 }}>
           {submitted ? (
             <div className="banner" style={{ marginBottom: 0 }}>
@@ -252,6 +255,7 @@ export default function CandidateDrawer({
             EWA remains the final approval step. This does not book the employee.
           </div>
         </div>
+        )}
       </div>
     </>
   );

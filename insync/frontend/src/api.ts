@@ -1,8 +1,10 @@
 // Thin Axios wrapper around the TalentBridge backend API.
 import axios from "axios";
 import type {
+  AppNotification,
   AuthResponse,
   AuthUser,
+  Candidate,
   ChatMeta,
   ChatResponse,
   CreateOpportunityPayload,
@@ -12,8 +14,11 @@ import type {
   Meta,
   OpportunityFormOptions,
   ParsedRequirement,
+  PendingOpportunity,
   PersonDetail,
   PersonSummary,
+  ProposalDetail,
+  ProposalSummary,
   RecommendationResult,
   Role,
   RoleOption,
@@ -176,4 +181,83 @@ export async function setBusinessFit(
       { note }
     )
   ).data;
+}
+
+// --------------------------- Workflow ---------------------------------- //
+export async function getPendingStaffing(): Promise<{ opportunities: PendingOpportunity[] }> {
+  return (await api.get("/api/workflow/pending-staffing")).data;
+}
+
+export async function getProposals(): Promise<{ proposals: ProposalSummary[]; role: string }> {
+  return (await api.get("/api/workflow/proposals")).data;
+}
+
+export async function getProposalDetail(id: string): Promise<ProposalDetail> {
+  return (await api.get(`/api/workflow/proposals/${encodeURIComponent(id)}`)).data;
+}
+
+export interface ProposalCandidateInput {
+  candidate: Candidate;
+  role_name?: string | null;
+  option_label?: string | null;
+  proposed_start?: string | null;
+  proposed_fte?: number;
+}
+
+export async function createProposal(payload: {
+  project_id: string;
+  candidates: ProposalCandidateInput[];
+  ai_summary?: string | null;
+  planner_note?: string | null;
+  option_label?: string | null;
+}): Promise<{ success: boolean; proposal_id: string; status: string }> {
+  return (await api.post("/api/workflow/proposals", payload)).data;
+}
+
+export async function submitDeliveryReview(
+  id: string,
+  decision: string,
+  comment?: string
+): Promise<{ success: boolean; status: string }> {
+  return (
+    await api.post(`/api/workflow/proposals/${encodeURIComponent(id)}/delivery-review`, {
+      decision,
+      comment,
+    })
+  ).data;
+}
+
+export async function submitBusinessReview(
+  id: string,
+  decision: string,
+  comment?: string
+): Promise<{ success: boolean; status: string }> {
+  return (
+    await api.post(`/api/workflow/proposals/${encodeURIComponent(id)}/business-review`, {
+      decision,
+      comment,
+    })
+  ).data;
+}
+
+export async function submitProposalToEWA(
+  id: string
+): Promise<{ success: boolean; status: string }> {
+  return (await api.post(`/api/workflow/proposals/${encodeURIComponent(id)}/submit-ewa`)).data;
+}
+
+// --------------------------- Notifications ----------------------------- //
+export async function getNotifications(): Promise<{
+  notifications: AppNotification[];
+  unread: number;
+}> {
+  return (await api.get("/api/notifications")).data;
+}
+
+export async function markNotificationRead(id: string): Promise<{ success: boolean }> {
+  return (await api.post(`/api/notifications/${encodeURIComponent(id)}/read`)).data;
+}
+
+export async function markAllNotificationsRead(): Promise<{ success: boolean }> {
+  return (await api.post("/api/notifications/read-all")).data;
 }

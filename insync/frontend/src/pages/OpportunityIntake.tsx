@@ -72,7 +72,7 @@ export default function OpportunityIntake({ meta }: { meta: Meta | null }) {
 
   // Client Partners get the structured, database-backed Create Opportunity form.
   if (isClient) {
-    return <CreateOpportunityForm meta={meta} />;
+    return <CreateOpportunityForm />;
   }
 
   return (
