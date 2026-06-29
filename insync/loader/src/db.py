@@ -19,11 +19,35 @@ def connect_db(config: AppConfig):
     return psycopg2.connect(**config.db_config)
 
 
+# DDL/migration scripts that ship with the loader. Only these vetted,
+# version-controlled files may be executed by ``execute_sql_file`` — the
+# function never runs arbitrary or user-supplied SQL.
+_SQL_DIR = (Path(__file__).resolve().parent.parent / "sql").resolve()
+_ALLOWED_SQL_FILES = frozenset(
+    {
+        "01_schema.sql",
+        "02_indexes.sql",
+        "03_analyze.sql",
+        "04_rag_schema.sql",
+    }
+)
+
+
 def execute_sql_file(conn, sql_path: Path):
-    logger.info("Executing SQL file: %s", sql_path)
-    sql = sql_path.read_text(encoding="utf-8")
+    """Run one of the bundled DDL files.
+
+    The path is validated against a fixed allowlist of files inside the
+    loader's ``sql/`` directory, so the executed statements are always
+    trusted, repo-controlled migration scripts and never user input.
+    """
+    resolved = Path(sql_path).resolve()
+    if resolved.parent != _SQL_DIR or resolved.name not in _ALLOWED_SQL_FILES:
+        raise ValueError(f"Refusing to execute non-allowlisted SQL file: {sql_path}")
+
+    logger.info("Executing SQL file: %s", resolved.name)
+    sql = resolved.read_text(encoding="utf-8")
     with conn.cursor() as cur:
-        cur.execute(sql)
+        cur.execute(sql)  # NOSONAR S3649 - trusted bundled DDL, path allowlisted above
 
 
 def bulk_insert(conn, sql: str, rows: List[Tuple], label: str, page_size: int = 1000):
