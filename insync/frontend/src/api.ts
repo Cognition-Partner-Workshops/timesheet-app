@@ -111,17 +111,10 @@ export async function searchPeople(
 // be used to construct an arbitrary URL.
 const EMPLOYEE_ID_PATTERN = /^[A-Za-z0-9_-]{1,32}$/;
 
-// Resource identifiers (proposals, notifications) are UUIDs. Validate and
-// encode any id before placing it in a request path so untrusted input can
-// never be used to construct an arbitrary URL.
+// Resource identifiers (proposals, notifications, EWA requests) are UUIDs.
+// Validate the value before putting it in a request path so untrusted input
+// can never be used to construct an arbitrary URL.
 const RESOURCE_ID_PATTERN = /^[A-Za-z0-9-]{1,64}$/;
-
-function safeId(id: string): string {
-  if (!RESOURCE_ID_PATTERN.test(id)) {
-    throw new Error(`Invalid id: ${id}`);
-  }
-  return encodeURIComponent(id);
-}
 
 export async function getPerson(id: string): Promise<PersonDetail> {
   if (!EMPLOYEE_ID_PATTERN.test(id)) {
@@ -174,9 +167,12 @@ export async function setDeliveryFit(
   approve: boolean,
   note?: string
 ): Promise<{ success: boolean; request: EWARequest }> {
+  if (!RESOURCE_ID_PATTERN.test(requestId)) {
+    throw new Error(`Invalid request id: ${requestId}`);
+  }
   return (
     await api.post(
-      `/api/ewa/${safeId(requestId)}/delivery?approve=${approve}`,
+      `/api/ewa/${encodeURIComponent(requestId)}/delivery?approve=${approve}`,
       { note }
     )
   ).data;
@@ -187,9 +183,12 @@ export async function setBusinessFit(
   approve: boolean,
   note?: string
 ): Promise<{ success: boolean; request: EWARequest }> {
+  if (!RESOURCE_ID_PATTERN.test(requestId)) {
+    throw new Error(`Invalid request id: ${requestId}`);
+  }
   return (
     await api.post(
-      `/api/ewa/${safeId(requestId)}/business?approve=${approve}`,
+      `/api/ewa/${encodeURIComponent(requestId)}/business?approve=${approve}`,
       { note }
     )
   ).data;
@@ -205,7 +204,10 @@ export async function getProposals(): Promise<{ proposals: ProposalSummary[]; ro
 }
 
 export async function getProposalDetail(id: string): Promise<ProposalDetail> {
-  return (await api.get(`/api/workflow/proposals/${safeId(id)}`)).data;
+  if (!RESOURCE_ID_PATTERN.test(id)) {
+    throw new Error(`Invalid proposal id: ${id}`);
+  }
+  return (await api.get(`/api/workflow/proposals/${encodeURIComponent(id)}`)).data;
 }
 
 export interface ProposalCandidateInput {
@@ -231,8 +233,11 @@ export async function submitDeliveryReview(
   decision: string,
   comment?: string
 ): Promise<{ success: boolean; status: string }> {
+  if (!RESOURCE_ID_PATTERN.test(id)) {
+    throw new Error(`Invalid proposal id: ${id}`);
+  }
   return (
-    await api.post(`/api/workflow/proposals/${safeId(id)}/delivery-review`, {
+    await api.post(`/api/workflow/proposals/${encodeURIComponent(id)}/delivery-review`, {
       decision,
       comment,
     })
@@ -244,8 +249,11 @@ export async function submitBusinessReview(
   decision: string,
   comment?: string
 ): Promise<{ success: boolean; status: string }> {
+  if (!RESOURCE_ID_PATTERN.test(id)) {
+    throw new Error(`Invalid proposal id: ${id}`);
+  }
   return (
-    await api.post(`/api/workflow/proposals/${safeId(id)}/business-review`, {
+    await api.post(`/api/workflow/proposals/${encodeURIComponent(id)}/business-review`, {
       decision,
       comment,
     })
@@ -255,7 +263,10 @@ export async function submitBusinessReview(
 export async function submitProposalToEWA(
   id: string
 ): Promise<{ success: boolean; status: string }> {
-  return (await api.post(`/api/workflow/proposals/${safeId(id)}/submit-ewa`)).data;
+  if (!RESOURCE_ID_PATTERN.test(id)) {
+    throw new Error(`Invalid proposal id: ${id}`);
+  }
+  return (await api.post(`/api/workflow/proposals/${encodeURIComponent(id)}/submit-ewa`)).data;
 }
 
 // --------------------------- Notifications ----------------------------- //
@@ -267,7 +278,10 @@ export async function getNotifications(): Promise<{
 }
 
 export async function markNotificationRead(id: string): Promise<{ success: boolean }> {
-  return (await api.post(`/api/notifications/${safeId(id)}/read`)).data;
+  if (!RESOURCE_ID_PATTERN.test(id)) {
+    throw new Error(`Invalid notification id: ${id}`);
+  }
+  return (await api.post(`/api/notifications/${encodeURIComponent(id)}/read`)).data;
 }
 
 export async function markAllNotificationsRead(): Promise<{ success: boolean }> {

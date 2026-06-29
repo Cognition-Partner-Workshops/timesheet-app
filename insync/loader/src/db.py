@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
 
 import psycopg2
+from psycopg2 import sql
 from psycopg2.extras import RealDictCursor, execute_values
 
 from src.config import AppConfig
@@ -45,9 +46,9 @@ def execute_sql_file(conn, sql_path: Path):
         raise ValueError(f"Refusing to execute non-allowlisted SQL file: {sql_path}")
 
     logger.info("Executing SQL file: %s", resolved.name)
-    sql = resolved.read_text(encoding="utf-8")
+    sql_text = resolved.read_text(encoding="utf-8")
     with conn.cursor() as cur:
-        cur.execute(sql)  # NOSONAR S3649 - trusted bundled DDL, path allowlisted above
+        cur.execute(sql_text)  # NOSONAR S3649 - trusted bundled DDL, path allowlisted above
 
 
 def bulk_insert(conn, sql: str, rows: List[Tuple], label: str, page_size: int = 1000):
@@ -61,9 +62,15 @@ def bulk_insert(conn, sql: str, rows: List[Tuple], label: str, page_size: int = 
 
 
 def fetch_map(conn, table: str, key_col: str, id_col: str) -> Dict[str, str]:
-    sql = f"SELECT {key_col}, {id_col} FROM {table}"
+    # Compose identifiers safely so they are quoted/escaped by psycopg2 rather
+    # than interpolated into the SQL string.
+    query = sql.SQL("SELECT {key}, {id} FROM {table}").format(
+        key=sql.Identifier(key_col),
+        id=sql.Identifier(id_col),
+        table=sql.Identifier(table),
+    )
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute(sql)
+        cur.execute(query)
         rows = cur.fetchall()
 
     return {str(row[key_col]): str(row[id_col]) for row in rows if row[key_col] is not None}

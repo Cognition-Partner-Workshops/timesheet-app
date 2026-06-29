@@ -65,11 +65,34 @@ def _connect():
         return None
 
 
-def _distinct(cur, column: str, table: str) -> list[str]:
-    cur.execute(
-        f"SELECT DISTINCT {column} FROM {table} "
-        f"WHERE {column} IS NOT NULL AND {column} <> '' ORDER BY 1;"
-    )
+# Fixed, fully-literal queries keyed by a logical name. Using constant SQL
+# strings (no identifier interpolation) keeps these queries injection-safe.
+_DISTINCT_QUERIES: dict[str, str] = {
+    "role_archetype": (
+        "SELECT DISTINCT role_archetype FROM employees "
+        "WHERE role_archetype IS NOT NULL AND role_archetype <> '' ORDER BY 1;"
+    ),
+    "grade": (
+        "SELECT DISTINCT grade FROM employees "
+        "WHERE grade IS NOT NULL AND grade <> '' ORDER BY 1;"
+    ),
+    "primary_domain": (
+        "SELECT DISTINCT primary_domain FROM employees "
+        "WHERE primary_domain IS NOT NULL AND primary_domain <> '' ORDER BY 1;"
+    ),
+    "region": (
+        "SELECT DISTINCT region FROM employees "
+        "WHERE region IS NOT NULL AND region <> '' ORDER BY 1;"
+    ),
+    "country": (
+        "SELECT DISTINCT country FROM employees "
+        "WHERE country IS NOT NULL AND country <> '' ORDER BY 1;"
+    ),
+}
+
+
+def _distinct(cur, key: str) -> list[str]:
+    cur.execute(_DISTINCT_QUERIES[key])
     return [row[0] for row in cur.fetchall()]
 
 
@@ -80,11 +103,11 @@ def form_options() -> dict[str, list[str]]:
         return dict(_FALLBACK)
     try:
         with conn.cursor() as cur:
-            roles = _distinct(cur, "role_archetype", "employees")
-            grades = _distinct(cur, "grade", "employees")
-            domains = _distinct(cur, "primary_domain", "employees")
-            regions = _distinct(cur, "region", "employees")
-            countries = _distinct(cur, "country", "employees")
+            roles = _distinct(cur, "role_archetype")
+            grades = _distinct(cur, "grade")
+            domains = _distinct(cur, "primary_domain")
+            regions = _distinct(cur, "region")
+            countries = _distinct(cur, "country")
         return {
             "roles": roles or _FALLBACK["roles"],
             "grades": grades or _FALLBACK["grades"],

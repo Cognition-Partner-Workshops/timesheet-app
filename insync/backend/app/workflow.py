@@ -488,7 +488,7 @@ def get_proposal(proposal_id: str) -> Optional[dict]:
             summary["candidates"] = candidates
             return summary
     except Exception as exc:  # pragma: no cover
-        logger.warning("Could not load proposal %s: %s", proposal_id, exc)
+        logger.warning("Could not load proposal: %s", exc)
         return None
     finally:
         conn.close()
