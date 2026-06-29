@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
+from .. import bookings
 from ..auth import ROLE_CLIENT, ROLE_DELIVERY, User
 from ..rbac import get_current_user, require_roles
 
@@ -68,6 +69,22 @@ def _find(request_id: str) -> dict:
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND, detail="EWA request not found."
     )
+
+
+def _maybe_book(rec: dict) -> None:
+    """Persist a booking once both gates are approved (idempotent)."""
+    if (
+        rec["delivery_fit"]["status"] == _APPROVED
+        and rec["business_fit"]["status"] == _APPROVED
+    ):
+        booked = bookings.record_booking(
+            ewa_request_id=rec["ewa_request_id"],
+            employee_id=rec["employee_id"],
+            employee_name=rec.get("employee_name"),
+            role_name=rec.get("role_name"),
+            opportunity_summary=rec.get("opportunity_summary"),
+        )
+        rec["booked"] = booked
 
 
 def _stamp(user: User, note: str | None, state: str) -> dict:
@@ -124,6 +141,7 @@ def set_delivery_fit(
     rec = _find(request_id)
     rec["delivery_fit"] = _stamp(user, body.note, _APPROVED if approve else _CHANGES)
     rec["status"] = _overall_status(rec)
+    _maybe_book(rec)
     return {"success": True, "request": rec}
 
 
@@ -138,6 +156,7 @@ def set_business_fit(
     rec = _find(request_id)
     rec["business_fit"] = _stamp(user, body.note, _APPROVED if approve else _CANCELLED)
     rec["status"] = _overall_status(rec)
+    _maybe_book(rec)
     return {"success": True, "request": rec}
 
 

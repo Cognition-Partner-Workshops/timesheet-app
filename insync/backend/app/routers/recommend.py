@@ -13,7 +13,7 @@ from typing import Optional
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from .. import ai, recommend as recommend_engine
+from .. import ai, bookings, recommend as recommend_engine
 from ..data_layer import get_store
 from ..scoring import RoleRequirement
 
@@ -80,7 +80,12 @@ def recommend(req: RecommendRequest) -> dict:
             )
         )
 
-    result = recommend_engine.build_options(store.all_employees(), requirements, snapshot)
+    # Drop anyone already booked via a fully-approved EWA so the same person
+    # cannot be proposed again.
+    booked_ids = bookings.booked_employee_ids()
+    available = [e for e in store.all_employees() if e["employee_id"] not in booked_ids]
+
+    result = recommend_engine.build_options(available, requirements, snapshot)
 
     summary = req.summary or "the requested roles"
     # Attach AI / mock explanations to options and individual candidates.
