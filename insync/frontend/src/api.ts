@@ -130,10 +130,37 @@ export async function submitEWA(payload: {
   proposed_start_date?: string | null;
   requested_fte?: number;
   match_score?: number;
+  opportunity_summary?: string;
 }): Promise<{ success: boolean; message: string; request: EWARequest }> {
   return (await api.post("/api/ewa", payload)).data;
 }
 
-export async function listEWA(): Promise<{ requests: EWARequest[] }> {
+export async function listEWA(): Promise<{ requests: EWARequest[]; role: string }> {
   return (await api.get("/api/ewa")).data;
+}
+
+export async function setDeliveryFit(
+  requestId: string,
+  approve: boolean,
+  note?: string
+): Promise<{ success: boolean; request: EWARequest }> {
+  return (
+    await api.post(
+      `/api/ewa/${encodeURIComponent(requestId)}/delivery?approve=${approve}`,
+      { note }
+    )
+  ).data;
+}
+
+export async function setBusinessFit(
+  requestId: string,
+  approve: boolean,
+  note?: string
+): Promise<{ success: boolean; request: EWARequest }> {
+  return (
+    await api.post(
+      `/api/ewa/${encodeURIComponent(requestId)}/business?approve=${approve}`,
+      { note }
+    )
+  ).data;
 }

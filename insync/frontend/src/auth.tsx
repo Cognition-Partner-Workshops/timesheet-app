@@ -75,7 +75,7 @@ export const ROLE_NAV: Record<Role, { to: string; label: string; icon: string }[
   ],
   client_manager: [
     { to: "/people", label: "People Search", icon: "◷" },
-    { to: "/intake", label: "Opportunity Intake", icon: "✦" },
+    { to: "/intake", label: "Create Opportunity", icon: "✦" },
     { to: "/ewa", label: "EWA Approvals", icon: "✓" },
   ],
 };

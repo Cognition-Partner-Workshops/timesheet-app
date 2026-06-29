@@ -84,6 +84,8 @@ export interface ChatResponse {
   used_ai: boolean;
   restricted: boolean;
   role: Role;
+  intent?: "qa" | "create_opportunity";
+  opportunity?: ParsedRequirement | null;
 }
 
 export interface ChatMeta {
@@ -237,6 +239,14 @@ export interface PersonDetail extends PersonSummary {
   availability_calendar: { week_start: string | null; available_fte: number; type: string }[];
 }
 
+export interface ApprovalGate {
+  status: "Pending" | "Approved" | "Changes Requested" | "Cancelled";
+  by: string | null;
+  role: Role | null;
+  note: string | null;
+  at: string | null;
+}
+
 export interface EWARequest {
   ewa_request_id: string;
   employee_id: string;
@@ -248,5 +258,9 @@ export interface EWARequest {
   match_score: number | null;
   status: string;
   submitted_at: string;
+  submitted_by?: string;
   booking_owner: string;
+  opportunity_summary?: string | null;
+  delivery_fit: ApprovalGate;
+  business_fit: ApprovalGate;
 }

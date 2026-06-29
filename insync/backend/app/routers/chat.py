@@ -28,9 +28,9 @@ _SUGGESTIONS = {
         "Show candidates with recent hands-on Kubernetes experience",
     ],
     ROLE_CLIENT: [
+        "Need 2 Java developers and 1 PM for a banking project in Pune in 30 days",
         "Which candidates suit a Banking client engagement in the UAE?",
         "What is the business fit for a Project Manager in Healthcare?",
-        "Summarise the proposed team for opportunity OPP-001",
     ],
 }
 
@@ -54,4 +54,6 @@ def chat_ask(req: ChatRequest, user: User = Depends(get_current_user)) -> dict:
         "used_ai": result.used_ai,
         "restricted": result.restricted,
         "role": result.role,
+        "intent": result.intent,
+        "opportunity": result.opportunity,
     }

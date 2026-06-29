@@ -20,6 +20,20 @@ from typing import Optional
 
 from . import ai, config, rag, rbac
 from .auth import ROLE_CLIENT, ROLE_DELIVERY, ROLE_PLANNER
+from .data_layer import get_store
+
+# Roles allowed to draft a new opportunity from the chatbot (requirement §5).
+_CREATE_ROLES = {ROLE_PLANNER, ROLE_CLIENT}
+
+# Verbs/keywords that signal the user is describing a NEW opportunity to staff.
+_BRIEF_TERMS = (
+    "need", "looking for", "require", "want", "staff", "build a team",
+    "set up a team", "resource", "create an opportunity", "new opportunity",
+)
+_ROLE_WORDS = (
+    "developer", "engineer", "qa", "tester", "pm", "project manager", "analyst",
+    "architect", "designer", "lead", "consultant", "scientist", "devops",
+)
 
 # Words that signal an org-wide supply / bench analytics question (planner-only).
 _ANALYTICS_TERMS = {
@@ -41,11 +55,52 @@ class ChatResponse:
     used_ai: bool
     role: str
     restricted: bool = False
+    intent: str = "qa"  # "qa" | "create_opportunity"
+    opportunity: Optional[dict] = None  # parsed structured brief, when applicable
 
 
 def _is_analytics(question: str) -> bool:
     low = question.lower()
     return any(term in low for term in _ANALYTICS_TERMS)
+
+
+def _is_opportunity_brief(question: str) -> bool:
+    """Heuristic: a staffing brief mentions an intent verb + a role/headcount."""
+    low = question.lower()
+    has_intent = any(term in low for term in _BRIEF_TERMS)
+    has_role = any(word in low for word in _ROLE_WORDS)
+    has_count = bool(re.search(r"\b\d+\s*[a-z]", low))
+    return has_intent and (has_role or has_count)
+
+
+def _opportunity_answer(parsed: dict, role: str) -> str:
+    roles = parsed.get("roles", [])
+    lines = [
+        "I turned your brief into a structured opportunity:",
+        "",
+        f"• Summary: {parsed.get('summary', '—')}",
+    ]
+    if parsed.get("domain"):
+        lines.append(f"• Domain: {parsed['domain']}")
+    if parsed.get("location"):
+        lines.append(f"• Location: {parsed['location']}")
+    lines.append(
+        f"• Start: in ~{parsed.get('start_window_days', '?')} days "
+        f"({parsed.get('start_date', '—')}) · {parsed.get('required_fte', '?')} FTE total"
+    )
+    lines.append("• Roles:")
+    for r in roles:
+        skills = ", ".join(r.get("required_skills", [])[:4]) or "—"
+        lines.append(
+            f"   – {r.get('count', 1)}× {r.get('role_name', 'Role')} "
+            f"(skills: {skills})"
+        )
+    lines.append("")
+    lines.append(
+        'Open "Create Opportunity" and click "Generate staffing options" to '
+        "score candidates against this brief."
+    )
+    return "\n".join(lines)
 
 
 def _intent_source_types(question: str) -> Optional[list[str]]:
@@ -129,6 +184,17 @@ def answer_question(question: str, role: str) -> ChatResponse:
         return ChatResponse(
             answer="Ask me about candidates, skills, roles, opportunities or approvals.",
             sources=[], retrieval="none", used_ai=False, role=role,
+        )
+
+    # Opportunity-creation intent: a natural-language staffing brief. Planners
+    # and Client Managers can draft one straight from the chatbot (requirement §5).
+    if _is_opportunity_brief(question) and role in _CREATE_ROLES:
+        store = get_store()
+        parsed = ai.parse_requirement(question, store.snapshot_date)
+        return ChatResponse(
+            answer=_opportunity_answer(parsed, role),
+            sources=[], retrieval="none", used_ai=config.ai_enabled(), role=role,
+            intent="create_opportunity", opportunity=parsed,
         )
 
     # RBAC: org-wide supply/bench analytics is Workforce-Planner-only.

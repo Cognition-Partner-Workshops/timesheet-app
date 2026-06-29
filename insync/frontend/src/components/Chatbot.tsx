@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getChatMeta, sendChat } from "../api";
 import type { ChatResponse } from "../types";
+
+// Stash key the Create Opportunity page reads to pre-fill a brief from chat.
+export const CHAT_BRIEF_KEY = "tb_opportunity_brief";
 
 interface Turn {
   role: "user" | "bot";
   text: string;
   data?: ChatResponse;
+  brief?: string;
 }
 
 export default function Chatbot() {
@@ -16,6 +21,7 @@ export default function Chatbot() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!open || suggestions.length) return;
@@ -39,7 +45,15 @@ export default function Chatbot() {
     setBusy(true);
     try {
       const res = await sendChat(q);
-      setTurns((t) => [...t, { role: "bot", text: res.answer, data: res }]);
+      setTurns((t) => [
+        ...t,
+        {
+          role: "bot",
+          text: res.answer,
+          data: res,
+          brief: res.intent === "create_opportunity" ? q : undefined,
+        },
+      ]);
     } catch {
       setTurns((t) => [
         ...t,
@@ -97,6 +111,19 @@ export default function Chatbot() {
                   {t.text.split("\n").map((line, j) => (
                     <p key={j}>{line}</p>
                   ))}
+                  {t.brief && (
+                    <button
+                      className="btn primary sm"
+                      style={{ marginTop: 8 }}
+                      onClick={() => {
+                        sessionStorage.setItem(CHAT_BRIEF_KEY, t.brief as string);
+                        setOpen(false);
+                        navigate("/intake");
+                      }}
+                    >
+                      Open in Create Opportunity →
+                    </button>
+                  )}
                   {t.data && t.data.sources.length > 0 && (
                     <details className="chat-sources">
                       <summary>

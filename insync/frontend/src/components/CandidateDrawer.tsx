@@ -19,6 +19,7 @@ interface Props {
   roleName?: string;
   optionLabel?: string;
   proposedStart?: string | null;
+  opportunitySummary?: string;
   onClose: () => void;
 }
 
@@ -27,6 +28,7 @@ export default function CandidateDrawer({
   roleName,
   optionLabel,
   proposedStart,
+  opportunitySummary,
   onClose,
 }: Props) {
   const c = candidate;
@@ -44,6 +46,7 @@ export default function CandidateDrawer({
         proposed_start_date: proposedStart ?? null,
         requested_fte: 1.0,
         match_score: c.overall_score,
+        opportunity_summary: opportunitySummary,
       });
       setSubmitted(res.request.ewa_request_id);
     } finally {

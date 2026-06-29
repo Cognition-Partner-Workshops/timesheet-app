@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { parseRequirement, recommend } from "../api";
 import type { Candidate, Meta, ParsedRequirement, RecommendationResult } from "../types";
 import RecommendationResults from "./RecommendationResults";
 import CandidateDrawer from "../components/CandidateDrawer";
+import { CHAT_BRIEF_KEY } from "../components/Chatbot";
+import { useAuth } from "../auth";
 
 const EXAMPLES = [
   "Need 2 Java developers, 1 QA engineer and 1 PM for a banking project in Pune starting in 30 days.",
@@ -12,6 +14,8 @@ const EXAMPLES = [
 ];
 
 export default function OpportunityIntake({ meta }: { meta: Meta | null }) {
+  const { user } = useAuth();
+  const isClient = user?.role === "client_manager";
   const [text, setText] = useState(EXAMPLES[0]);
   const [parsed, setParsed] = useState<ParsedRequirement | null>(null);
   const [result, setResult] = useState<RecommendationResult | null>(null);
@@ -23,6 +27,15 @@ export default function OpportunityIntake({ meta }: { meta: Meta | null }) {
     option?: string;
     start?: string | null;
   } | null>(null);
+
+  // If the chatbot routed a natural-language brief here, pre-fill the box.
+  useEffect(() => {
+    const brief = sessionStorage.getItem(CHAT_BRIEF_KEY);
+    if (brief) {
+      setText(brief);
+      sessionStorage.removeItem(CHAT_BRIEF_KEY);
+    }
+  }, []);
 
   async function handleParse() {
     setParsing(true);
@@ -59,8 +72,8 @@ export default function OpportunityIntake({ meta }: { meta: Meta | null }) {
   return (
     <>
       <div className="page-head">
-        <h1>Opportunity Intake</h1>
-        <p>Describe an opportunity in plain English — InSync structures it, then scores your people.</p>
+        <h1>{isClient ? "Create Opportunity" : "Opportunity Intake"}</h1>
+        <p>Describe an opportunity in plain English — TalentBridge structures it, then scores your people.</p>
       </div>
 
       {meta && (
@@ -184,6 +197,7 @@ export default function OpportunityIntake({ meta }: { meta: Meta | null }) {
           roleName={selected.role}
           optionLabel={selected.option}
           proposedStart={selected.start}
+          opportunitySummary={parsed?.summary}
           onClose={() => setSelected(null)}
         />
       )}
