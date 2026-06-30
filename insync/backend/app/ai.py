@@ -17,8 +17,6 @@ import re
 from datetime import date, timedelta
 from typing import Optional
 
-import httpx
-
 from . import config
 
 # --------------------------------------------------------------------------
@@ -444,38 +442,14 @@ _PARSE_SYSTEM = (
 
 
 def _chat(messages: list[dict], temperature: float = 0.2) -> Optional[str]:
-    """Call the configured chat completion endpoint; None on any failure."""
-    try:
-        if config.AI_PROVIDER == "openai":
-            resp = httpx.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {config.OPENAI_API_KEY}"},
-                json={
-                    "model": config.OPENAI_MODEL,
-                    "messages": messages,
-                    "temperature": temperature,
-                },
-                timeout=30,
-            )
-            resp.raise_for_status()
-            return resp.json()["choices"][0]["message"]["content"]
-        if config.AI_PROVIDER == "azure":
-            url = (
-                f"{config.AZURE_OPENAI_ENDPOINT}/openai/deployments/"
-                f"{config.AZURE_OPENAI_DEPLOYMENT}/chat/completions"
-                f"?api-version={config.AZURE_OPENAI_API_VERSION}"
-            )
-            resp = httpx.post(
-                url,
-                headers={"api-key": config.AZURE_OPENAI_API_KEY},
-                json={"messages": messages, "temperature": temperature},
-                timeout=30,
-            )
-            resp.raise_for_status()
-            return resp.json()["choices"][0]["message"]["content"]
-    except Exception:  # noqa: BLE001 - any failure -> graceful mock fallback
-        return None
-    return None
+    """Delegate to the provider-independent LLM service; None on any failure.
+
+    The active provider is selected purely by ``LLM_PROVIDER`` and the service
+    degrades safely to deterministic mode when the provider is unavailable.
+    """
+    from . import llm
+
+    return llm.get_service().chat(messages, temperature)
 
 
 def _safe_json(raw: str) -> Optional[dict]:

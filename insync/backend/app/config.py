@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 from datetime import date, datetime
 from pathlib import Path
+from typing import Optional
 
 from dotenv import load_dotenv
 
@@ -53,8 +54,30 @@ FERNET_KEY: str = os.getenv("FERNET_KEY", "")
 # set TB_AUTH_SECRET in the environment for anything longer-lived.
 AUTH_SECRET: str = os.getenv("TB_AUTH_SECRET", "talentbridge-demo-secret-change-me")
 
-# AI provider selection: "mock" (default), "openai", or "azure".
-AI_PROVIDER: str = (os.getenv("INSYNC_AI_PROVIDER", "mock") or "mock").lower()
+# --------------------------------------------------------------------------- #
+# LLM provider abstraction.                                                     #
+#                                                                               #
+# The provider is selected ONLY by the LLM_PROVIDER environment variable        #
+# (gemini | openai | azure | mock). Switching providers is an environment       #
+# change only — no business logic, prompt, retrieval or RBAC code changes.      #
+# API keys come exclusively from environment variables; nothing is hardcoded.   #
+#                                                                               #
+# Dev default provider: gemini. Prod: openai. When the selected provider has    #
+# no usable key the app degrades safely to the deterministic "mock" provider.   #
+# --------------------------------------------------------------------------- #
+# ``INSYNC_AI_PROVIDER`` is kept as a backwards-compatible alias for the older
+# config name; ``LLM_PROVIDER`` takes precedence when both are set.
+LLM_PROVIDER: str = (
+    os.getenv("LLM_PROVIDER")
+    or os.getenv("INSYNC_AI_PROVIDER")
+    or "mock"
+).lower()
+
+# Back-compat alias used by older modules.
+AI_PROVIDER: str = LLM_PROVIDER
+
+GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 
 OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
@@ -67,14 +90,22 @@ AZURE_OPENAI_API_VERSION: str = os.getenv(
 )
 
 
-def ai_enabled() -> bool:
-    """Return True when a real AI provider is configured and usable."""
-    if AI_PROVIDER == "openai":
+def provider_has_key(provider: Optional[str] = None) -> bool:
+    """Return True when the given (or configured) provider has usable creds."""
+    provider = (provider or LLM_PROVIDER).lower()
+    if provider == "gemini":
+        return bool(GEMINI_API_KEY)
+    if provider == "openai":
         return bool(OPENAI_API_KEY)
-    if AI_PROVIDER == "azure":
+    if provider == "azure":
         return bool(
             AZURE_OPENAI_API_KEY
             and AZURE_OPENAI_ENDPOINT
             and AZURE_OPENAI_DEPLOYMENT
         )
-    return False
+    return False  # "mock" or unknown -> deterministic mode
+
+
+def ai_enabled() -> bool:
+    """Return True when a real (non-mock) AI provider is configured and usable."""
+    return LLM_PROVIDER != "mock" and provider_has_key(LLM_PROVIDER)

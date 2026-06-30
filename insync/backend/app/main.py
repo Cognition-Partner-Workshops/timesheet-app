@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import config, rag
+from . import config, llm, rag
 from .data_layer import get_store
 from .routers import (
     auth,
@@ -49,8 +49,17 @@ app.include_router(notifications.router)
 
 @app.on_event("startup")
 def _warm_store() -> None:
-    """Eagerly load the workbook so the first request is fast."""
+    """Eagerly load the workbook, log the LLM provider, build local vectors."""
     get_store()
+    # Log the resolved provider (never logs secrets).
+    llm.log_provider_selection()
+    # Build the local vector store from rag_documents so retrieval keeps working
+    # as a fallback when pgvector is unavailable. No-op if Postgres is missing.
+    try:
+        if not rag.local_store_available():
+            rag.build_local_store()
+    except Exception:  # pragma: no cover - never block startup
+        pass
 
 
 @app.get("/api/health", tags=["meta"])
@@ -66,7 +75,9 @@ def meta() -> dict:
         "snapshot_date": store.snapshot_date.isoformat(),
         "ai_enabled": config.ai_enabled(),
         "ai_provider": config.AI_PROVIDER,
+        "llm_provider": llm.get_service().provider_name,
         "retrieval_enabled": rag.retrieval_enabled(),
+        "retrieval_backend": rag.active_backend(),
         "skills": store.skill_vocabulary(),
         "domains": sorted({e.get("primary_domain") for e in store.all_employees() if e.get("primary_domain")}),
         "regions": sorted({e.get("region") for e in store.all_employees() if e.get("region")}),

@@ -7,6 +7,9 @@ backend/.env
 # Runtime auth store (demo accounts are re-seeded on startup)
 backend/data/users.json
 
+# Local-vector RAG fallback store (rebuilt from Postgres at startup)
+backend/data/rag_vectors.json
+
 # Node / Vite
 frontend/node_modules/
 frontend/dist/

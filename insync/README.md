@@ -152,30 +152,128 @@ npm run dev
 App is on <http://localhost:5173>. The Vite dev server proxies `/api` → `:8000`,
 so no CORS setup is needed locally.
 
----
-
-## AI configuration (optional)
-
-The app is **fully functional with no API key** — a deterministic mock parser and
-mock explanation generator keep the demo working offline. To enable live AI, set
-variables in `backend/.env`:
+### 3. Backend tests
 
 ```bash
-# OpenAI
-INSYNC_AI_PROVIDER=openai
+cd insync/backend
+source .venv/bin/activate
+pip install pytest
+python -m pytest tests/ -q
+```
+
+Covers provider resolution by `LLM_PROVIDER` (incl. env-only Gemini→OpenAI
+swap and safe fallback), read-only action detection, RBAC denial strings per
+role, retrieval-backend selection, local-vector fallback, the
+insufficient-evidence response, 7-section formatting and UUID masking. The
+suite is DB-free (retrieval/lookups are stubbed) so it runs offline.
+
+### RAG document / vector setup
+
+The chatbot reads `rag_documents` / `retrieval_embeddings` from Postgres
+(populated by the loader in `insync/loader/`). The **local-vector fallback** is
+built automatically at startup when `backend/data/rag_vectors.json` is absent;
+to (re)build it manually:
+
+```bash
+cd insync/backend && source .venv/bin/activate
+python -c "from app import rag; print('built', rag.build_local_store(), 'docs')"
+```
+
+---
+
+## AI configuration & provider abstraction
+
+The app is **fully functional with no API key** — a deterministic mock parser and
+mock explanation generator keep the demo working offline.
+
+The LLM layer is **provider-independent** (`app/llm.py`):
+
+```
+AIProvider (interface: chat(messages, temperature) -> str | None)
+  ├── GeminiProvider        (dev default)
+  ├── OpenAIProvider        (production)
+  ├── AzureOpenAIProvider
+  └── MockProvider          (deterministic; returns None)
+LLMService  → resolves the active provider ONLY from LLM_PROVIDER and
+              fails safe to deterministic mode on any error.
+```
+
+The active provider is selected **only by the `LLM_PROVIDER` environment
+variable** — switching providers is an environment change with **no code,
+prompt, retrieval or RBAC changes**. API keys come exclusively from env vars and
+are never hardcoded or logged.
+
+```bash
+# Development — Gemini
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=...
+GEMINI_MODEL=gemini-1.5-flash
+
+# Production — OpenAI
+LLM_PROVIDER=openai
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4o-mini
 
 # …or Azure OpenAI
-INSYNC_AI_PROVIDER=azure
+LLM_PROVIDER=azure
 AZURE_OPENAI_API_KEY=...
 AZURE_OPENAI_ENDPOINT=https://<resource>.openai.azure.com
 AZURE_OPENAI_DEPLOYMENT=<deployment-name>
 AZURE_OPENAI_API_VERSION=2024-08-01-preview
+
+# Offline / deterministic (default)
+LLM_PROVIDER=mock
 ```
+
+> `INSYNC_AI_PROVIDER` remains a backwards-compatible alias; `LLM_PROVIDER` wins
+> when both are set. The resolved provider is logged once at startup (no secrets).
 
 Even with AI enabled, **the scoring engine still selects every candidate** — AI
 output is restricted to parsing and narrating the engine's decision.
+
+### Read-only role-aware chatbot (`app/chat.py`)
+
+The chatbot is a **read-only knowledge assistant** that answers **only from
+retrieved evidence** and never performs business actions. Every request is
+answered under an authenticated `UserContext` (`app/user_context.py`:
+`userId, userName, userRole, accessibleProjects, accessibleAccounts,
+accessibleEmployees, businessUnit, location`). Order of checks:
+
+1. **Empty query** → prompt for input.
+2. **Read-only block** — action-intent prompts (create/update/delete/approve/
+   reject/assign/allocate/submit to EWA/generate proposal/trigger workflow/
+   modify DB) return exactly:
+   *"I can explain the process and answer questions about the available
+   workforce planning data, but I cannot perform business actions or modify
+   records."*
+3. **RBAC scope block** — exact per-role denial strings:
+   - Delivery Manager (out of scope): *"You do not have permission to access
+     information outside your assigned projects."*
+   - Client Partner (out of scope): *"You do not have permission to access
+     opportunities outside your assigned customer accounts."*
+   - Workforce Planner: enterprise-wide, no denial.
+4. **Role-specific retrieval filtering** → retrieval → evidence-only answer in
+   the 7-section format (Executive Summary, Key Findings, Supporting Evidence,
+   Confidence Level, Risks / Constraints, Recommended Next Actions, EWA
+   Considerations).
+5. **Insufficient evidence** (no docs, or all below the relevance threshold) →
+   exactly: *"I couldn't find enough information to answer that question."*
+
+Internal UUID identifiers are masked in all human-facing text. Chat endpoints
+are query-only and never call write services.
+
+### Retrieval fallback chain (`app/rag.py`)
+
+```
+pgvector (primary)  →  local-vector store (cosine over locally-embedded
+                       rag_documents, backend/data/rag_vectors.json)
+                    →  insufficient-information response
+```
+
+`retrieval_enabled()` is true when **either** pgvector **or** the local store is
+usable; `active_backend()` reports which one served each query (logged per
+request). The local store is built at startup from `rag_documents` when absent
+(`rag.build_local_store()`), so retrieval keeps working when pgvector is down.
 
 Other settings:
 

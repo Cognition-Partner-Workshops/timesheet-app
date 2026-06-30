@@ -14,16 +14,76 @@ Key constraints honoured:
 """
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from typing import Optional
 
-from . import ai, config, rag, rbac
+from . import ai, config, rag
 from .auth import ROLE_CLIENT, ROLE_DELIVERY, ROLE_PLANNER
 from .data_layer import get_store
+from .user_context import UserContext, build_context
+
+logger = logging.getLogger(__name__)
 
 # Roles allowed to draft a new opportunity from the chatbot (requirement §5).
 _CREATE_ROLES = {ROLE_PLANNER, ROLE_CLIENT}
+
+# --------------------------------------------------------------------------- #
+# Exact response strings mandated by the spec (do not change the wording).      #
+# --------------------------------------------------------------------------- #
+INSUFFICIENT_EVIDENCE = "I couldn't find enough information to answer that question."
+READ_ONLY_REFUSAL = (
+    "I can explain the process and answer questions about the available workforce "
+    "planning data, but I cannot perform business actions or modify records."
+)
+DELIVERY_SCOPE_DENIAL = (
+    "You do not have permission to access information outside your assigned projects."
+)
+CLIENT_SCOPE_DENIAL = (
+    "You do not have permission to access opportunities outside your assigned "
+    "customer accounts."
+)
+
+# Action verbs that signal a write / business action. Matched on word boundaries
+# so "approved"/"approval" (informational) do not trigger a false block.
+_ACTION_VERBS = (
+    "create", "update", "delete", "approve", "reject", "assign", "allocate",
+    "submit", "modify", "book", "cancel", "remove", "deploy", "promote",
+    "trigger", "edit", "insert", "drop", "grant", "revoke", "schedule",
+)
+_ACTION_PHRASES = (
+    "submit to ewa", "generate proposal", "generate a proposal",
+    "trigger workflow", "modify db", "modify the database", "add to ewa",
+    "push to ewa", "set status", "mark as",
+)
+# When the prompt is clearly about the *process* we explain rather than refuse —
+# but the refusal string itself offers to explain, so this is a soft allowance.
+_PROCESS_HINTS = (
+    "how do", "how to", "how does", "what happens", "what is the process",
+    "explain the process", "steps to", "process for", "process of",
+)
+
+# Enterprise-wide / company-wide intent (out of scope for Delivery & Client).
+_ENTERPRISE_TERMS = (
+    "enterprise", "company-wide", "company wide", "organisation", "organization",
+    "org-wide", "all projects", "every project", "all employees", "everyone",
+    "whole bench", "entire bench", "all teams", "across the company",
+    "other delivery", "other manager", "all accounts", "every account",
+)
+# Internal supply/bench terms a Client Partner may never see.
+_INTERNAL_SUPPLY_TERMS = (
+    "bench", "utilisation", "utilization", "internal staff", "headcount",
+    "supply", "rolling off", "roll-off", "availability of employees",
+)
+_ACTION_VERB_RE = re.compile(
+    r"\b(" + "|".join(_ACTION_VERBS) + r")\b", re.IGNORECASE
+)
+
+# Minimum retrieval similarity for a document to count as usable evidence.
+# Below this, the question is treated as having insufficient evidence rather
+# than answered from weakly-related records (prevents fabrication / drift).
+_MIN_RELEVANCE_SCORE = 0.18
 
 # Verbs/keywords that signal the user is describing a NEW opportunity to staff.
 _BRIEF_TERMS = (
@@ -544,16 +604,227 @@ def _ai_answer(question: str, role: str, docs: list[rag.RetrievedDoc]) -> Option
     )
 
 
-def answer_question(question: str, role: str) -> ChatResponse:
+# --------------------------------------------------------------------------- #
+# Read-only enforcement                                                         #
+# --------------------------------------------------------------------------- #
+def is_action_request(question: str) -> bool:
+    """True when the prompt asks the assistant to perform a business action.
+
+    Action-intent prompts (create/update/delete/approve/reject/assign/allocate/
+    submit to EWA/generate proposal/trigger workflow/modify DB) are blocked. A
+    staffing *brief* ("Need 2 engineers …") is a query, not an action, and is
+    not blocked here. Clear process/explanation questions are allowed through.
+    """
+    low = question.lower()
+    if any(hint in low for hint in _PROCESS_HINTS):
+        return False
+    if any(phrase in low for phrase in _ACTION_PHRASES):
+        return True
+    return bool(_ACTION_VERB_RE.search(low))
+
+
+# --------------------------------------------------------------------------- #
+# RBAC scope enforcement (exact denial strings per role)                        #
+# --------------------------------------------------------------------------- #
+def _mentions_any(question: str, terms) -> bool:
+    low = question.lower()
+    return any(term in low for term in terms)
+
+
+def _referenced_out_of_scope_accounts(question: str, ctx: UserContext) -> bool:
+    """True when the prompt names a known account outside the caller's scope."""
+    try:
+        all_accounts = {
+            o.get("client_name")
+            for o in get_store().all_opportunities()
+            if o.get("client_name")
+        }
+    except Exception:  # pragma: no cover - DB unavailable
+        return False
+    accessible = {a.lower() for a in ctx.accessible_accounts}
+    qnorm = _norm(question)
+    for account in all_accounts:
+        if account and _contains_phrase(qnorm, account) and account.lower() not in accessible:
+            return True
+    return False
+
+
+def rbac_scope_denial(question: str, ctx: UserContext) -> Optional[str]:
+    """Return the exact denial string if the query is outside the caller's scope."""
+    if ctx.user_role == ROLE_PLANNER:
+        return None  # enterprise-wide visibility
+
+    if ctx.user_role == ROLE_DELIVERY:
+        if _mentions_any(question, _ENTERPRISE_TERMS):
+            return DELIVERY_SCOPE_DENIAL
+        if _mentions_any(question, ("bench", "supply", "utilisation", "utilization")):
+            # Enterprise bench/supply analytics are not visible to Delivery.
+            return DELIVERY_SCOPE_DENIAL
+        if _referenced_out_of_scope_accounts(question, ctx):
+            return DELIVERY_SCOPE_DENIAL
+        return None
+
+    if ctx.user_role == ROLE_CLIENT:
+        if _mentions_any(question, _ENTERPRISE_TERMS):
+            return CLIENT_SCOPE_DENIAL
+        if _mentions_any(question, _INTERNAL_SUPPLY_TERMS):
+            return CLIENT_SCOPE_DENIAL
+        if _referenced_out_of_scope_accounts(question, ctx):
+            return CLIENT_SCOPE_DENIAL
+        return None
+
+    return None
+
+
+# --------------------------------------------------------------------------- #
+# Security: mask confidential internal identifiers in human-facing text         #
+# --------------------------------------------------------------------------- #
+_UUID_RE = re.compile(
+    r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+    r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
+)
+
+
+def _mask_ids(text: str) -> str:
+    """Redact UUID-style internal identifiers from a human-facing string."""
+    return _UUID_RE.sub("[internal-id]", text or "")
+
+
+# --------------------------------------------------------------------------- #
+# 7-part response formatting                                                    #
+# --------------------------------------------------------------------------- #
+def format_sections(
+    summary: str,
+    key_findings: list[str],
+    evidence: list[str],
+    confidence: str,
+    risks: list[str],
+    next_actions: list[str],
+    ewa: str,
+) -> str:
+    """Render the mandated 7-section structure (omitting empty list bullets)."""
+    def block(title: str, body) -> list[str]:
+        lines = [title]
+        if isinstance(body, list):
+            if body:
+                lines.extend(f"- {b}" for b in body)
+            else:
+                lines.append("- None identified from the retrieved evidence.")
+        else:
+            lines.append(body)
+        lines.append("")
+        return lines
+
+    out: list[str] = []
+    out += block("Executive Summary", summary)
+    out += block("Key Findings", key_findings)
+    out += block("Supporting Evidence", evidence)
+    out += block("Confidence Level", confidence)
+    out += block("Risks / Constraints", risks)
+    out += block("Recommended Next Actions", next_actions)
+    out += block("EWA Considerations", ewa)
+    return _mask_ids("\n".join(out).strip())
+
+
+def _role_source_types(ctx: UserContext, question: str) -> Optional[list[str]]:
+    """Role-specific retrieval source filtering."""
+    if ctx.user_role == ROLE_PLANNER:
+        return _intent_source_types(question)  # broad access
+    if ctx.user_role == ROLE_DELIVERY:
+        # Project-relevant sources only (no enterprise bench summaries).
+        return _DEMAND_TYPES + _CANDIDATE_TYPES + _PROPOSAL_TYPES
+    if ctx.user_role == ROLE_CLIENT:
+        # Account / opportunity relevant only; never internal employee evidence.
+        return _DEMAND_TYPES + _PROPOSAL_TYPES
+    return _intent_source_types(question)
+
+
+def _sectioned_from_docs(
+    question: str, ctx: UserContext, docs: list[rag.RetrievedDoc]
+) -> str:
+    """Build a 7-section, evidence-only answer from retrieved documents."""
+    ai_text = _ai_answer(question, ctx.user_role, docs) if config.ai_enabled() else None
+    evidence = [
+        f"[{d.source_type}] " + _snippet(
+            _mask_ids(
+                str(d.metadata.get("employee_token") or d.source_id or d.document_key)
+                + ": " + d.content
+            ),
+            260,
+        )
+        for d in docs[:4]
+    ]
+    if ai_text:
+        summary = _mask_ids(_snippet(ai_text, 600))
+    else:
+        summary = (
+            f"Based on the top {len(docs)} retrieved record(s), here is what the "
+            "available workforce-planning evidence indicates."
+        )
+    findings = [
+        _mask_ids(_snippet(d.content, 160)) for d in docs[:3]
+    ]
+    avg = sum(d.score for d in docs) / len(docs)
+    confidence = (
+        f"{'High' if avg >= 0.6 else 'Medium' if avg >= 0.4 else 'Low'} — "
+        f"grounded in {len(docs)} retrieved record(s) (avg similarity {avg:.2f})."
+    )
+    risks: list[str] = []
+    if avg < 0.45:
+        risks.append("Retrieved evidence is weakly related to the question.")
+    next_actions = [_NEXT_ACTIONS.get(ctx.user_role, "Review the supporting evidence.")]
+    ewa = (
+        "This is a read-only summary; any EWA submission or approval must be done "
+        "through the EWA workflow by an authorised user."
+    )
+    return format_sections(
+        summary, findings, evidence, confidence, risks, next_actions, ewa
+    )
+
+
+def answer_question(
+    question: str,
+    role: Optional[str] = None,
+    context: Optional[UserContext] = None,
+) -> ChatResponse:
+    """Answer a chat question under read-only + RBAC + evidence-only constraints.
+
+    Order of checks (spec §4.2): empty query -> read-only action block -> RBAC
+    scope block -> role-specific retrieval filtering -> retrieval -> evidence-only
+    answer -> insufficient-evidence fallback.
+    """
+    ctx = context
+    role = (ctx.user_role if ctx else role) or ""
     question = (question or "").strip()
+
+    # 1. Empty query.
     if not question:
         return ChatResponse(
             answer="Ask me about candidates, skills, roles, opportunities or approvals.",
             sources=[], retrieval="none", used_ai=False, role=role,
         )
 
-    # Opportunity-creation intent: a natural-language staffing brief. Planners
-    # and Client Managers can draft one straight from the chatbot (requirement §5).
+    # 2. Read-only action block.
+    if is_action_request(question):
+        logger.info("chat read-only block: role=%s", role)
+        return ChatResponse(
+            answer=READ_ONLY_REFUSAL,
+            sources=[], retrieval="none", used_ai=False, role=role, restricted=True,
+        )
+
+    # 3. RBAC scope block (exact per-role denial strings).
+    if ctx is not None:
+        denial = rbac_scope_denial(question, ctx)
+        if denial:
+            logger.info("chat RBAC denial: role=%s reason=out-of-scope", role)
+            return ChatResponse(
+                answer=denial,
+                sources=[], retrieval="none", used_ai=False, role=role,
+                restricted=True,
+            )
+
+    # Opportunity-drafting intent: a natural-language staffing brief (query only,
+    # never writes). Planners and Client Managers may draft one from the chatbot.
     if _is_opportunity_brief(question) and role in _CREATE_ROLES:
         store = get_store()
         parsed = ai.parse_requirement(question, store.snapshot_date)
@@ -563,52 +834,66 @@ def answer_question(question: str, role: str) -> ChatResponse:
             intent="create_opportunity", opportunity=parsed,
         )
 
-    # RBAC: org-wide supply/bench analytics is Workforce-Planner-only.
-    if _is_analytics(question) and not rbac.can_view_bench_analytics(role):
-        return ChatResponse(
-            answer=(
-                "Bench and supply analytics are available to Workforce Planners. "
-                "For your role, I can help with a specific opportunity or candidate — "
-                "e.g. \"Is C0123 a good fit for a Java role in Banking?\""
-            ),
-            sources=[], retrieval="none", used_ai=False, role=role, restricted=True,
-        )
+    # Deterministic candidate lookup (Planner / Delivery only — Client Partners
+    # never see internal staff). Explicit locations are hard filters.
+    if role in (ROLE_PLANNER, ROLE_DELIVERY):
+        candidate_answer = _candidate_lookup_answer(question, role)
+        if candidate_answer:
+            answer, sources = candidate_answer
+            return ChatResponse(
+                answer=_mask_ids(answer),
+                sources=sources,
+                retrieval=rag.active_backend() if rag.retrieval_enabled() else "fallback",
+                used_ai=False,
+                role=role,
+            )
 
-    # Deterministic candidate lookup. Explicit locations are hard filters here:
-    # a "Pune" question only returns Pune-based people, never Mumbai/Perth/etc.
-    candidate_answer = _candidate_lookup_answer(question, role)
-    if candidate_answer:
-        answer, sources = candidate_answer
-        return ChatResponse(
-            answer=answer,
-            sources=sources,
-            retrieval="fallback",
-            used_ai=False,
-            role=role,
-        )
+    # 4-5. Role-specific source filtering + retrieval execution.
+    source_types = _role_source_types(ctx, question) if ctx else _intent_source_types(question)
+    docs = rag.retrieve(question, top_k=6, source_types=source_types)
+    backend = rag.active_backend()
 
-    docs = rag.retrieve(question, top_k=6, source_types=_intent_source_types(question))
-    retrieval = "pgvector" if rag.retrieval_enabled() else "fallback"
+    # Evidence-only guard: drop weakly-related matches so off-topic questions
+    # fall through to the insufficient-evidence response instead of fabricating.
+    if ctx is not None:
+        docs = [d for d in docs if d.score >= _MIN_RELEVANCE_SCORE]
+
+    # 7. Insufficient-evidence fallback (exact string).
     if not docs:
-        retrieval = "none" if retrieval == "fallback" else retrieval
+        return ChatResponse(
+            answer=INSUFFICIENT_EVIDENCE,
+            sources=[], retrieval="none", used_ai=False, role=role,
+        )
 
-    used_ai = False
-    answer: Optional[str] = None
-    if config.ai_enabled() and docs:
-        answer = _ai_answer(question, role, docs)
-        used_ai = answer is not None
-    if not answer:
-        answer = _deterministic_answer(question, role, docs)
+    # 6. Evidence-only answer in the mandated 7-section format.
+    if ctx is not None:
+        answer = _sectioned_from_docs(question, ctx, docs)
+        used_ai = config.ai_enabled()
+    else:
+        used_ai = False
+        answer = None
+        if config.ai_enabled():
+            answer = _ai_answer(question, role, docs)
+            used_ai = answer is not None
+        if not answer:
+            answer = _deterministic_answer(question, role, docs)
+        answer = _mask_ids(answer)
 
     sources = [
         {
-            "document_key": d.document_key,
+            "document_key": _mask_ids(str(d.document_key)),
             "source_type": d.source_type,
             "score": round(d.score, 4),
-            "snippet": _snippet(d.content, 240),
+            "snippet": _mask_ids(_snippet(d.content, 240)),
         }
         for d in docs
     ]
     return ChatResponse(
-        answer=answer, sources=sources, retrieval=retrieval, used_ai=used_ai, role=role,
+        answer=answer, sources=sources, retrieval=backend, used_ai=used_ai, role=role,
     )
+
+
+def answer_for_user(question: str, user) -> ChatResponse:
+    """Convenience entrypoint: build the user context, then answer."""
+    ctx = build_context(user)
+    return answer_question(question, context=ctx)

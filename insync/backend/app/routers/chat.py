@@ -46,7 +46,7 @@ def chat_meta(user: User = Depends(get_current_user)) -> dict:
 
 @router.post("")
 def chat_ask(req: ChatRequest, user: User = Depends(get_current_user)) -> dict:
-    result = chat.answer_question(req.message, user.role)
+    result = chat.answer_for_user(req.message, user)
     return {
         "answer": result.answer,
         "sources": result.sources,
