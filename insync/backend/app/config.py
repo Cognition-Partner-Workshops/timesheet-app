@@ -18,15 +18,6 @@ load_dotenv()
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
 
 
-def _resolve_data_file() -> Path:
-    """Resolve the workforce workbook path relative to the backend root."""
-    raw = os.getenv("INSYNC_DATA_FILE", "data/workforce_dataset.xlsx")
-    path = Path(raw)
-    if not path.is_absolute():
-        path = BACKEND_ROOT / path
-    return path
-
-
 def _resolve_snapshot_date() -> date:
     """The 'today' used for every availability calculation.
 
@@ -39,14 +30,13 @@ def _resolve_snapshot_date() -> date:
         return date.today()
 
 
-DATA_FILE: Path = _resolve_data_file()
 SNAPSHOT_DATE: date = _resolve_snapshot_date()
 FRONTEND_URL: str = os.getenv("INSYNC_FRONTEND_URL", "http://localhost:5173")
 
 # --------------------------------------------------------------------------- #
-# PostgreSQL + pgvector (used by the chatbot retrieval layer).                 #
-# When disabled or unreachable the app falls back to the in-memory workbook,   #
-# so it still runs end-to-end without a database.                              #
+# PostgreSQL + pgvector. The sole data source for the app (employees,         #
+# opportunities, capacity, skills) and the chatbot retrieval layer. The Excel  #
+# workbook is no longer used; if Postgres is unreachable the store is empty.   #
 # --------------------------------------------------------------------------- #
 PG_ENABLED: bool = (os.getenv("TB_PG_ENABLED", "true") or "true").lower() == "true"
 PG_HOST: str = os.getenv("PGHOST", "localhost")
@@ -54,6 +44,10 @@ PG_PORT: int = int(os.getenv("PGPORT", "5432"))
 PG_DATABASE: str = os.getenv("PGDATABASE", "insync_wfp")
 PG_USER: str = os.getenv("PGUSER", "postgres")
 PG_PASSWORD: str = os.getenv("PGPASSWORD", "postgres")
+
+# Fernet key used by the loader to encrypt employee names at rest. When present
+# the backend decrypts names for display; otherwise the masked token is shown.
+FERNET_KEY: str = os.getenv("FERNET_KEY", "")
 
 # Secret used to sign demo auth tokens. A random default is fine for a demo;
 # set TB_AUTH_SECRET in the environment for anything longer-lived.
