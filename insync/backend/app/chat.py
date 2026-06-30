@@ -468,10 +468,25 @@ def _candidate_lookup_answer(question: str, role: str) -> Optional[tuple[str, li
     selected = (exact or matches)[:6]
     label = _filters_label(filters)
     if not selected:
-        answer = (
-            f"I searched for {label}, but did not find any matching people. "
-            "Try relaxing one filter or use People Search to browse the full pool."
-        )
+        locations = filters.get("locations") or []
+        skills = filters.get("skills") or []
+        if locations and skills:
+            answer = (
+                "Unfortunately, there aren't any available people for this location "
+                f"({', '.join(locations)}) and this skill set ({', '.join(skills)})."
+            )
+        elif locations:
+            answer = (
+                "Unfortunately, there aren't any available people for this location "
+                f"({', '.join(locations)})."
+            )
+        elif skills:
+            answer = (
+                "Unfortunately, there aren't any available people with this skill set "
+                f"({', '.join(skills)})."
+            )
+        else:
+            answer = f"I searched for {label}, but did not find any matching people."
         return answer, []
 
     if exact:

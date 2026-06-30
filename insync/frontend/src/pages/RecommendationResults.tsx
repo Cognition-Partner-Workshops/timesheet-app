@@ -89,6 +89,11 @@ function OptionPanel({
                     </span>
                   )}
                 </div>
+                {a.unfilled > 0 && a.candidates.length > 0 && a.unfilled_reason && (
+                  <div className="faint" style={{ fontSize: 11.5, marginTop: 6 }}>
+                    {a.unfilled_reason}
+                  </div>
+                )}
               </div>
               <div style={{ maxWidth: "50%", textAlign: "right" }}>
                 {a.required_skills.map((s) => (
@@ -151,7 +156,8 @@ function OptionPanel({
               ))}
               {a.candidates.length === 0 && (
                 <div className="faint" style={{ padding: 16 }}>
-                  No suitable candidates found for this role.
+                  {a.unfilled_reason ||
+                    "Unfortunately, there aren't any available people for this role."}
                 </div>
               )}
             </div>

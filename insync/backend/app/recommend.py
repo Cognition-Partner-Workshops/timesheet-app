@@ -80,7 +80,8 @@ def build_options(
     snapshot: date,
 ) -> dict:
     """Return the three staffing options plus the per-role candidate pools."""
-    # Pre-score every employee against every role once.
+    # Pre-score every employee against every role once. Only candidates that
+    # pass the hard location + required-skill gate are returned here.
     role_pools: list[dict] = []
     for req in requirements:
         ranked = scoring.rank_candidates(employees, req, snapshot, limit=25)
@@ -101,6 +102,7 @@ def build_options(
             picks = candidates[: max(req.count, 1)]
             for pick in picks:
                 assigned_ids.add(pick["employee_id"])
+            unfilled = max(req.count - len(picks), 0)
             assignments.append(
                 {
                     "role_name": req.role_name,
@@ -109,7 +111,8 @@ def build_options(
                     "required_skills": req.required_skills,
                     "desired_skills": req.desired_skills,
                     "candidates": picks,
-                    "unfilled": max(req.count - len(picks), 0),
+                    "unfilled": unfilled,
+                    "unfilled_reason": _unfilled_reason(req) if unfilled else None,
                 }
             )
 
@@ -142,6 +145,28 @@ def build_options(
             for p in role_pools
         ],
     }
+
+
+def _unfilled_reason(req: RoleRequirement) -> str:
+    """Honest message when a role cannot be staffed from eligible candidates."""
+    location = (req.location_preference or "").strip()
+    skills = ", ".join(s for s in req.required_skills if s)
+    if location and skills:
+        return (
+            f"Unfortunately, there aren't any available people for this location "
+            f"({location}) and this skill set ({skills})."
+        )
+    if location:
+        return (
+            f"Unfortunately, there aren't any available people for this location "
+            f"({location})."
+        )
+    if skills:
+        return (
+            f"Unfortunately, there aren't any available people with this skill "
+            f"set ({skills})."
+        )
+    return "Unfortunately, there aren't any available people for this role."
 
 
 def _team_start(assignments: list[dict]):

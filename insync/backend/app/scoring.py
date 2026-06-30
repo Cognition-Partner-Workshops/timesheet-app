@@ -104,6 +104,35 @@ def _location_constrained_employees(
     return []
 
 
+def _has_required_skills(emp: dict, req: RoleRequirement) -> bool:
+    """True if the employee owns every required skill for the role.
+
+    Required skills are a hard eligibility gate, not a soft weight. A candidate
+    who is missing any required skill is unsuited for the role and must never be
+    recommended just because their availability or location is strong.
+    """
+    if not req.required_skills:
+        return True
+    owned = [s["name"] for s in emp.get("skills", []) if s.get("name")]
+    return all(
+        any(_skill_matches(skill, owned_skill) for owned_skill in owned)
+        for skill in req.required_skills
+    )
+
+
+def _eligible_employees(
+    employees: list[dict],
+    req: RoleRequirement,
+) -> list[dict]:
+    """Hard eligibility gate: candidates must match BOTH location and skills.
+
+    Returns an empty list when no candidate satisfies both constraints, so the
+    role is left unfilled rather than padded with unsuited people.
+    """
+    located = _location_constrained_employees(employees, req)
+    return [emp for emp in located if _has_required_skills(emp, req)]
+
+
 # ----------------------------------------------------------------- components
 def score_skills(emp: dict, req: RoleRequirement) -> dict:
     """Skill match weighted toward required skills, with a desired-skill bonus."""
@@ -357,15 +386,16 @@ def rank_candidates(
     snapshot: date,
     limit: int = 25,
 ) -> list[dict]:
-    """Score and rank all employees for a role (best overall first).
+    """Score and rank all eligible employees for a role (best overall first).
 
-    Explicit location preferences are hard eligibility filters applied *before*
-    scoring, so a strong skill match in another city can never override a
-    concrete location requirement. If no employee matches the requested
-    city/country/region, the role is left unfilled rather than staffed from
-    elsewhere.
+    Location preference AND required skills are hard eligibility filters applied
+    *before* scoring: a candidate must be in the requested city/country/region
+    and possess every required skill to be ranked. Strong availability or a
+    great location can never override a missing required skill, and vice versa.
+    If no employee satisfies both constraints the role is left unfilled rather
+    than staffed with unsuited people.
     """
-    eligible_employees = _location_constrained_employees(employees, req)
+    eligible_employees = _eligible_employees(employees, req)
     scored = [score_candidate(emp, req, snapshot) for emp in eligible_employees]
     scored.sort(key=lambda c: c["overall_score"], reverse=True)
     return scored[:limit]

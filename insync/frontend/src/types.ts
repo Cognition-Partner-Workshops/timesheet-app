@@ -226,6 +226,7 @@ export interface Assignment {
   desired_skills: string[];
   candidates: Candidate[];
   unfilled: number;
+  unfilled_reason?: string | null;
 }
 
 export interface StaffingOption {
