@@ -42,12 +42,17 @@ def signup(req: SignUpRequest) -> AuthResponse:
         user = auth.get_store().create(req.full_name, str(req.email), req.password, req.role)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except auth.AuthUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     return AuthResponse(token=auth.issue_token(user), user=user.public())
 
 
 @router.post("/signin", response_model=AuthResponse)
 def signin(req: SignInRequest) -> AuthResponse:
-    user = auth.get_store().get_by_email(str(req.email))
+    try:
+        user = auth.get_store().get_by_email(str(req.email))
+    except auth.AuthUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     if not user or not auth.verify_password(req.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password.")
     return AuthResponse(token=auth.issue_token(user), user=user.public())

@@ -1,10 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getChatMeta, sendChat } from "../api";
+import { useAuth } from "../auth";
 import type { ChatResponse } from "../types";
 
 // Stash key the Create Opportunity page reads to pre-fill a brief from chat.
 export const CHAT_BRIEF_KEY = "tb_opportunity_brief";
+
+// Per-user chat history is persisted to localStorage so closing/reopening the
+// panel (or reloading the page) never loses the conversation. History is keyed
+// by the signed-in user so Sarah, Raj and Jenny never see each other's chats.
+const CHAT_HISTORY_PREFIX = "talentbridge_chat_history_";
+
+function historyKey(email: string | undefined | null): string | null {
+  return email ? `${CHAT_HISTORY_PREFIX}${email.toLowerCase()}` : null;
+}
 
 interface Turn {
   role: "user" | "bot";
@@ -14,14 +24,56 @@ interface Turn {
 }
 
 export default function Chatbot() {
+  const { user } = useAuth();
+  const storageKey = historyKey(user?.email);
   const [open, setOpen] = useState(false);
   const [retrievalEnabled, setRetrievalEnabled] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [turns, setTurns] = useState<Turn[]>([]);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+
+  // Restore this user's chat history whenever the signed-in user changes.
+  useEffect(() => {
+    if (!storageKey) {
+      setTurns([]);
+      setLoadedKey(null);
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(storageKey);
+      setTurns(raw ? (JSON.parse(raw) as Turn[]) : []);
+    } catch {
+      setTurns([]);
+    }
+    setLoadedKey(storageKey);
+  }, [storageKey]);
+
+  // Persist on every change (only after the current user's history has loaded,
+  // so we never clobber stored history with the initial empty state).
+  useEffect(() => {
+    if (!storageKey || loadedKey !== storageKey) return;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(turns));
+    } catch {
+      /* storage full / unavailable — keep working in-memory */
+    }
+  }, [turns, storageKey, loadedKey]);
+
+  function clearChat() {
+    if (!window.confirm("Are you sure you want to clear this chat?")) return;
+    setTurns([]);
+    if (storageKey) {
+      try {
+        localStorage.removeItem(storageKey);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
 
   useEffect(() => {
     if (!open || suggestions.length) return;
@@ -83,9 +135,23 @@ export default function Chatbot() {
                 {retrievalEnabled ? "pgvector retrieval" : "fallback mode"}
               </div>
             </div>
-            <button className="drawer-close" onClick={() => setOpen(false)}>
-              ×
-            </button>
+            <div className="chat-head-actions">
+              <button
+                className="btn ghost sm"
+                onClick={clearChat}
+                disabled={turns.length === 0}
+                title="Clear this conversation"
+              >
+                Clear Chat
+              </button>
+              <button
+                className="drawer-close"
+                onClick={() => setOpen(false)}
+                aria-label="Close assistant"
+              >
+                ×
+              </button>
+            </div>
           </div>
 
           <div className="chat-body" ref={bodyRef}>

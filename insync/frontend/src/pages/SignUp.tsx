@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { getRoles, signUp } from "../api";
 import { useAuth } from "../auth";
-import { BrandMark } from "../components/BrandMark";
+import { AuthLayout } from "../components/AuthLayout";
 import type { Role, RoleOption } from "../types";
 
 export default function SignUp() {
@@ -59,15 +59,13 @@ export default function SignUp() {
   }
 
   return (
-    <div className="auth-shell">
-      <div className="auth-card">
-        <BrandMark />
-        <h1 className="auth-title">Create your account</h1>
-        <p className="auth-sub">
-          Choose the role that matches how you'll use TalentBridge.
-        </p>
+    <AuthLayout>
+      <h1 className="auth-title">Create your account</h1>
+      <p className="auth-sub">
+        Choose the role that matches how you'll use TalentBridge.
+      </p>
 
-        <form onSubmit={submit} className="auth-form">
+      <form onSubmit={submit} className="auth-form">
           <div>
             <label htmlFor="full_name">Full name</label>
             <input
@@ -137,10 +135,9 @@ export default function SignUp() {
           </button>
         </form>
 
-        <p className="auth-switch">
-          Already have an account? <Link to="/signin">Sign in</Link>
-        </p>
-      </div>
-    </div>
+      <p className="auth-switch">
+        Already have an account? <Link to="/signin">Sign in</Link>
+      </p>
+    </AuthLayout>
   );
 }

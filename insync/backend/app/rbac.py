@@ -23,7 +23,12 @@ def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token"
         )
-    user = auth.get_store().get_by_id(payload["sub"])
+    try:
+        user = auth.get_store().get_by_id(payload["sub"])
+    except auth.AuthUnavailable as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Unknown user"
