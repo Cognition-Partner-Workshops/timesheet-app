@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createOpportunity, getOpportunityFormOptions } from "../api";
 import type { CreateOpportunityResult, OpportunityFormOptions } from "../types";
+import { useAuth } from "../auth";
 
 interface RoleRow {
   role_name: string;
@@ -18,6 +19,44 @@ const EMPTY_ROLE: RoleRow = {
   fte_required: 1,
 };
 
+interface HappyPathTemplate {
+  title: string;
+  region: string;
+  country: string;
+  city: string;
+  domain: string;
+  description: string;
+  startDate: string;
+  durationWeeks: number;
+  roles: RoleRow[];
+}
+
+// Happy path demo opportunity generated from seeded PostgreSQL data. Keep in sync with seed dataset.
+// Verified against the live recommendation API: location "Melbourne, Australia" + required skill
+// "CI/CD" returns 3 high-confidence candidates who all share the city, cover the start date, and are
+// none EWA Booked (Grace White EMP-051, Ethan Mitchell EMP-205, Mia Anderson EMP-275).
+const HAPPY_PATH: HappyPathTemplate = {
+  title: "Cloud Platform Modernization",
+  region: "APAC",
+  country: "Australia",
+  city: "Melbourne",
+  domain: "Payments",
+  description:
+    "Modernize the payments cloud platform: migrate services to containerized CI/CD pipelines, " +
+    "improve release automation and observability. Demo opportunity with guaranteed candidate matches.",
+  startDate: "2026-08-17",
+  durationWeeks: 12,
+  roles: [
+    {
+      role_name: "Cloud Engineer",
+      count: 3,
+      grade_preference: "Consultant",
+      required_skills: "CI/CD",
+      fte_required: 1,
+    },
+  ],
+};
+
 function splitSkills(value: string): string[] {
   return value
     .split(",")
@@ -26,6 +65,8 @@ function splitSkills(value: string): string[] {
 }
 
 export default function CreateOpportunityForm() {
+  const { user } = useAuth();
+  const isClientManager = user?.role === "client_manager";
   const [options, setOptions] = useState<OpportunityFormOptions | null>(null);
   const [title, setTitle] = useState("");
   const [region, setRegion] = useState("");
@@ -57,6 +98,20 @@ export default function CreateOpportunityForm() {
 
   function removeRole(idx: number) {
     setRoles((rs) => (rs.length > 1 ? rs.filter((_, i) => i !== idx) : rs));
+  }
+
+  function applyHappyPath() {
+    setTitle(HAPPY_PATH.title);
+    setRegion(HAPPY_PATH.region);
+    setCountry(HAPPY_PATH.country);
+    setCity(HAPPY_PATH.city);
+    setDomain(HAPPY_PATH.domain);
+    setDescription(HAPPY_PATH.description);
+    setStartDate(HAPPY_PATH.startDate);
+    setDurationWeeks(HAPPY_PATH.durationWeeks);
+    setRoles(HAPPY_PATH.roles.map((r) => ({ ...r })));
+    setSaved(null);
+    setError(null);
   }
 
   const validRoles = roles.filter((r) => r.role_name.trim());
@@ -97,12 +152,23 @@ export default function CreateOpportunityForm() {
 
   return (
     <>
-      <div className="page-head">
-        <h1>Create Opportunity</h1>
-        <p>
-          Capture a client opportunity with structured roles. Saving stores it in the
-          workforce database and notifies the Workforce Planner to build a staffing proposal.
-        </p>
+      <div className="page-head spread">
+        <div>
+          <h1>Create Opportunity</h1>
+          <p>
+            Capture a client opportunity with structured roles. Saving stores it in the
+            workforce database and notifies the Workforce Planner to build a staffing proposal.
+          </p>
+        </div>
+        {isClientManager && (
+          <button
+            className="btn ghost"
+            onClick={applyHappyPath}
+            title="Pre-fill a verified demo opportunity that returns at least 3 matching candidates"
+          >
+            ✨ Use Happy Path Demo Opportunity
+          </button>
+        )}
       </div>
 
       <div className="card">
