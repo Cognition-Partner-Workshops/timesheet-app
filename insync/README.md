@@ -207,7 +207,7 @@ are never hardcoded or logged.
 # Development — Gemini
 LLM_PROVIDER=gemini
 GEMINI_API_KEY=...
-GEMINI_MODEL=gemini-1.5-flash
+GEMINI_MODEL=gemini-2.5-flash
 
 # Production — OpenAI
 LLM_PROVIDER=openai
