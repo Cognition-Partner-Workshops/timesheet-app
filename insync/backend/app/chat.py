@@ -139,6 +139,357 @@ def _snippet(text: str, limit: int = 320) -> str:
     return text if len(text) <= limit else text[:limit].rsplit(" ", 1)[0] + "…"
 
 
+def _norm(value: object) -> str:
+    """Normalize text for deterministic, punctuation-tolerant matching."""
+    return re.sub(r"[^a-z0-9+#.]+", " ", str(value or "").lower()).strip()
+
+
+def _contains_phrase(text_norm: str, phrase: str) -> bool:
+    phrase_norm = _norm(phrase)
+    return bool(phrase_norm and f" {phrase_norm} " in f" {text_norm} ")
+
+
+def _loose_match(target: str, value: str) -> bool:
+    target_norm = _norm(target)
+    value_norm = _norm(value)
+    return bool(
+        target_norm
+        and value_norm
+        and (target_norm in value_norm or value_norm in target_norm)
+    )
+
+
+def _dedupe(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for value in values:
+        key = _norm(value)
+        if key and key not in seen:
+            seen.add(key)
+            out.append(value)
+    return out
+
+
+def _detect_vocab(question: str, vocab: set[str]) -> list[str]:
+    qnorm = _norm(question)
+    matches = [
+        value
+        for value in sorted(vocab, key=lambda v: len(_norm(v)), reverse=True)
+        if _contains_phrase(qnorm, value)
+    ]
+    return _dedupe(matches)
+
+
+def _candidate_vocab(employees: list[dict]) -> tuple[set[str], set[str], set[str]]:
+    store = get_store()
+    skills = set(store.skill_vocabulary())
+    domains = set(ai.DOMAINS)
+    locations = set(ai.LOCATIONS)
+    for emp in employees:
+        for field in ("city", "country", "region"):
+            if emp.get(field):
+                locations.add(str(emp[field]))
+        for field in ("primary_domain", "secondary_domain"):
+            if emp.get(field):
+                domains.add(str(emp[field]))
+        for skill in emp.get("skills", []):
+            if skill.get("name"):
+                skills.add(str(skill["name"]))
+        for hist in emp.get("project_history", []):
+            if hist.get("domain"):
+                domains.add(str(hist["domain"]))
+    return skills, domains, locations
+
+
+def _availability_filter(question: str) -> Optional[set[str]]:
+    qnorm = _norm(question)
+    if _contains_phrase(qnorm, "current bench") or _contains_phrase(qnorm, "bench"):
+        return {"Current Bench"}
+    if _contains_phrase(qnorm, "partial capacity"):
+        return {"Partial Capacity"}
+    if any(_contains_phrase(qnorm, term) for term in ("available", "availability", "free")):
+        return {"Current Bench", "Partial Capacity", "Rolling Off 0-30"}
+    if _contains_phrase(qnorm, "rolling off"):
+        return {"Rolling Off 0-30", "Rolling Off 31-60", "Rolling Off 61-90"}
+    return None
+
+
+def _role_filter(question: str) -> list[str]:
+    qnorm = _norm(question)
+    roles: list[str] = []
+    if any(_contains_phrase(qnorm, term) for term in ("engineer", "engineers", "developer", "developers")):
+        roles.extend(["engineer", "engineering", "developer"])
+    if any(_contains_phrase(qnorm, term) for term in ("qa", "tester", "testers", "testing")):
+        roles.extend(["qa", "test", "quality"])
+    if any(_contains_phrase(qnorm, term) for term in ("pm", "project manager", "project managers")):
+        roles.extend(["project manager", "project management", "pm"])
+    return _dedupe(roles)
+
+
+def _candidate_filters(question: str, employees: list[dict]) -> Optional[dict]:
+    skills_vocab, domains_vocab, locations_vocab = _candidate_vocab(employees)
+    filters = {
+        "skills": _detect_vocab(question, skills_vocab),
+        "domains": _detect_vocab(question, domains_vocab),
+        "locations": _detect_vocab(question, locations_vocab),
+        "roles": _role_filter(question),
+        "availability": _availability_filter(question),
+    }
+    qnorm = _norm(question)
+    looks_like_lookup = any(
+        _contains_phrase(qnorm, term)
+        for term in (
+            "find",
+            "show",
+            "who",
+            "which",
+            "people",
+            "person",
+            "candidate",
+            "candidates",
+            "employee",
+            "employees",
+            "skill",
+            "experience",
+        )
+    )
+    has_filter = any(
+        filters[key] for key in ("skills", "domains", "locations", "roles", "availability")
+    )
+    if looks_like_lookup and has_filter:
+        return filters
+
+    # Also support terse prompts like "React Banking Pune".
+    filter_groups = sum(1 for key in ("skills", "domains", "locations", "roles") if filters[key])
+    return filters if filter_groups >= 2 else None
+
+
+def _skill_hits(emp: dict, requested: list[str]) -> list[str]:
+    if not requested:
+        return []
+    owned = [s.get("name") for s in emp.get("skills", []) if s.get("name")]
+    return [
+        skill
+        for skill in requested
+        if any(_loose_match(skill, owned_skill) for owned_skill in owned)
+    ]
+
+
+def _location_hit(emp: dict, requested: list[str]) -> Optional[str]:
+    """Strict location match: city first, then country, then region.
+
+    A concrete city request (e.g. Pune) must match the candidate's own
+    city/country/region — candidates based elsewhere are excluded entirely,
+    regardless of how strong their other signals are.
+    """
+    for location in requested:
+        if _loose_match(location, emp.get("city") or ""):
+            return f"Based in {emp.get('city')}"
+        if _loose_match(location, emp.get("country") or ""):
+            return f"Based in {emp.get('country')}"
+        if _loose_match(location, emp.get("region") or ""):
+            return f"In region {emp.get('region')}"
+    return None
+
+
+def _domain_hit(emp: dict, requested: list[str]) -> Optional[str]:
+    for domain in requested:
+        if _loose_match(domain, emp.get("primary_domain") or ""):
+            return f"Primary domain {emp.get('primary_domain')}"
+        if _loose_match(domain, emp.get("secondary_domain") or ""):
+            return f"Secondary domain {emp.get('secondary_domain')}"
+        for hist in emp.get("project_history", []):
+            if _loose_match(domain, hist.get("domain") or ""):
+                project = hist.get("project_name") or "a past project"
+                return f"Delivered {project} in {hist.get('domain')}"
+    return None
+
+
+def _role_hit(emp: dict, requested: list[str]) -> Optional[str]:
+    if not requested:
+        return None
+    fields = [
+        emp.get("role_archetype") or "",
+        emp.get("discipline") or "",
+        emp.get("current_role") or "",
+    ]
+    for role in requested:
+        for value in fields:
+            if _loose_match(role, value):
+                return f"Role {value}"
+    return None
+
+
+def _candidate_match(emp: dict, filters: dict) -> Optional[dict]:
+    groups = 0
+    hits = 0
+    evidence: list[str] = []
+
+    requested_skills = filters["skills"]
+    skill_hits = _skill_hits(emp, requested_skills)
+    if requested_skills:
+        groups += 1
+        if len(skill_hits) == len(requested_skills):
+            hits += 1
+            evidence.append("Skills: " + ", ".join(skill_hits))
+        else:
+            return None
+
+    requested_locations = filters["locations"]
+    location_hit = _location_hit(emp, requested_locations)
+    if requested_locations:
+        groups += 1
+        # Hard location filter: no match -> candidate is excluded outright.
+        if location_hit:
+            hits += 1
+            evidence.append(location_hit)
+        else:
+            return None
+
+    requested_domains = filters["domains"]
+    domain_hit = _domain_hit(emp, requested_domains)
+    if requested_domains:
+        groups += 1
+        if domain_hit:
+            hits += 1
+            evidence.append(domain_hit)
+        else:
+            return None
+
+    requested_roles = filters["roles"]
+    role_hit = _role_hit(emp, requested_roles)
+    if requested_roles:
+        groups += 1
+        if role_hit:
+            hits += 1
+            evidence.append(role_hit)
+        else:
+            return None
+
+    availability = filters["availability"]
+    if availability:
+        groups += 1
+        category = emp.get("availability_category")
+        if category in availability:
+            hits += 1
+            evidence.append(f"Availability {category}")
+        else:
+            return None
+
+    if groups == 0 or hits == 0:
+        return None
+
+    availability_order = {
+        "Current Bench": 0,
+        "Partial Capacity": 1,
+        "Rolling Off 0-30": 2,
+        "Rolling Off 31-60": 3,
+        "Rolling Off 61-90": 4,
+        "Allocated >90": 5,
+        "Booked": 6,
+    }
+    return {
+        "employee": emp,
+        "evidence": evidence,
+        "score": hits / groups,
+        "exact": hits == groups,
+        "availability_rank": availability_order.get(emp.get("availability_category"), 9),
+    }
+
+
+def _filters_label(filters: dict) -> str:
+    bits = []
+    if filters["locations"]:
+        bits.append("location " + ", ".join(filters["locations"]))
+    if filters["skills"]:
+        bits.append("skill " + ", ".join(filters["skills"]))
+    if filters["domains"]:
+        bits.append("domain experience " + ", ".join(filters["domains"]))
+    if filters["roles"]:
+        bits.append("role " + ", ".join(filters["roles"]))
+    if filters["availability"]:
+        bits.append("availability " + ", ".join(sorted(filters["availability"])))
+    return "; ".join(bits)
+
+
+def _candidate_line(match: dict, index: int) -> str:
+    emp = match["employee"]
+    place = ", ".join(v for v in (emp.get("city"), emp.get("country")) if v)
+    availability = emp.get("availability_category") or "availability unknown"
+    fte = emp.get("available_fte_current")
+    fte_text = f", {fte} FTE free" if fte is not None else ""
+    evidence = "; ".join(match["evidence"]) or "Matched profile"
+    return (
+        f"{index}. {emp.get('name')} ({emp.get('employee_id')}) - "
+        f"{emp.get('role_archetype') or emp.get('discipline')}, {place}. "
+        f"{availability}{fte_text}. Evidence: {evidence}."
+    )
+
+
+def _candidate_source(match: dict) -> dict:
+    emp = match["employee"]
+    snippet = (
+        f"{emp.get('name')} ({emp.get('employee_id')}), "
+        f"{emp.get('role_archetype') or emp.get('discipline')}, "
+        f"{emp.get('city')}, {emp.get('country')}. "
+        f"{emp.get('availability_category')} with {emp.get('available_fte_current')} FTE free. "
+        f"{'; '.join(match['evidence'])}"
+    )
+    return {
+        "document_key": emp.get("employee_id"),
+        "source_type": "candidate",
+        "score": round(float(match["score"]), 4),
+        "snippet": _snippet(snippet, 240),
+    }
+
+
+def _candidate_lookup_answer(question: str, role: str) -> Optional[tuple[str, list[dict]]]:
+    store = get_store()
+    employees = store.all_employees()
+    filters = _candidate_filters(question, employees)
+    if not filters:
+        return None
+
+    matches = [
+        match
+        for emp in employees
+        if (match := _candidate_match(emp, filters)) is not None
+    ]
+    matches.sort(
+        key=lambda m: (
+            not m["exact"],
+            -m["score"],
+            m["availability_rank"],
+            m["employee"].get("name") or "",
+        )
+    )
+
+    exact = [m for m in matches if m["exact"]]
+    selected = (exact or matches)[:6]
+    label = _filters_label(filters)
+    if not selected:
+        answer = (
+            f"I searched for {label}, but did not find any matching people. "
+            "Try relaxing one filter or use People Search to browse the full pool."
+        )
+        return answer, []
+
+    if exact:
+        lines = [f"Found {len(exact)} people matching {label}:", ""]
+    else:
+        lines = [
+            f"I did not find an exact match for {label}. Closest partial matches:",
+            "",
+        ]
+    for i, match in enumerate(selected, 1):
+        lines.append(_candidate_line(match, i))
+    lines.append("")
+    lines.append(_NEXT_ACTIONS.get(role, ""))
+    return "\n".join(line for line in lines if line is not None), [
+        _candidate_source(match) for match in selected
+    ]
+
+
 def _deterministic_answer(question: str, role: str, docs: list[rag.RetrievedDoc]) -> str:
     if not docs:
         return (
@@ -206,6 +557,19 @@ def answer_question(question: str, role: str) -> ChatResponse:
                 "e.g. \"Is C0123 a good fit for a Java role in Banking?\""
             ),
             sources=[], retrieval="none", used_ai=False, role=role, restricted=True,
+        )
+
+    # Deterministic candidate lookup. Explicit locations are hard filters here:
+    # a "Pune" question only returns Pune-based people, never Mumbai/Perth/etc.
+    candidate_answer = _candidate_lookup_answer(question, role)
+    if candidate_answer:
+        answer, sources = candidate_answer
+        return ChatResponse(
+            answer=answer,
+            sources=sources,
+            retrieval="fallback",
+            used_ai=False,
+            role=role,
         )
 
     docs = rag.retrieve(question, top_k=6, source_types=_intent_source_types(question))

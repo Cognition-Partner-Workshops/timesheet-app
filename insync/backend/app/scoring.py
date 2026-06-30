@@ -72,6 +72,38 @@ def _skill_matches(required: str, owned: str) -> bool:
     return r == o or r in o or o in r
 
 
+def _location_matches(preference: Optional[str], value: Optional[str]) -> bool:
+    pref, candidate_value = _norm(preference), _norm(value)
+    if not pref or not candidate_value:
+        return False
+    return pref == candidate_value or candidate_value in pref or pref in candidate_value
+
+
+def _location_constrained_employees(
+    employees: list[dict],
+    req: RoleRequirement,
+) -> list[dict]:
+    """Apply explicit location preferences as eligibility filters.
+
+    Location still contributes to the scorecard, but a concrete preference like
+    Pune should not be diluted by strong skill matches from Mumbai, Perth or
+    Vietnam. Match in specificity order: city, then country, then region.
+    """
+    pref = _norm(req.location_preference)
+    if not pref or "remote" in pref or "regional" in pref:
+        return employees
+
+    for field in ("city", "country", "region"):
+        matches = [
+            emp
+            for emp in employees
+            if _location_matches(req.location_preference, emp.get(field))
+        ]
+        if matches:
+            return matches
+    return []
+
+
 # ----------------------------------------------------------------- components
 def score_skills(emp: dict, req: RoleRequirement) -> dict:
     """Skill match weighted toward required skills, with a desired-skill bonus."""
@@ -143,12 +175,12 @@ def score_location(emp: dict, req: RoleRequirement) -> dict:
     city = _norm(emp.get("city"))
     timezone = _norm(emp.get("timezone"))
 
+    if city and city in pref:
+        return {"score": 1.0, "evidence": f"Based in {emp.get('city')}."}
     if country and country in pref:
         return {"score": 1.0, "evidence": f"Based in {emp.get('country')}."}
     if region and region in pref:
         return {"score": 0.8, "evidence": f"In preferred region {emp.get('region')}."}
-    if city and city in pref:
-        return {"score": 0.9, "evidence": f"Based in {emp.get('city')}."}
     if timezone and any(tok and tok in pref for tok in timezone.split("/")):
         return {"score": 0.7, "evidence": f"Timezone overlap ({emp.get('timezone')})."}
     # Remote-friendly roles still get partial credit.
@@ -325,7 +357,15 @@ def rank_candidates(
     snapshot: date,
     limit: int = 25,
 ) -> list[dict]:
-    """Score and rank all employees for a role (best overall first)."""
-    scored = [score_candidate(emp, req, snapshot) for emp in employees]
+    """Score and rank all employees for a role (best overall first).
+
+    Explicit location preferences are hard eligibility filters applied *before*
+    scoring, so a strong skill match in another city can never override a
+    concrete location requirement. If no employee matches the requested
+    city/country/region, the role is left unfilled rather than staffed from
+    elsewhere.
+    """
+    eligible_employees = _location_constrained_employees(employees, req)
+    scored = [score_candidate(emp, req, snapshot) for emp in eligible_employees]
     scored.sort(key=lambda c: c["overall_score"], reverse=True)
     return scored[:limit]
