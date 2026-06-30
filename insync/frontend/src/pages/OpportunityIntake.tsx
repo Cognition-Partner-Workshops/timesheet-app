@@ -1,23 +1,53 @@
 import { useEffect, useState } from "react";
-import { parseRequirement, recommend } from "../api";
-import type { Candidate, Meta, ParsedRequirement, RecommendationResult } from "../types";
+import { getOpportunityExamples, parseRequirement, recommend } from "../api";
+import type {
+  Candidate,
+  IntakeExample,
+  Meta,
+  ParsedRequirement,
+  RecommendationResult,
+} from "../types";
 import RecommendationResults from "./RecommendationResults";
 import CandidateDrawer from "../components/CandidateDrawer";
 import { CHAT_BRIEF_KEY } from "../components/Chatbot";
 import { useAuth } from "../auth";
 import CreateOpportunityForm from "./CreateOpportunityForm";
 
-const EXAMPLES = [
-  "Need 2 Java developers, 1 QA engineer and 1 PM for a banking project in Pune starting in 30 days.",
-  "Looking for a senior data engineer and an AI engineer for a healthcare data platform in Bengaluru in 60 days.",
-  "Need a solution architect and 2 React frontend engineers for a payments programme in Singapore ASAP.",
-  "1 UX designer and 1 business analyst for a retail discovery in Dubai next month.",
+// Safe static fallback shown only if the database-aware examples endpoint is
+// unavailable. Examples 1-3 are demo-safe combinations likely present in the
+// seeded dataset; Example 4 is the intentional "No Strong Internal Match" case.
+const FALLBACK_EXAMPLES: IntakeExample[] = [
+  {
+    label: "Example 1",
+    prompt:
+      "Need 2 Backend Engineers with Java and REST API Design for a Banking project in Pune in 30 days.",
+    expected_result: "valid_match",
+  },
+  {
+    label: "Example 2",
+    prompt:
+      "Need 2 React Frontend Engineers with React and TypeScript for a Payments project in Bengaluru in 60 days.",
+    expected_result: "valid_match",
+  },
+  {
+    label: "Example 3",
+    prompt:
+      "Need 1 Data Engineer with Data Engineering and SQL for a Healthcare project in Hyderabad in 30 days.",
+    expected_result: "valid_match",
+  },
+  {
+    label: "Example 4",
+    prompt:
+      "Need 1 AI Engineer with LLM Integration, Agentic Workflows and OpenAI API for a project in Singapore starting ASAP.",
+    expected_result: "no_strong_internal_match",
+  },
 ];
 
 export default function OpportunityIntake({ meta }: { meta: Meta | null }) {
   const { user } = useAuth();
   const isClient = user?.role === "client_manager";
-  const [text, setText] = useState(EXAMPLES[0]);
+  const [examples, setExamples] = useState<IntakeExample[]>(FALLBACK_EXAMPLES);
+  const [text, setText] = useState(FALLBACK_EXAMPLES[0].prompt);
   const [parsed, setParsed] = useState<ParsedRequirement | null>(null);
   const [result, setResult] = useState<RecommendationResult | null>(null);
   const [parsing, setParsing] = useState(false);
@@ -36,6 +66,21 @@ export default function OpportunityIntake({ meta }: { meta: Meta | null }) {
       setText(brief);
       sessionStorage.removeItem(CHAT_BRIEF_KEY);
     }
+  }, []);
+
+  // Fetch database-aware demo examples so the buttons always return candidates.
+  useEffect(() => {
+    let active = true;
+    getOpportunityExamples()
+      .then((ex) => {
+        if (active && Array.isArray(ex) && ex.length > 0) setExamples(ex);
+      })
+      .catch(() => {
+        /* keep the safe static fallback */
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   async function handleParse() {
@@ -99,9 +144,18 @@ export default function OpportunityIntake({ meta }: { meta: Meta | null }) {
           placeholder="e.g. Need 2 Java developers, 1 QA engineer and 1 PM for a banking project in Pune starting in 30 days."
         />
         <div className="row wrap" style={{ marginTop: 10, gap: 8 }}>
-          {EXAMPLES.map((ex, i) => (
-            <button key={i} className="btn ghost sm" onClick={() => setText(ex)}>
-              Example {i + 1}
+          {examples.map((ex, i) => (
+            <button
+              key={ex.label || i}
+              className="btn ghost sm"
+              title={ex.prompt}
+              onClick={() => {
+                setText(ex.prompt);
+                setParsed(null);
+                setResult(null);
+              }}
+            >
+              {ex.label || `Example ${i + 1}`}
             </button>
           ))}
         </div>

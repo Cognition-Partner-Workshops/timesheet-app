@@ -13,6 +13,7 @@ import type {
   EWARequest,
   Meta,
   OpportunityFormOptions,
+  IntakeExample,
   ParsedRequirement,
   PendingOpportunity,
   PersonDetail,
@@ -137,6 +138,10 @@ export async function recommend(payload: {
 
 export async function getOpportunityFormOptions(): Promise<OpportunityFormOptions> {
   return (await api.get("/api/opportunities/form-options")).data;
+}
+
+export async function getOpportunityExamples(): Promise<IntakeExample[]> {
+  return (await api.get("/api/opportunities/examples")).data;
 }
 
 export async function createOpportunity(

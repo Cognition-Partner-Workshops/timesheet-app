@@ -246,6 +246,12 @@ export interface Assignment {
   } | null;
 }
 
+export interface IntakeExample {
+  label: string;
+  prompt: string;
+  expected_result: "valid_match" | "no_strong_internal_match";
+}
+
 export interface StaffingOption {
   key: string;
   label: string;

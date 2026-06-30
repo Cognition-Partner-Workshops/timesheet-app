@@ -6,6 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
+from .. import examples as examples_module
 from .. import opportunities_store
 from ..auth import ROLE_CLIENT, User
 from ..data_layer import get_store
@@ -13,6 +14,17 @@ from ..rbac import require_roles
 
 
 router = APIRouter(prefix="/api", tags=["opportunities"])
+
+
+@router.get("/opportunities/examples")
+def opportunity_examples() -> list[dict]:
+    """Demo-safe Opportunity Intake examples, validated against live Postgres.
+
+    Examples 1-3 are generated from real available employees so they always
+    return at least one candidate; Example 4 is the intentional capability-gap
+    ("No Strong Internal Match") scenario. Deterministic SQL/logic only.
+    """
+    return examples_module.build_examples()
 
 
 def _jsonable(opp: dict) -> dict:
