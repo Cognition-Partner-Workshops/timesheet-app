@@ -120,7 +120,16 @@ function OptionPanel({
 
             {a.capability_gap ? (
               <div className="card" style={{ background: "var(--navy-700)", padding: 16 }}>
-                <strong>{a.capability_gap.headline}</strong>
+                <div className="spread">
+                  <strong>{a.capability_gap.headline}</strong>
+                  <span className="score-chip" style={{ color: scoreColor(0) }}>
+                    0
+                  </span>
+                </div>
+                <div className="row wrap" style={{ gap: 6, margin: "8px 0 4px" }}>
+                  <Pill kind="amber">Match Score 0</Pill>
+                  <Pill kind="red">Risk · Capability Gap</Pill>
+                </div>
                 <div className="faint" style={{ fontSize: 12.5, margin: "6px 0 10px" }}>
                   {a.capability_gap.summary}
                 </div>

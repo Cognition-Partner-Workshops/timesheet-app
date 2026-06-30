@@ -20,19 +20,19 @@ const FALLBACK_EXAMPLES: IntakeExample[] = [
   {
     label: "Example 1",
     prompt:
-      "Need 2 Backend Engineers with Java and REST API Design for a Banking project in Pune in 30 days.",
+      "Need 1 DevOps Engineer with CI/CD and Kubernetes for a Banking project in Melbourne in 30 days.",
     expected_result: "valid_match",
   },
   {
     label: "Example 2",
     prompt:
-      "Need 2 React Frontend Engineers with React and TypeScript for a Payments project in Bengaluru in 60 days.",
+      "Need 1 Software Engineer with REST API Design for a Payments project in Kuala Lumpur in 30 days.",
     expected_result: "valid_match",
   },
   {
     label: "Example 3",
     prompt:
-      "Need 1 Data Engineer with Data Engineering and SQL for a Healthcare project in Hyderabad in 30 days.",
+      "Need 1 Software Engineer with REST API Design for a Retail project in Perth in 30 days.",
     expected_result: "valid_match",
   },
   {

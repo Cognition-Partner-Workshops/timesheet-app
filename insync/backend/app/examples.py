@@ -1,16 +1,24 @@
 """Database-aware demo examples for the Opportunity Intake screen.
 
-The four "Example" buttons must be reliable for live demos: the first three
-have to return at least one real candidate from the current PostgreSQL data,
-and the fourth must intentionally land in the "No Strong Internal Match"
-capability-gap state.
+The four "Example" buttons must be reliable for live demos:
 
-Everything here is deterministic SQL/Python logic — **no OpenAI**. Each of the
-first three candidate prompts is *self-validated* by running the exact same
-mock parser + recommendation pool the live ``/api/recommend`` flow uses, so a
-prompt is only emitted once it is proven to yield candidates against the
-current data. If anything goes wrong (e.g. Postgres unavailable) we fall back
-to safe static examples chosen to exist in the seeded dataset.
+* Examples 1-3 must return at least one **real, in-location, unbooked** candidate
+  from the current PostgreSQL data, across every staffing strategy tab.
+* Example 4 must intentionally land in the "No Strong Internal Match"
+  capability-gap state.
+
+Everything here is deterministic SQL/Python logic — **no OpenAI**.
+
+Strategy: a small set of *hardcoded, pre-verified* prompts (chosen by inspecting
+the seeded Postgres data) is the primary source. On every request each primary
+prompt is re-validated against the EXACT live recommendation pipeline
+(``ai.mock_parse`` -> ``recommend.build_options``) the "Generate staffing
+options" button uses. A prompt is only emitted when, across all three strategy
+tabs, it returns at least one candidate who is in the requested city, holds the
+required skills, is not booked, and triggered no location fallback or capability
+gap. If a hardcoded prompt ever stops validating (e.g. the data changed), it is
+transparently replaced by regenerating an equivalent valid combination from the
+live data. If Postgres is unavailable we fall back to safe static examples.
 """
 
 from __future__ import annotations
@@ -18,59 +26,20 @@ from __future__ import annotations
 import logging
 from collections import Counter
 from datetime import date
-from typing import Optional
 
-from . import ai, scoring, workflow
+from . import ai, recommend as recommend_engine, workflow
 from .data_layer import get_store
 from .scoring import RoleRequirement
 
 logger = logging.getLogger("insync.examples")
 
-# Candidate roles to try, in priority order. Each phrase contains the role
-# keyword so the deterministic parser maps it back to the right role library
-# entry (which is what actually drives required-skill matching).
-_ROLE_CANDIDATES: list[tuple[str, str]] = [
-    ("backend", "Backend Engineers"),
-    ("react", "React Frontend Engineers"),
-    ("data engineer", "Data Engineers"),
-    ("qa", "QA Engineers"),
-    ("devops", "DevOps Engineers"),
-    ("business analyst", "Business Analysts"),
-    ("project manager", "Project Managers"),
-    ("solution architect", "Solution Architects"),
-    ("cloud engineer", "Cloud Engineers"),
-    ("full stack", "Full Stack Engineers"),
-]
-
-# Only cities the deterministic parser can actually detect (its location
-# vocabulary). Using anything outside this set would not parse back to a
-# location and the example would silently behave as "no location".
-_DETECTABLE_LOCATIONS = {loc.lower() for loc in ai.LOCATIONS}
-
-_START_WINDOWS = ["in 30 days", "in 60 days", "starting ASAP"]
-
-# Demo-safe static fallback (used only if Postgres / the store is unavailable).
-_STATIC_FALLBACK: list[dict] = [
-    {
-        "label": "Example 1",
-        "prompt": "Need 2 Backend Engineers with Java and REST API Design for a Banking project in Pune in 30 days.",
-        "expected_result": "valid_match",
-    },
-    {
-        "label": "Example 2",
-        "prompt": "Need 2 React Frontend Engineers with React and TypeScript for a Payments project in Bengaluru in 60 days.",
-        "expected_result": "valid_match",
-    },
-    {
-        "label": "Example 3",
-        "prompt": "Need 1 Data Engineer with Data Engineering and SQL for a Healthcare project in Hyderabad in 30 days.",
-        "expected_result": "valid_match",
-    },
-    {
-        "label": "Example 4",
-        "prompt": "Need 1 AI Engineer with LLM Integration, Agentic Workflows and OpenAI API for a project in Singapore starting ASAP.",
-        "expected_result": "no_strong_internal_match",
-    },
+# Pre-verified, demo-safe prompts. Each was confirmed against the seeded
+# PostgreSQL data to return an in-city, skill-matching, unbooked candidate in
+# every staffing strategy. They are still re-validated live on each request.
+_PRIMARY_PROMPTS: list[str] = [
+    "Need 1 DevOps Engineer with CI/CD and Kubernetes for a Banking project in Melbourne in 30 days.",
+    "Need 1 Software Engineer with REST API Design for a Payments project in Kuala Lumpur in 30 days.",
+    "Need 1 Software Engineer with REST API Design for a Retail project in Perth in 30 days.",
 ]
 
 # Example 4 is intentionally a capability gap: no single employee carries all
@@ -81,8 +50,20 @@ _GAP_PROMPT = (
     "for a project in Singapore starting ASAP."
 )
 
+# Demo-safe static fallback (used only if Postgres / the store is unavailable).
+_STATIC_FALLBACK: list[dict] = [
+    {"label": "Example 1", "prompt": _PRIMARY_PROMPTS[0], "expected_result": "valid_match"},
+    {"label": "Example 2", "prompt": _PRIMARY_PROMPTS[1], "expected_result": "valid_match"},
+    {"label": "Example 3", "prompt": _PRIMARY_PROMPTS[2], "expected_result": "valid_match"},
+    {"label": "Example 4", "prompt": _GAP_PROMPT, "expected_result": "no_strong_internal_match"},
+]
 
-def _requirements(parsed: dict, snapshot: date) -> list[RoleRequirement]:
+_DETECTABLE_LOCATIONS = {loc.lower() for loc in ai.LOCATIONS}
+
+
+def _requirements(prompt: str, snapshot: date) -> list[RoleRequirement]:
+    """Parse a prompt exactly as the live /api/parse + /api/recommend flow does."""
+    parsed = ai.mock_parse(prompt, snapshot)
     reqs: list[RoleRequirement] = []
     for r in parsed["roles"]:
         reqs.append(
@@ -101,110 +82,185 @@ def _requirements(parsed: dict, snapshot: date) -> list[RoleRequirement]:
     return reqs
 
 
-def _evaluate(prompt: str, available: list[dict], snapshot: date) -> tuple[int, bool]:
-    """Run the real parse->pool flow; return (candidate_count, no_skill_match)."""
-    parsed = ai.mock_parse(prompt, snapshot)
-    total = 0
-    gap = False
-    for req in _requirements(parsed, snapshot):
-        pool = scoring.build_role_pool(
-            available, req, snapshot, min_candidates=1, limit=25
-        )
-        total += len(pool["candidates"])
-        gap = gap or pool["no_skill_match"]
-    return total, gap
+def _is_booked_status(status: str | None) -> bool:
+    """A descriptive 'Booked - ...' status that should not be shown as available.
+
+    'Booked - Partial Capacity' / 'Booked - Release Planned' are still partially
+    available supply, but for demo clarity we only accept genuinely unbooked
+    candidates ('No Active Booking') so the recommended people never read as
+    booked.
+    """
+    return (status or "").strip().lower().startswith("booked")
 
 
-def _domain_for(city_emps: list[dict]) -> str:
+def _validate_valid_match(prompt: str, available: list[dict], snapshot: date) -> bool:
+    """True only if the prompt yields a clean in-location, unbooked match.
+
+    Runs the EXACT live pipeline and requires, for every strategy tab:
+      * at least one candidate, all in the requested city (no fallback),
+      * no off-city candidates,
+      * every shown candidate genuinely unbooked,
+      * no capability gap.
+    """
+    reqs = _requirements(prompt, snapshot)
+    if not reqs:
+        return False
+    req = reqs[0]
+    city = (req.location_preference or "").strip().lower()
+    if not city:
+        return False
+    result = recommend_engine.build_options(available, reqs, snapshot)
+    for option in result["options"]:
+        assignment = option["assignments"][0]
+        if assignment.get("no_strong_match") or assignment.get("capability_gap"):
+            return False
+        if assignment.get("location_level") != "city":
+            return False
+        cands = assignment["candidates"]
+        if not cands:
+            return False
+        for c in cands:
+            if (c.get("city") or "").strip().lower() != city:
+                return False
+            if _is_booked_status(c.get("ewa_status")):
+                return False
+    return True
+
+
+def _validate_gap(prompt: str, available: list[dict], snapshot: date) -> bool:
+    """True if the prompt lands in the capability-gap / no-strong-match state."""
+    reqs = _requirements(prompt, snapshot)
+    if not reqs:
+        return False
+    result = recommend_engine.build_options(available, reqs, snapshot)
+    return all(
+        option["assignments"][0].get("no_strong_match")
+        or option["assignments"][0].get("capability_gap")
+        for option in result["options"]
+    )
+
+
+def _distinct_roles() -> list[tuple[str, dict]]:
+    seen: set[str] = set()
+    out: list[tuple[str, dict]] = []
+    for keyword, lib in ai.ROLE_LIBRARY.items():
+        if lib["role_name"] in seen:
+            continue
+        seen.add(lib["role_name"])
+        out.append((keyword, lib))
+    return out
+
+
+def _domain_for(emps: list[dict]) -> str:
     counts = Counter(
-        e.get("primary_domain")
-        for e in city_emps
-        if e.get("primary_domain") in ai.DOMAINS
+        e.get("primary_domain") for e in emps if e.get("primary_domain") in ai.DOMAINS
     )
-    if counts:
-        return counts.most_common(1)[0][0]
-    return "Banking"
+    return counts.most_common(1)[0][0] if counts else "Banking"
 
 
-def _build_prompt(count: int, phrase: str, skills: list[str], domain: str, city: str, window: str) -> str:
+def _build_prompt(role_name: str, skills: list[str], domain: str, city: str, window: str) -> str:
     skill_text = " and ".join(skills) if skills else "the required skills"
-    role_phrase = phrase[:-1] if count == 1 and phrase.endswith("s") else phrase
     return (
-        f"Need {count} {role_phrase} with {skill_text} for a {domain} project "
-        f"in {city} {window}."
+        f"Need 1 {role_name} with {skill_text} for a {domain} project in {city} {window}."
     )
+
+
+def _regenerate(
+    available: list[dict],
+    snapshot: date,
+    used_roles: set[str],
+    used_cities: set[str],
+) -> dict | None:
+    """Find a fresh, fully-validated valid-match prompt from live data."""
+    by_city: dict[str, list[dict]] = {}
+    for e in available:
+        city = (e.get("city") or "").strip()
+        if city and city.lower() in _DETECTABLE_LOCATIONS:
+            by_city.setdefault(city, []).append(e)
+    cities = sorted(by_city, key=lambda c: -len(by_city[c]))
+
+    for keyword, lib in _distinct_roles():
+        role_name = lib["role_name"]
+        if role_name in used_roles:
+            continue
+        skills = list(lib["required_skills"])
+        display_skills = skills[:2] if len(skills) >= 2 else skills
+        for city in cities:
+            if city in used_cities:
+                continue
+            domain = _domain_for(by_city[city])
+            prompt = _build_prompt(role_name, display_skills, domain, city, "in 30 days")
+            # The parser must round-trip to this role + city, and validate clean.
+            reqs = _requirements(prompt, snapshot)
+            if not reqs or reqs[0].role_name != role_name:
+                continue
+            if (reqs[0].location_preference or "").strip().lower() != city.lower():
+                continue
+            if _validate_valid_match(prompt, available, snapshot):
+                return {"prompt": prompt, "role_name": role_name, "city": city}
+    return None
 
 
 def build_examples() -> list[dict]:
-    """Return four demo examples (3 valid-match, 1 capability-gap)."""
+    """Return four demo examples (3 valid-match, 1 capability-gap).
+
+    Hardcoded prompts are re-validated live; any that no longer hold are
+    transparently regenerated from the current PostgreSQL data.
+    """
     try:
         store = get_store()
         snapshot = store.snapshot_date
         booked = workflow.booked_employee_codes()
-        available = [
-            e for e in store.all_employees() if e["employee_id"] not in booked
-        ]
+        available = [e for e in store.all_employees() if e["employee_id"] not in booked]
         if not available:
             return _STATIC_FALLBACK
-
-        # Group available employees by detectable city.
-        by_city: dict[str, list[dict]] = {}
-        for e in available:
-            city = (e.get("city") or "").strip()
-            if city and city.lower() in _DETECTABLE_LOCATIONS:
-                by_city.setdefault(city, []).append(e)
-        cities = sorted(by_city, key=lambda c: -len(by_city[c]))
 
         valid: list[dict] = []
         used_roles: set[str] = set()
         used_cities: set[str] = set()
 
-        for keyword, phrase in _ROLE_CANDIDATES:
+        for prompt in _PRIMARY_PROMPTS:
             if len(valid) >= 3:
                 break
-            lib = ai.ROLE_LIBRARY[keyword]
-            role_name = lib["role_name"]
-            if role_name in used_roles:
+            reqs = _requirements(prompt, snapshot)
+            if not reqs:
                 continue
-            skills = list(lib["required_skills"])[:2]
-            for city in cities:
-                if city in used_cities:
-                    continue
-                window = _START_WINDOWS[len(valid) % len(_START_WINDOWS)]
-                domain = _domain_for(by_city[city])
-                # Probe with count=2 (count does not change pool membership).
-                probe = _build_prompt(2, phrase, skills, domain, city, window)
-                count_candidates, gap = _evaluate(probe, available, snapshot)
-                if count_candidates >= 1 and not gap:
-                    count = min(count_candidates, 2)
-                    prompt = _build_prompt(count, phrase, skills, domain, city, window)
-                    valid.append(
-                        {
-                            "label": f"Example {len(valid) + 1}",
-                            "prompt": prompt,
-                            "expected_result": "valid_match",
-                        }
-                    )
-                    used_roles.add(role_name)
-                    used_cities.add(city)
-                    break
+            role_name = reqs[0].role_name
+            city = (reqs[0].location_preference or "").strip()
+            if role_name in used_roles or city in used_cities:
+                continue
+            if _validate_valid_match(prompt, available, snapshot):
+                valid.append({"prompt": prompt, "expected_result": "valid_match"})
+                used_roles.add(role_name)
+                used_cities.add(city)
 
-        # If the data could not yield three distinct valid combos, top up from
-        # the validated static fallback so the UI always shows four buttons.
+        # Replace any primaries that failed validation (or duplicates) by
+        # regenerating equivalent valid combinations from the live data.
+        while len(valid) < 3:
+            fresh = _regenerate(available, snapshot, used_roles, used_cities)
+            if not fresh:
+                break
+            valid.append({"prompt": fresh["prompt"], "expected_result": "valid_match"})
+            used_roles.add(fresh["role_name"])
+            used_cities.add(fresh["city"])
+
+        # Last-resort top-up so the UI always shows three valid buttons.
         if len(valid) < 3:
             for fb in _STATIC_FALLBACK[:3]:
                 if len(valid) >= 3:
                     break
-                valid.append({**fb, "label": f"Example {len(valid) + 1}"})
+                if any(v["prompt"] == fb["prompt"] for v in valid):
+                    continue
+                valid.append({"prompt": fb["prompt"], "expected_result": "valid_match"})
 
-        valid.append(
-            {
-                "label": "Example 4",
-                "prompt": _GAP_PROMPT,
-                "expected_result": "no_strong_internal_match",
-            }
+        examples = [
+            {"label": f"Example {i + 1}", "prompt": v["prompt"], "expected_result": v["expected_result"]}
+            for i, v in enumerate(valid[:3])
+        ]
+        examples.append(
+            {"label": "Example 4", "prompt": _GAP_PROMPT, "expected_result": "no_strong_internal_match"}
         )
-        return valid
+        return examples
     except Exception as exc:  # pragma: no cover - defensive demo fallback
         logger.warning("example generation failed, using static fallback: %s", exc)
         return _STATIC_FALLBACK
