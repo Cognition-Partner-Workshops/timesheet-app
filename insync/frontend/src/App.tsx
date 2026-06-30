@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { getMeta } from "./api";
 import type { Meta } from "./types";
@@ -16,6 +16,27 @@ import Chatbot from "./components/Chatbot";
 import NotificationBell from "./components/NotificationBell";
 import { BrandMark } from "./components/BrandMark";
 import { Spinner } from "./ui";
+import {
+  LayoutDashboard,
+  Search,
+  PlusCircle,
+  CheckCircle2,
+  Briefcase,
+  Settings as SettingsIcon,
+  Sun,
+  Moon,
+  LogOut,
+  ChevronsLeft,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+
+const NAV_ICONS: Record<string, LucideIcon> = {
+  "/dashboard": LayoutDashboard,
+  "/work": Briefcase,
+  "/people": Search,
+  "/intake": PlusCircle,
+  "/ewa": CheckCircle2,
+};
 
 function ThemeToggle() {
   const { theme, toggle } = useTheme();
@@ -26,8 +47,58 @@ function ThemeToggle() {
       aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
       title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
     >
-      {theme === "dark" ? "☀️" : "🌙"}
+      {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
     </button>
+  );
+}
+
+function SidebarSettings({ collapsed }: { collapsed: boolean }) {
+  const { theme, toggle } = useTheme();
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  return (
+    <div className="sidebar-settings" ref={ref}>
+      <button
+        className={`nav-link ${open ? "active" : ""}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title="Settings"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className="nav-icon"><SettingsIcon size={18} /></span>
+        {!collapsed && <span className="nav-label">Settings</span>}
+      </button>
+      {open && (
+        <div className="settings-pop card" role="menu">
+          <button className="settings-item" role="menuitem" onClick={toggle}>
+            {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
+            Switch to {theme === "dark" ? "light" : "dark"} mode
+          </button>
+          <button
+            className="settings-item"
+            role="menuitem"
+            onClick={() => {
+              logout();
+              navigate("/signin", { replace: true });
+            }}
+          >
+            <LogOut size={15} /> Log out
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -73,6 +144,7 @@ function UserMenu() {
 function Shell() {
   const { user } = useAuth();
   const [meta, setMeta] = useState<Meta | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     getMeta().then(setMeta).catch(() => setMeta(null));
@@ -82,34 +154,55 @@ function Shell() {
   const nav = ROLE_NAV[user.role];
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${collapsed ? "collapsed" : ""}`}>
       <aside className="sidebar">
         <BrandMark />
-        {nav.map((n) => (
-          <NavLink
-            key={n.to}
-            to={n.to}
-            className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
-          >
-            <span className="nav-icon">{n.icon}</span>
-            {n.label}
-          </NavLink>
-        ))}
+        <nav className="sidebar-nav">
+          {nav.map((n) => {
+            const Icon = NAV_ICONS[n.to] ?? LayoutDashboard;
+            return (
+              <NavLink
+                key={n.to}
+                to={n.to}
+                className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
+                title={n.label}
+              >
+                <span className="nav-icon"><Icon size={18} /></span>
+                <span className="nav-label">{n.label}</span>
+              </NavLink>
+            );
+          })}
+        </nav>
         <div className="sidebar-foot">
-          Right People. Right Opportunity.
-          <br />
-          AI surfaces evidence — people decide.
-          <br />
-          <br />
-          {meta && (
-            <>
-              Data snapshot: {meta.snapshot_date}
+          {!collapsed && (
+            <div className="sidebar-tag">
+              Right People. Right Opportunity.
               <br />
-              AI: {meta.ai_enabled ? `live (${meta.ai_provider})` : "mock mode"}
-              <br />
-              Retrieval: {meta.retrieval_enabled ? "pgvector" : "fallback"}
-            </>
+              AI surfaces evidence — people decide.
+              {meta && (
+                <>
+                  <br />
+                  <br />
+                  Data snapshot: {meta.snapshot_date}
+                  <br />
+                  AI: {meta.ai_enabled ? `live (${meta.ai_provider})` : "mock mode"}
+                  <br />
+                  Retrieval: {meta.retrieval_enabled ? "pgvector" : "fallback"}
+                </>
+              )}
+            </div>
           )}
+          <div className="sidebar-foot-row">
+            <SidebarSettings collapsed={collapsed} />
+            <button
+              className="collapse-btn"
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              onClick={() => setCollapsed((c) => !c)}
+            >
+              <ChevronsLeft size={18} />
+            </button>
+          </div>
         </div>
       </aside>
 
