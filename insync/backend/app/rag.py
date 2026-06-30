@@ -120,6 +120,47 @@ def retrieval_enabled() -> bool:
     return _pg_available()
 
 
+def semantic_scores_for_tokens(
+    query: str,
+    employee_tokens: list[str],
+    top_k: int = 50,
+) -> dict[str, float]:
+    """pgvector similarity restricted to a pre-filtered candidate pool.
+
+    Per the hybrid retrieval architecture, semantic search must run **only**
+    against the SQL-filtered candidate pool, never the whole workforce. We embed
+    the role/skill/domain query once and rank the embedding documents whose
+    ``employee_token`` is in ``employee_tokens``. Returns ``{token: best_score}``.
+    Degrades to an empty dict when pgvector is unavailable.
+    """
+    tokens = [t for t in employee_tokens if t]
+    if not tokens or not _pg_available():
+        return {}
+    conn = _connect()
+    if conn is None:
+        return {}
+    try:
+        qvec = _vector_literal(embed_text(query))
+        sql = """
+            SELECT d.metadata->>'employee_token' AS token,
+                   MAX(1 - (e.embedding <=> %s::vector)) AS score
+            FROM retrieval_embeddings e
+            JOIN rag_documents d ON d.document_id = e.document_id
+            WHERE d.metadata->>'employee_token' = ANY(%s)
+            GROUP BY d.metadata->>'employee_token'
+            ORDER BY score DESC
+            LIMIT %s;
+        """
+        with conn.cursor() as cur:
+            cur.execute(sql, [qvec, tokens, top_k])
+            return {row[0]: float(row[1]) for row in cur.fetchall() if row[0]}
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("pgvector subset retrieval failed: %s", exc)
+        return {}
+    finally:
+        conn.close()
+
+
 def retrieve(
     query: str,
     top_k: int = 6,

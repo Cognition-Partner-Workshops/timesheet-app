@@ -334,7 +334,8 @@ class DataStore:
 
     def _load_employees(self, cur, cipher) -> None:
         cur.execute(
-            "SELECT employee_code, employee_name_encrypted, raw_payload "
+            "SELECT employee_code, employee_token, employee_status, "
+            "employee_name_encrypted, raw_payload "
             "FROM employees ORDER BY employee_code;"
         )
         for row in cur.fetchall():
@@ -345,7 +346,12 @@ class DataStore:
             name = self._decrypt_name(cipher, row["employee_name_encrypted"]) or _clean(
                 payload.get("Employee_Name")
             )
-            self._employees[emp] = self._build_employee(emp, name, payload)
+            built = self._build_employee(emp, name, payload)
+            built["employee_token"] = _clean(row["employee_token"])
+            built["status"] = _clean(row["employee_status"]) or _clean(
+                payload.get("EmployeeStatus")
+            )
+            self._employees[emp] = built
 
     @staticmethod
     def _decrypt_name(cipher, token: Any) -> Optional[str]:

@@ -104,8 +104,36 @@ function OptionPanel({
               </div>
             </div>
 
+            {a.location_fallback && a.location_fallback_notice && (
+              <div
+                className="pill amber"
+                style={{ display: "block", padding: "8px 12px", marginTop: 8, fontSize: 12.5 }}
+              >
+                ⤢ {a.location_fallback_notice}
+                {typeof a.location_penalty === "number" && a.location_penalty > 0 && (
+                  <> (location penalty +{a.location_penalty} applied to risk)</>
+                )}
+              </div>
+            )}
+
             <div className="divider" />
 
+            {a.capability_gap ? (
+              <div className="card" style={{ background: "var(--navy-700)", padding: 16 }}>
+                <strong>{a.capability_gap.headline}</strong>
+                <div className="faint" style={{ fontSize: 12.5, margin: "6px 0 10px" }}>
+                  {a.capability_gap.summary}
+                </div>
+                <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 4 }}>
+                  Suggested next actions
+                </div>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5 }}>
+                  {a.capability_gap.suggested_next_actions.map((s) => (
+                    <li key={s}>{s}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
             <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
               {a.candidates.map((c) => (
                 <div
@@ -134,6 +162,19 @@ function OptionPanel({
                       {c.availability_category}
                     </Pill>
                     <Pill kind={confidenceClass(c.confidence)}>{c.confidence}</Pill>
+                    {typeof c.risk_score === "number" && (
+                      <Pill
+                        kind={
+                          c.risk_level === "High"
+                            ? "red"
+                            : c.risk_level === "Medium"
+                            ? "amber"
+                            : "green"
+                        }
+                      >
+                        Risk {c.risk_score}
+                      </Pill>
+                    )}
                   </div>
                   <div style={{ marginTop: 8 }}>
                     {c.skill_detail.matched_required.slice(0, 4).map((s) => (
@@ -161,6 +202,7 @@ function OptionPanel({
                 </div>
               )}
             </div>
+            )}
           </div>
         ))}
       </div>

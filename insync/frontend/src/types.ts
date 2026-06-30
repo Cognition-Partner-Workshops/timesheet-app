@@ -204,6 +204,13 @@ export interface Candidate {
   ewa_status: string;
   work_mode: string;
   overall_score: number;
+  match_score?: number;
+  risk_score?: number;
+  risk_level?: string;
+  risk_flags?: string[];
+  semantic_score?: number | null;
+  location_level?: string;
+  location_penalty?: number;
   components: Record<string, number>;
   weighted_contributions: Record<string, number>;
   skill_detail: SkillDetail;
@@ -227,6 +234,16 @@ export interface Assignment {
   candidates: Candidate[];
   unfilled: number;
   unfilled_reason?: string | null;
+  location_level?: string;
+  location_penalty?: number;
+  location_fallback?: boolean;
+  location_fallback_notice?: string | null;
+  no_strong_match?: boolean;
+  capability_gap?: {
+    headline: string;
+    summary: string;
+    suggested_next_actions: string[];
+  } | null;
 }
 
 export interface StaffingOption {

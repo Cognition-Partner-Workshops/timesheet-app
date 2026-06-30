@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Optional
+from typing import Callable, Optional
 
 from . import availability
 
@@ -102,6 +102,47 @@ def _location_constrained_employees(
         if matches:
             return matches
     return []
+
+
+# Progressive location expansion: (level, risk penalty, location component score).
+# City is the exact match (no penalty); each fallback widens the search and adds
+# an explainable location penalty that feeds the Risk Score, never the selection.
+LOCATION_LEVELS: list[tuple[str, int, float]] = [
+    ("city", 0, 1.0),
+    ("country", 5, 0.85),
+    ("region", 10, 0.7),
+    ("remote", 20, 0.5),
+    ("global", 30, 0.3),
+]
+_LEVEL_PENALTY = {lvl: pen for lvl, pen, _ in LOCATION_LEVELS}
+_LEVEL_SCORE = {lvl: score for lvl, _, score in LOCATION_LEVELS}
+_LEVEL_LABEL = {
+    "city": "city",
+    "country": "country",
+    "region": "region",
+    "remote": "remote-eligible workforce",
+    "global": "global workforce",
+}
+
+
+def _is_active(emp: dict) -> bool:
+    """Hard business filter: only ACTIVE employees are eligible."""
+    status = _norm(emp.get("status"))
+    return status in ("", "active")
+
+
+def _emp_matches_location(emp: dict, req: RoleRequirement, level: str) -> bool:
+    if level == "city":
+        return _location_matches(req.location_preference, emp.get("city"))
+    if level == "country":
+        return _location_matches(req.location_preference, emp.get("country"))
+    if level == "region":
+        return _location_matches(req.location_preference, emp.get("region"))
+    if level == "remote":
+        return _norm(emp.get("work_mode")) in ("remote", "hybrid")
+    if level == "global":
+        return True
+    return False
 
 
 def _has_required_skills(emp: dict, req: RoleRequirement) -> bool:
@@ -273,15 +314,47 @@ def score_project_history(emp: dict, req: RoleRequirement) -> dict:
     return {"score": round(best, 4), "evidence": best_evidence}
 
 
+def _location_by_level(emp: dict, level: Optional[str]) -> dict:
+    """Location component derived from the resolved progressive-expansion level."""
+    if not level or level in ("any",):
+        return {"score": _LEVEL_SCORE.get("city", 1.0), "evidence": "No location constraint.", "level": level or "any"}
+    score = _LEVEL_SCORE.get(level, 0.3)
+    if level == "city":
+        evidence = f"Based in {emp.get('city')}."
+    elif level == "country":
+        evidence = f"Based in {emp.get('country')}."
+    elif level == "region":
+        evidence = f"In region {emp.get('region')}."
+    elif level == "remote":
+        evidence = f"{emp.get('work_mode') or 'Remote'} delivery (location expanded)."
+    else:
+        evidence = f"Located in {emp.get('country')} (global fallback)."
+    return {"score": score, "evidence": evidence, "level": level}
+
+
 # ------------------------------------------------------------------- compose
-def score_candidate(emp: dict, req: RoleRequirement, snapshot: date) -> dict:
-    """Produce the full weighted scorecard for one employee against one role."""
+def score_candidate(
+    emp: dict,
+    req: RoleRequirement,
+    snapshot: date,
+    *,
+    location_level: Optional[str] = None,
+    location_penalty: int = 0,
+    semantic_score: Optional[float] = None,
+) -> dict:
+    """Produce the full weighted scorecard for one employee against one role.
+
+    ``location_level`` (city/country/region/remote/global) comes from the
+    progressive-expansion stage so the Match Score and the independent Risk
+    Score both reflect *how* the candidate's location was matched. When omitted
+    the legacy soft location scoring is used.
+    """
     required_start = req.start_date or snapshot
 
     skills = score_skills(emp, req)
     avail = availability.availability_fit(emp, required_start, req.fte_required, snapshot)
     domain = score_domain(emp, req)
-    location = score_location(emp, req)
+    location = _location_by_level(emp, location_level) if location_level else score_location(emp, req)
     grade = score_grade(emp, req)
     history = score_project_history(emp, req)
 
@@ -298,6 +371,9 @@ def score_candidate(emp: dict, req: RoleRequirement, snapshot: date) -> dict:
 
     confidence = _confidence(overall_100, emp, avail, skills)
     risks = _risks(emp, avail, skills, location, grade)
+    risk = _risk_assessment(
+        emp, avail, skills, grade, location_level, location_penalty
+    )
     next_actions = _next_actions(emp, avail, skills)
 
     return {
@@ -314,6 +390,7 @@ def score_candidate(emp: dict, req: RoleRequirement, snapshot: date) -> dict:
         "ewa_status": emp.get("ewa_status"),
         "work_mode": emp.get("work_mode"),
         "overall_score": overall_100,
+        "match_score": overall_100,
         "components": {k: round(v * 100, 1) for k, v in components.items()},
         "weighted_contributions": {
             k: round(components[k] * WEIGHTS[k] * 100, 1) for k in WEIGHTS
@@ -322,12 +399,60 @@ def score_candidate(emp: dict, req: RoleRequirement, snapshot: date) -> dict:
         "availability_detail": avail,
         "domain_detail": domain,
         "location_detail": location,
+        "location_level": location_level or "any",
+        "location_penalty": location_penalty,
         "grade_detail": grade,
         "project_history_detail": history,
         "confidence": confidence,
         "risks": risks,
+        "risk_score": risk["risk_score"],
+        "risk_level": risk["risk_level"],
+        "risk_flags": risk["risk_flags"],
+        "semantic_score": round(semantic_score, 4) if semantic_score is not None else None,
         "next_actions": next_actions,
     }
+
+
+def _risk_assessment(
+    emp: dict,
+    avail: dict,
+    skills: dict,
+    grade: dict,
+    location_level: Optional[str],
+    location_penalty: int,
+) -> dict:
+    """Risk Score computed independently from the Match Score (0=low .. 100=high)."""
+    score = 0.0
+    flags: list[str] = []
+
+    if skills["missing_required"]:
+        score += 25
+        flags.append("Missing required skills: " + ", ".join(skills["missing_required"]))
+    if availability.is_booked(emp):
+        score += 25
+        flags.append("Currently booked / recently allocated.")
+    if not avail["covers_start"]:
+        score += 30
+        flags.append("Availability gap at the requested start date.")
+    elif avail["days_late"] > 0:
+        score += min(avail["days_late"] * 0.2, 10)
+    if location_penalty:
+        score += location_penalty
+        flags.append(f"Location expanded to {_LEVEL_LABEL.get(location_level, location_level)}.")
+    if _norm(emp.get("availability_category")) == "partial capacity":
+        score += 8
+        flags.append("Only partial capacity available.")
+    bench = emp.get("bench") or {}
+    if _norm(bench.get("bench_risk")) == "high":
+        score += 8
+        flags.append("High bench risk.")
+    if grade["score"] < 0.5:
+        score += 8
+        flags.append("Seniority below the preferred grade.")
+
+    score = round(min(score, 100.0), 1)
+    level = "High" if score >= 50 else "Medium" if score >= 20 else "Low"
+    return {"risk_score": score, "risk_level": level, "risk_flags": flags}
 
 
 def _confidence(overall: float, emp: dict, avail: dict, skills: dict) -> str:
@@ -380,22 +505,97 @@ def _next_actions(emp: dict, avail: dict, skills: dict) -> list[str]:
     return actions
 
 
+def _semantic_query(req: RoleRequirement) -> str:
+    """Embedding query text built from the role, required skills and domain."""
+    parts = [req.role_name or ""]
+    parts.extend(req.required_skills)
+    parts.extend(req.desired_skills)
+    if req.domain:
+        parts.append(req.domain)
+    return " ".join(p for p in parts if p)
+
+
+def build_role_pool(
+    employees: list[dict],
+    req: RoleRequirement,
+    snapshot: date,
+    *,
+    min_candidates: int = 1,
+    semantic_fn: Optional["Callable[[str, list[str]], dict[str, float]]"] = None,
+    limit: int = 25,
+) -> dict:
+    """Hybrid retrieval pool for one role, following the enterprise pipeline.
+
+    1. Hard business filters (SQL-equivalent): ACTIVE employees that possess every
+       required skill. (EWA-booked people are removed upstream by the router.)
+    2. Progressive location expansion: city -> country -> region -> remote ->
+       global. Expansion only triggers when a level yields fewer than
+       ``min_candidates``, so a concrete city with matching people is never
+       diluted by other locations. Each fallback adds an explainable penalty.
+    3. ``semantic_scores`` (pgvector similarity computed over *this filtered pool
+       only*) is attached and used as a tertiary ranking signal.
+
+    Returns the ranked candidates plus expansion metadata for the UI.
+    """
+    base = [e for e in employees if _is_active(e) and _has_required_skills(e, req)]
+
+    pref = _norm(req.location_preference)
+    fallback = False
+    if not pref or "remote" in pref or "regional" in pref:
+        pool, level, penalty = base, ("remote" if pref else "any"), 0
+    else:
+        pool, level, penalty = [], "none", 0
+        for idx, (lvl, pen, _score) in enumerate(LOCATION_LEVELS):
+            matched = [e for e in base if _emp_matches_location(e, req, lvl)]
+            if len(matched) >= max(min_candidates, 1):
+                pool, level, penalty, fallback = matched, lvl, pen, idx > 0
+                break
+
+    # pgvector semantic retrieval restricted to the filtered candidate pool only.
+    semantic_scores: dict[str, float] = {}
+    if semantic_fn and pool:
+        tokens = [e.get("employee_token") for e in pool if e.get("employee_token")]
+        try:
+            semantic_scores = semantic_fn(_semantic_query(req), tokens) or {}
+        except Exception:  # pragma: no cover - defensive, never break ranking
+            semantic_scores = {}
+
+    scored = [
+        score_candidate(
+            emp,
+            req,
+            snapshot,
+            location_level=level,
+            location_penalty=penalty,
+            semantic_score=semantic_scores.get(emp.get("employee_token")),
+        )
+        for emp in pool
+    ]
+    # Final ranking: Match Score (desc) -> Risk Score (asc) -> semantic (desc).
+    scored.sort(
+        key=lambda c: (
+            -c["overall_score"],
+            c["risk_score"],
+            -(c["semantic_score"] or 0.0),
+        )
+    )
+
+    return {
+        "candidates": scored[:limit],
+        "location_level": level,
+        "location_penalty": penalty,
+        "fallback": fallback,
+        "no_skill_match": not base,
+        "sql_pool_size": len(base),
+        "located_pool_size": len(pool),
+    }
+
+
 def rank_candidates(
     employees: list[dict],
     req: RoleRequirement,
     snapshot: date,
     limit: int = 25,
 ) -> list[dict]:
-    """Score and rank all eligible employees for a role (best overall first).
-
-    Location preference AND required skills are hard eligibility filters applied
-    *before* scoring: a candidate must be in the requested city/country/region
-    and possess every required skill to be ranked. Strong availability or a
-    great location can never override a missing required skill, and vice versa.
-    If no employee satisfies both constraints the role is left unfilled rather
-    than staffed with unsuited people.
-    """
-    eligible_employees = _eligible_employees(employees, req)
-    scored = [score_candidate(emp, req, snapshot) for emp in eligible_employees]
-    scored.sort(key=lambda c: c["overall_score"], reverse=True)
-    return scored[:limit]
+    """Backward-compatible wrapper returning just the ranked candidate list."""
+    return build_role_pool(employees, req, snapshot, limit=limit)["candidates"]

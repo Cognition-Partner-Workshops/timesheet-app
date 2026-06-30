@@ -14,8 +14,21 @@ from __future__ import annotations
 from datetime import date
 from typing import Callable
 
-from . import scoring
+from . import config, rag, scoring
 from .scoring import RoleRequirement
+
+# Expand the location search only when the current level yields no eligible
+# candidate (configurable). Keeping this at 1 honours the rule that an exact
+# city with matching people is never diluted by other locations.
+_MIN_CANDIDATES = max(getattr(config, "RECOMMEND_MIN_CANDIDATES", 1), 1)
+
+_REGION_LABEL = {
+    "city": "city",
+    "country": "country",
+    "region": "region",
+    "remote": "remote-eligible workforce",
+    "global": "global workforce",
+}
 
 
 def _confidence_rank(conf: str) -> int:
@@ -84,8 +97,24 @@ def build_options(
     # pass the hard location + required-skill gate are returned here.
     role_pools: list[dict] = []
     for req in requirements:
-        ranked = scoring.rank_candidates(employees, req, snapshot, limit=25)
-        role_pools.append({"requirement": req, "candidates": ranked})
+        pool = scoring.build_role_pool(
+            employees,
+            req,
+            snapshot,
+            min_candidates=_MIN_CANDIDATES,
+            semantic_fn=rag.semantic_scores_for_tokens,
+            limit=25,
+        )
+        role_pools.append(
+            {
+                "requirement": req,
+                "candidates": pool["candidates"],
+                "location_level": pool["location_level"],
+                "location_penalty": pool["location_penalty"],
+                "fallback": pool["fallback"],
+                "no_skill_match": pool["no_skill_match"],
+            }
+        )
 
     options = []
     for key, (label, description, sort_fn) in STRATEGIES.items():
@@ -112,7 +141,15 @@ def build_options(
                     "desired_skills": req.desired_skills,
                     "candidates": picks,
                     "unfilled": unfilled,
-                    "unfilled_reason": _unfilled_reason(req) if unfilled else None,
+                    "unfilled_reason": (
+                        _unfilled_reason(req, pool) if unfilled else None
+                    ),
+                    "location_level": pool["location_level"],
+                    "location_penalty": pool["location_penalty"],
+                    "location_fallback": pool["fallback"],
+                    "location_fallback_notice": _fallback_notice(req, pool),
+                    "no_strong_match": pool["no_skill_match"],
+                    "capability_gap": _capability_gap(req, pool),
                 }
             )
 
@@ -147,8 +184,53 @@ def build_options(
     }
 
 
-def _unfilled_reason(req: RoleRequirement) -> str:
+def _fallback_notice(req: RoleRequirement, pool: dict) -> str | None:
+    """UI banner shown when progressive location expansion was triggered."""
+    if not pool.get("fallback"):
+        return None
+    location = (req.location_preference or "").strip()
+    level = pool.get("location_level")
+    sample = next(
+        (c for c in pool.get("candidates", [])), {}
+    )
+    if level == "country":
+        target = sample.get("country") or "the wider country"
+    elif level == "region":
+        target = (sample.get("region") + " region") if sample.get("region") else "the wider region"
+    else:
+        target = f"the {_REGION_LABEL.get(level, level)}"
+    return (
+        f"No suitable candidates found in {location}. "
+        f"Recommendations have been expanded to {target}."
+    )
+
+
+def _capability_gap(req: RoleRequirement, pool: dict) -> dict | None:
+    """Case 3: no employee anywhere has the required skills -> capability gap."""
+    if not pool.get("no_skill_match"):
+        return None
+    skills = ", ".join(s for s in req.required_skills if s)
+    return {
+        "headline": "No Strong Internal Match",
+        "summary": (
+            f"No internal employee currently has the required skill set"
+            + (f" ({skills})" if skills else "")
+            + ". This represents a capability gap rather than an availability gap."
+        ),
+        "suggested_next_actions": [
+            "Consider reskilling or upskilling an adjacent internal employee.",
+            "Consider external sourcing / hiring for this capability.",
+            "Consider remote hiring to widen the candidate pool.",
+        ],
+    }
+
+
+def _unfilled_reason(req: RoleRequirement, pool: dict | None = None) -> str:
     """Honest message when a role cannot be staffed from eligible candidates."""
+    if pool and pool.get("no_skill_match"):
+        gap = _capability_gap(req, pool)
+        if gap:
+            return f"{gap['headline']} — {gap['summary']}"
     location = (req.location_preference or "").strip()
     skills = ", ".join(s for s in req.required_skills if s)
     if location and skills:
