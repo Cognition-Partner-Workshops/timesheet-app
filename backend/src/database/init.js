@@ -1,5 +1,6 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const logger = require('../lib/logger');
 
 let db = null;
 let isClosing = false;
@@ -14,9 +15,11 @@ function getDatabase() {
     db = new sqlite3.Database(':memory:', (err) => {
       if (err) {
         console.error('Error opening database:', err);
+        logger.error({ err }, 'error opening database');
         throw err;
       }
       console.log('Connected to SQLite in-memory database');
+      logger.info('connected to SQLite in-memory database');
     });
   }
   return db;
@@ -73,6 +76,7 @@ async function initializeDatabase() {
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_date ON work_entries (date)`);
 
       console.log('Database tables created successfully');
+      logger.info('database tables created successfully');
       resolve();
     });
   });
@@ -81,13 +85,11 @@ async function initializeDatabase() {
 function closeDatabase() {
   return new Promise((resolve, reject) => {
     if (isClosed) {
-      // Already closed, resolve immediately
       resolve();
       return;
     }
     
     if (isClosing) {
-      // Currently closing, wait for it to complete
       const checkClosed = setInterval(() => {
         if (isClosed) {
           clearInterval(checkClosed);
@@ -98,7 +100,6 @@ function closeDatabase() {
     }
     
     if (!db) {
-      // No database connection, resolve immediately
       resolve();
       return;
     }
@@ -110,8 +111,10 @@ function closeDatabase() {
       db = null;
       if (err) {
         console.error('Error closing database:', err);
+        logger.error({ err }, 'error closing database');
       } else {
         console.log('Database connection closed');
+        logger.info('database connection closed');
       }
       resolve();
     });

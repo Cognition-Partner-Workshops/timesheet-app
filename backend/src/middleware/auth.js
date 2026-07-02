@@ -1,8 +1,10 @@
 const { getDatabase } = require('../database/init');
+const logger = require('../lib/logger');
 
 // Simple email-based authentication middleware
 function authenticateUser(req, res, next) {
   const userEmail = req.headers['x-user-email'];
+  const log = req.log || logger;
   
   if (!userEmail) {
     return res.status(401).json({ error: 'User email required in x-user-email header' });
@@ -19,7 +21,7 @@ function authenticateUser(req, res, next) {
   // Check if user exists, create if not
   db.get('SELECT email FROM users WHERE email = ?', [userEmail], (err, row) => {
     if (err) {
-      console.error('Database error:', err);
+      log.error({ err }, 'database error during authentication');
       return res.status(500).json({ error: 'Internal server error' });
     }
     
@@ -27,7 +29,7 @@ function authenticateUser(req, res, next) {
       // Create new user
       db.run('INSERT INTO users (email) VALUES (?)', [userEmail], (err) => {
         if (err) {
-          console.error('Error creating user:', err);
+          log.error({ err }, 'error creating user');
           return res.status(500).json({ error: 'Failed to create user' });
         }
         

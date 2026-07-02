@@ -2,6 +2,7 @@ const express = require('express');
 const { getDatabase } = require('../database/init');
 const { emailSchema } = require('../validation/schemas');
 const { authenticateUser } = require('../middleware/auth');
+const logger = require('../lib/logger');
 
 const router = express.Router();
 
@@ -15,11 +16,12 @@ router.post('/login', async (req, res, next) => {
 
     const { email } = value;
     const db = getDatabase();
+    const log = req.log || logger;
 
     // Check if user exists
     db.get('SELECT email, created_at FROM users WHERE email = ?', [email], (err, row) => {
       if (err) {
-        console.error('Database error:', err);
+        log.error({ err }, 'database error during login');
         return res.status(500).json({ error: 'Internal server error' });
       }
 
@@ -36,7 +38,7 @@ router.post('/login', async (req, res, next) => {
         // Create new user
         db.run('INSERT INTO users (email) VALUES (?)', [email], function(err) {
           if (err) {
-            console.error('Error creating user:', err);
+            log.error({ err }, 'error creating user during login');
             return res.status(500).json({ error: 'Failed to create user' });
           }
 
@@ -58,10 +60,11 @@ router.post('/login', async (req, res, next) => {
 // Get current user info
 router.get('/me', authenticateUser, (req, res) => {
   const db = getDatabase();
+  const log = req.log || logger;
   
   db.get('SELECT email, created_at FROM users WHERE email = ?', [req.userEmail], (err, row) => {
     if (err) {
-      console.error('Database error:', err);
+      log.error({ err }, 'database error fetching user info');
       return res.status(500).json({ error: 'Internal server error' });
     }
 
