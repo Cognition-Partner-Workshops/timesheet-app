@@ -23,13 +23,13 @@ export function authHeaders(email) {
 
 // Random helpers
 export function randomInt(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+  return Math.floor(Math.random() * (max - min + 1)) + min; // NOSONAR - load test helper, not security-sensitive
 }
 
 export function randomDate() {
   const start = new Date('2024-01-01');
   const end = new Date('2025-12-31');
-  const d = new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
+  const d = new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime())); // NOSONAR - load test helper
   return d.toISOString().split('T')[0];
 }
 
@@ -46,7 +46,7 @@ export function randomDescription() {
     'Client consultation call',
     'Architecture design session',
   ];
-  return tasks[Math.floor(Math.random() * tasks.length)];
+  return tasks[Math.floor(Math.random() * tasks.length)]; // NOSONAR - load test helper
 }
 
 export function randomClientName(suffix) {
@@ -55,5 +55,5 @@ export function randomClientName(suffix) {
     'ByteForce', 'NetPeak Systems', 'CodeCraft LLC', 'PixelPerfect Design',
     'ServerStack', 'AppWave Digital',
   ];
-  return `${names[Math.floor(Math.random() * names.length)]} ${suffix}`;
+  return `${names[Math.floor(Math.random() * names.length)]} ${suffix}`; // NOSONAR - load test helper
 }
