@@ -1,8 +1,8 @@
-const logger = require('../lib/logger');
+const { getLog } = require('../lib/routeHelpers');
 
 function errorHandler(err, req, res, next) {
   const requestId = req.id;
-  const log = req.log || logger;
+  const log = getLog(req);
 
   // Joi validation errors
   if (err.isJoi) {
@@ -25,7 +25,7 @@ function errorHandler(err, req, res, next) {
   // Default error — structured with stack trace
   const status = err.status || 500;
   console.error('Error:', err);
-  log.error({
+  getLog(req).error({
     err,
     requestId,
     statusCode: status,

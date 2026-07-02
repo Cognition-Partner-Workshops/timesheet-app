@@ -5,7 +5,7 @@ const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 const PDFDocument = require('pdfkit');
 const path = require('path');
 const fs = require('fs');
-const logger = require('../lib/logger');
+const { getLog } = require('../lib/routeHelpers');
 
 const router = express.Router();
 
@@ -21,7 +21,6 @@ router.get('/client/:clientId', (req, res) => {
   }
   
   const db = getDatabase();
-  const log = req.log || logger;
   
   // Verify client belongs to user
   db.get(
@@ -29,7 +28,7 @@ router.get('/client/:clientId', (req, res) => {
     [clientId, req.userEmail],
     (err, client) => {
       if (err) {
-        log.error({ err }, 'database error fetching client for report');
+        getLog(req).error({ err }, 'database error fetching client for report');
         return res.status(500).json({ error: 'Internal server error' });
       }
       
@@ -46,7 +45,7 @@ router.get('/client/:clientId', (req, res) => {
         [clientId, req.userEmail],
         (err, workEntries) => {
           if (err) {
-            log.error({ err }, 'database error fetching work entries for report');
+            getLog(req).error({ err }, 'database error fetching work entries for report');
             return res.status(500).json({ error: 'Internal server error' });
           }
           
@@ -74,7 +73,6 @@ router.get('/export/csv/:clientId', (req, res) => {
   }
   
   const db = getDatabase();
-  const log = req.log || logger;
   
   // Verify client belongs to user and get data
   db.get(
@@ -82,7 +80,7 @@ router.get('/export/csv/:clientId', (req, res) => {
     [clientId, req.userEmail],
     (err, client) => {
       if (err) {
-        log.error({ err }, 'database error fetching client for CSV export');
+        getLog(req).error({ err }, 'database error fetching client for CSV export');
         return res.status(500).json({ error: 'Internal server error' });
       }
       
@@ -99,7 +97,7 @@ router.get('/export/csv/:clientId', (req, res) => {
         [clientId, req.userEmail],
         (err, workEntries) => {
           if (err) {
-            log.error({ err }, 'database error fetching work entries for CSV export');
+            getLog(req).error({ err }, 'database error fetching work entries for CSV export');
             return res.status(500).json({ error: 'Internal server error' });
           }
           
@@ -129,18 +127,18 @@ router.get('/export/csv/:clientId', (req, res) => {
               // Send file and clean up
               res.download(tempPath, filename, (err) => {
                 if (err) {
-                  log.error({ err }, 'error sending CSV file');
+                  getLog(req).error({ err }, 'error sending CSV file');
                 }
                 // Clean up temp file
                 fs.unlink(tempPath, (unlinkErr) => {
                   if (unlinkErr) {
-                    log.warn({ err: unlinkErr }, 'error deleting temp CSV file');
+                    getLog(req).warn({ err: unlinkErr }, 'error deleting temp CSV file');
                   }
                 });
               });
             })
             .catch((error) => {
-              log.error({ err: error }, 'error creating CSV');
+              getLog(req).error({ err: error }, 'error creating CSV');
               res.status(500).json({ error: 'Failed to generate CSV report' });
             });
         }
@@ -158,7 +156,6 @@ router.get('/export/pdf/:clientId', (req, res) => {
   }
   
   const db = getDatabase();
-  const log = req.log || logger;
   
   // Verify client belongs to user and get data
   db.get(
@@ -166,7 +163,7 @@ router.get('/export/pdf/:clientId', (req, res) => {
     [clientId, req.userEmail],
     (err, client) => {
       if (err) {
-        log.error({ err }, 'database error fetching client for PDF export');
+        getLog(req).error({ err }, 'database error fetching client for PDF export');
         return res.status(500).json({ error: 'Internal server error' });
       }
       
@@ -183,7 +180,7 @@ router.get('/export/pdf/:clientId', (req, res) => {
         [clientId, req.userEmail],
         (err, workEntries) => {
           if (err) {
-            log.error({ err }, 'database error fetching work entries for PDF export');
+            getLog(req).error({ err }, 'database error fetching work entries for PDF export');
             return res.status(500).json({ error: 'Internal server error' });
           }
           
