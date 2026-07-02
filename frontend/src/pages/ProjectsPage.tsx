@@ -127,6 +127,7 @@ const ProjectsPage: React.FC = () => {
 
   const projects = projectsData?.projects || [];
   const clients: Client[] = clientsData?.clients || [];
+  const isSaving = createMutation.isPending || updateMutation.isPending;
 
   const handleOpen = (project?: Project) => {
     if (project) {
@@ -327,7 +328,7 @@ const ProjectsPage: React.FC = () => {
               required
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={isSaving}
             />
             <TextField
               margin="dense"
@@ -336,7 +337,7 @@ const ProjectsPage: React.FC = () => {
               select
               value={formData.clientId}
               onChange={(e) => setFormData({ ...formData, clientId: e.target.value })}
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={isSaving}
             >
               <MenuItem value="">
                 <em>None</em>
@@ -354,7 +355,7 @@ const ProjectsPage: React.FC = () => {
               select
               value={formData.status}
               onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={isSaving}
             >
               <MenuItem value="active">Active</MenuItem>
               <MenuItem value="completed">Completed</MenuItem>
@@ -367,7 +368,7 @@ const ProjectsPage: React.FC = () => {
               type="date"
               value={formData.startDate}
               onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={isSaving}
               slotProps={{ inputLabel: { shrink: true } }}
             />
             <TextField
@@ -378,23 +379,13 @@ const ProjectsPage: React.FC = () => {
               rows={3}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={isSaving}
             />
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="contained"
-              disabled={createMutation.isPending || updateMutation.isPending}
-            >
-              {createMutation.isPending || updateMutation.isPending ? (
-                <CircularProgress size={24} />
-              ) : (
-                editingProject ? 'Update' : 'Create'
-              )}
+            <Button onClick={handleClose} disabled={isSaving}>Cancel</Button>
+            <Button type="submit" variant="contained" disabled={isSaving}>
+              {isSaving ? <CircularProgress size={24} /> : (editingProject ? 'Update' : 'Create')}
             </Button>
           </DialogActions>
         </form>
