@@ -351,16 +351,19 @@ jobs:
     steps:
       - name: Post quality dashboard comment
         uses: actions/github-script@v7
+        env:
+          FE_DETAILS: ${{ needs.security.outputs.fe_details }}
+          BE_DETAILS: ${{ needs.security.outputs.be_details }}
+          TSC_OUTPUT: ${{ needs.typecheck.outputs.typecheck_output }}
+          ESLINT_OUTPUT: ${{ needs.lint.outputs.frontend_eslint_output }}
         with:
           script: |
-            // Helper to render pass/fail badge
             const badge = (ok) => ok ? '`PASS`' : '`FAIL`';
             const icon  = (ok) => ok ? ':white_check_mark:' : ':x:';
 
             // Gate 1: Lint
             const eslintOk   = '${{ needs.lint.outputs.frontend_eslint }}'   === 'success';
             const prettierOk = '${{ needs.lint.outputs.frontend_prettier }}' === 'success';
-            const lintOk     = eslintOk && prettierOk;
 
             // Gate 2: Tests
             const testsOk = '${{ needs.test.outputs.tests_passed }}' === 'success';
@@ -380,8 +383,8 @@ jobs:
             const feCrit    = '${{ needs.security.outputs.fe_critical }}';
             const beHigh    = '${{ needs.security.outputs.be_high }}';
             const beCrit    = '${{ needs.security.outputs.be_critical }}';
-            const feDetails = `${{ needs.security.outputs.fe_details }}`;
-            const beDetails = `${{ needs.security.outputs.be_details }}`;
+            const feDetails = process.env.FE_DETAILS || '';
+            const beDetails = process.env.BE_DETAILS || '';
 
             // Gate 5: TypeScript
             const tscOk = '${{ needs.typecheck.outputs.typecheck_result }}' === 'success';
@@ -392,7 +395,7 @@ jobs:
             const baseSize  = '${{ needs.bundle-size.outputs.base_size }}';
             const changePct = '${{ needs.bundle-size.outputs.change_pct }}';
 
-            const allOk = lintOk && testsOk && covOk && secOk && tscOk && bundleOk;
+            const allOk = eslintOk && prettierOk && testsOk && covOk && secOk && tscOk && bundleOk;
             const header = allOk
               ? '## :white_check_mark: Quality Pipeline — All Gates Passed'
               : '## :x: Quality Pipeline — Some Gates Failed';
@@ -400,48 +403,46 @@ jobs:
             const formatBytes = (b) => {
               const n = parseInt(b, 10);
               if (isNaN(n)) return 'N/A';
-              if (n < 1024) return `${n} B`;
-              return `${(n / 1024).toFixed(1)} KB`;
+              if (n < 1024) return n + ' B';
+              return (n / 1024).toFixed(1) + ' KB';
             };
 
             let secDetail = '';
             if (!secOk) {
               const parts = [];
-              if (feDetails.trim()) parts.push(`**Frontend:**\n${feDetails}`);
-              if (beDetails.trim()) parts.push(`**Backend:**\n${beDetails}`);
+              if (feDetails.trim()) parts.push('**Frontend:**\n' + feDetails);
+              if (beDetails.trim()) parts.push('**Backend:**\n' + beDetails);
               if (parts.length) {
-                secDetail = `\n<details><summary>Vulnerability details</summary>\n\n${parts.join('\n\n')}\n</details>`;
+                secDetail = '\n<details><summary>Vulnerability details</summary>\n\n' + parts.join('\n\n') + '\n</details>';
               }
             }
 
             let tscDetail = '';
-            const tscOutput = `${{ needs.typecheck.outputs.typecheck_output }}`.trim();
+            const tscOutput = (process.env.TSC_OUTPUT || '').trim();
             if (!tscOk && tscOutput) {
-              tscDetail = `\n<details><summary>Type errors</summary>\n\n\`\`\`\n${tscOutput}\n\`\`\`\n</details>`;
+              tscDetail = '\n<details><summary>Type errors</summary>\n\n```\n' + tscOutput + '\n```\n</details>';
             }
 
             let eslintDetail = '';
-            const eslintOutput = `${{ needs.lint.outputs.frontend_eslint_output }}`.trim();
+            const eslintOutput = (process.env.ESLINT_OUTPUT || '').trim();
             if (!eslintOk && eslintOutput) {
-              eslintDetail = `\n<details><summary>ESLint errors</summary>\n\n\`\`\`\n${eslintOutput}\n\`\`\`\n</details>`;
+              eslintDetail = '\n<details><summary>ESLint errors</summary>\n\n```\n' + eslintOutput + '\n```\n</details>';
             }
 
-            const body = `${header}
+            const rows = [
+              '| Gate | Check | Result | Details |',
+              '|------|-------|--------|---------|',
+              '| 1 | **ESLint** | ' + icon(eslintOk) + ' ' + badge(eslintOk) + ' | Frontend linting |',
+              '| 1 | **Prettier** | ' + icon(prettierOk) + ' ' + badge(prettierOk) + ' | Code formatting |',
+              '| 2 | **Unit Tests** | ' + icon(testsOk) + ' ' + badge(testsOk) + ' | ' + (testsOk ? 'All tests passed' : 'Some tests failed') + ' |',
+              '| 3 | **Coverage >= 80%** | ' + icon(covOk) + ' ' + badge(covOk) + ' | Stmts: ' + covStmts + '% / Branch: ' + covBranch + '% / Funcs: ' + covFuncs + '% / Lines: ' + covLines + '% |',
+              '| 4 | **Security (frontend)** | ' + icon(feAuditOk) + ' ' + badge(feAuditOk) + ' | ' + (feAuditOk ? 'No high/critical CVEs' : feHigh + ' high, ' + feCrit + ' critical') + ' |',
+              '| 4 | **Security (backend)** | ' + icon(beAuditOk) + ' ' + badge(beAuditOk) + ' | ' + (beAuditOk ? 'No high/critical CVEs' : beHigh + ' high, ' + beCrit + ' critical') + ' |',
+              '| 5 | **TypeScript** | ' + icon(tscOk) + ' ' + badge(tscOk) + ' | tsc --noEmit |',
+              '| 6 | **Bundle Size** | ' + icon(bundleOk) + ' ' + badge(bundleOk) + ' | Base: ' + formatBytes(baseSize) + ' -> PR: ' + formatBytes(prSize) + ' (' + changePct + '%) |',
+            ];
 
-            | Gate | Check | Result | Details |
-            |------|-------|--------|---------|
-            | 1 | **ESLint** | ${icon(eslintOk)} ${badge(eslintOk)} | Frontend linting |
-            | 1 | **Prettier** | ${icon(prettierOk)} ${badge(prettierOk)} | Code formatting |
-            | 2 | **Unit Tests** | ${icon(testsOk)} ${badge(testsOk)} | ${testsOk ? 'All tests passed' : 'Some tests failed'} |
-            | 3 | **Coverage ≥ 80%** | ${icon(covOk)} ${badge(covOk)} | Stmts: ${covStmts}% · Branch: ${covBranch}% · Funcs: ${covFuncs}% · Lines: ${covLines}% |
-            | 4 | **Security (frontend)** | ${icon(feAuditOk)} ${badge(feAuditOk)} | ${feAuditOk ? 'No high/critical CVEs' : `${feHigh} high, ${feCrit} critical`} |
-            | 4 | **Security (backend)** | ${icon(beAuditOk)} ${badge(beAuditOk)} | ${beAuditOk ? 'No high/critical CVEs' : `${beHigh} high, ${beCrit} critical`} |
-            | 5 | **TypeScript** | ${icon(tscOk)} ${badge(tscOk)} | tsc --noEmit |
-            | 6 | **Bundle Size** | ${icon(bundleOk)} ${badge(bundleOk)} | Base: ${formatBytes(baseSize)} → PR: ${formatBytes(prSize)} (${changePct}%) |
-            ${eslintDetail}${tscDetail}${secDetail}
-
-            ---
-            <sub>Quality pipeline powered by GitHub Actions · Thresholds defined in <code>QUALITY_GATES.md</code></sub>`;
+            const body = header + '\n\n' + rows.join('\n') + '\n' + eslintDetail + tscDetail + secDetail + '\n\n---\n<sub>Quality pipeline powered by GitHub Actions. Thresholds defined in <code>QUALITY_GATES.md</code></sub>';
 
             // Find and update existing dashboard comment, or create new one
             const marker = 'Quality Pipeline';
