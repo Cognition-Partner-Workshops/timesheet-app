@@ -133,6 +133,12 @@ class ApiClient {
     return response.data;
   }
 
+  // Team workload endpoint
+  async getTeamWorkload() {
+    const response = await this.client.get('/api/team-workload');
+    return response.data;
+  }
+
   // Health check
   async healthCheck() {
     const response = await this.client.get('/health');
