@@ -22,10 +22,10 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting (configurable via RATE_LIMIT_MAX env var; default 100)
+// Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.RATE_LIMIT_MAX !== undefined ? parseInt(process.env.RATE_LIMIT_MAX, 10) : 100,
+  max: 100,
 });
 app.use(limiter);
 

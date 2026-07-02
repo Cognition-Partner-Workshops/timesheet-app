@@ -14,7 +14,7 @@ Load testing was performed using [k6](https://k6.io/) across three scenarios to 
 | **Database** | SQLite (in-memory) |
 | **Load Tool** | k6 v0.57.0 |
 | **Machine** | Single VM, localhost testing |
-| **Rate Limiting** | Disabled for testing (`RATE_LIMIT_MAX=1000000`) |
+| **Rate Limiting** | Temporarily increased to 1,000,000 for testing |
 
 ---
 
@@ -88,7 +88,7 @@ The default `express-rate-limit` configuration limits requests to **100 per 15-m
 
 - **Impact:** Any concurrency above ~2 users will hit the rate limit within seconds
 - **Production Concern:** Shared IP environments (corporate networks, load balancers) will see false rate limiting
-- **Fix Applied:** Made rate limit configurable via `RATE_LIMIT_MAX` environment variable
+- **Recommendation:** Tune the rate limit per-environment or implement per-user (not per-IP) limiting
 
 ### 2. Auth Middleware DB Lookup (Moderate)
 
@@ -169,9 +169,9 @@ The `express-rate-limit` at 100 req/15min is the most impactful constraint in pr
 # Install k6 (if not already installed)
 # See https://grafana.com/docs/k6/latest/set-up/install-k6/
 
-# Start the backend with rate limiting disabled
+# Start the backend (temporarily increase rate limit in server.js for load testing)
 cd backend
-RATE_LIMIT_MAX=1000000 LOG_LEVEL=silent node src/server.js &
+LOG_LEVEL=silent node src/server.js &
 
 # Run individual scenarios
 k6 run -e BASE_URL=http://localhost:3001 load-tests/scenario-workflow.js
@@ -195,6 +195,6 @@ k6 run -e BASE_URL=http://localhost:3001 load-tests/scenario-breakpoint.js
 - `load-tests/.gitignore` -- Exclude test results from VCS
 
 ### Modified Files
-- `backend/src/server.js` -- Configurable rate limiting and conditional logging
+- `backend/src/server.js` -- Conditional logging
 - `backend/src/middleware/auth.js` -- In-memory user cache for auth middleware
 - `backend/src/database/init.js` -- Added compound index for work_entries queries
