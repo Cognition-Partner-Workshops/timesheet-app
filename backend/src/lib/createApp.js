@@ -117,4 +117,22 @@ function createApp(options = {}) {
   return app;
 }
 
-module.exports = { createApp, logger };
+async function startServer(app, options = {}) {
+  const { initializeDatabase } = require('../database/init');
+  const port = options.port || process.env.PORT || 3001;
+  const host = options.host || undefined;
+  const extraLogFields = options.extraLogFields || {};
+
+  try {
+    await initializeDatabase();
+    const listenArgs = host ? [port, host] : [port];
+    app.listen(...listenArgs, () => {
+      logger.info({ port, ...extraLogFields }, 'server started');
+    });
+  } catch (error) {
+    logger.fatal({ err: error }, 'failed to start server');
+    process.exit(1);
+  }
+}
+
+module.exports = { createApp, startServer, logger };
