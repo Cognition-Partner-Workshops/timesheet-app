@@ -1,0 +1,23 @@
+{
+  "name": "timesheet-app",
+  "version": "1.0.0",
+  "description": "A full-stack web application for tracking and reporting employee hourly work across different clients.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Cognition-Partner-Workshops/timesheet-app.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Cognition-Partner-Workshops/timesheet-app/issues"
+  },
+  "homepage": "https://github.com/Cognition-Partner-Workshops/timesheet-app#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
+  }
+}
