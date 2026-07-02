@@ -10,7 +10,7 @@ export const THRESHOLDS = {
 
 // Generate a unique user email for a given VU
 export function getUserEmail(vuId) {
-  return `loadtest-user-${vuId}@k6test.local`;
+  return `loadtest-user-${vuId}@k6test.com`;
 }
 
 // Standard headers for authenticated requests

@@ -1,5 +1,10 @@
 const { getDatabase } = require('../database/init');
 
+// In-memory cache of known user emails to avoid a DB query on every request.
+// The cache is invalidated when the database instance changes (e.g. reconnect).
+let knownUsers = new Set();
+let cachedDbRef = null;
+
 // Simple email-based authentication middleware
 function authenticateUser(req, res, next) {
   const userEmail = req.headers['x-user-email'];
@@ -15,6 +20,18 @@ function authenticateUser(req, res, next) {
   }
 
   const db = getDatabase();
+
+  // Invalidate cache when the database instance changes
+  if (db !== cachedDbRef) {
+    knownUsers = new Set();
+    cachedDbRef = db;
+  }
+
+  // Fast path: skip DB lookup for users we have already verified
+  if (knownUsers.has(userEmail)) {
+    req.userEmail = userEmail;
+    return next();
+  }
   
   // Check if user exists, create if not
   db.get('SELECT email FROM users WHERE email = ?', [userEmail], (err, row) => {
@@ -31,10 +48,12 @@ function authenticateUser(req, res, next) {
           return res.status(500).json({ error: 'Failed to create user' });
         }
         
+        knownUsers.add(userEmail);
         req.userEmail = userEmail;
         next();
       });
     } else {
+      knownUsers.add(userEmail);
       req.userEmail = userEmail;
       next();
     }

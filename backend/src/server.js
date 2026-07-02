@@ -22,15 +22,17 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting
+// Rate limiting (configurable via RATE_LIMIT_MAX env var; default 100)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  max: process.env.RATE_LIMIT_MAX !== undefined ? parseInt(process.env.RATE_LIMIT_MAX, 10) : 100,
 });
 app.use(limiter);
 
-// Logging
-app.use(morgan('combined'));
+// Logging (skip in load-testing / silent mode via LOG_LEVEL=silent)
+if (process.env.LOG_LEVEL !== 'silent') {
+  app.use(morgan('combined'));
+}
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
