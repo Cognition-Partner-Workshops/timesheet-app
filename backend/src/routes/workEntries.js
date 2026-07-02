@@ -12,7 +12,7 @@ router.use(authenticateUser);
 router.get('/', (req, res) => {
   const { clientId } = req.query;
   const db = getDatabase();
-  
+
   let query = `
     SELECT we.id, we.client_id, we.hours, we.description, we.date, 
            we.created_at, we.updated_at, c.name as client_name
@@ -20,9 +20,9 @@ router.get('/', (req, res) => {
     JOIN clients c ON we.client_id = c.id
     WHERE we.user_email = ?
   `;
-  
+
   const params = [req.userEmail];
-  
+
   if (clientId) {
     const clientIdNum = parseInt(clientId);
     if (isNaN(clientIdNum)) {
@@ -31,15 +31,15 @@ router.get('/', (req, res) => {
     query += ' AND we.client_id = ?';
     params.push(clientIdNum);
   }
-  
+
   query += ' ORDER BY we.date DESC, we.created_at DESC';
-  
+
   db.all(query, params, (err, rows) => {
     if (err) {
       console.error('Database error:', err);
       return res.status(500).json({ error: 'Internal server error' });
     }
-    
+
     res.json({ workEntries: rows });
   });
 });
@@ -47,13 +47,13 @@ router.get('/', (req, res) => {
 // Get specific work entry
 router.get('/:id', (req, res) => {
   const workEntryId = parseInt(req.params.id);
-  
+
   if (isNaN(workEntryId)) {
     return res.status(400).json({ error: 'Invalid work entry ID' });
   }
-  
+
   const db = getDatabase();
-  
+
   db.get(
     `SELECT we.id, we.client_id, we.hours, we.description, we.date, 
             we.created_at, we.updated_at, c.name as client_name
@@ -66,13 +66,13 @@ router.get('/:id', (req, res) => {
         console.error('Database error:', err);
         return res.status(500).json({ error: 'Internal server error' });
       }
-      
+
       if (!row) {
         return res.status(404).json({ error: 'Work entry not found' });
       }
-      
+
       res.json({ workEntry: row });
-    }
+    },
   );
 });
 
@@ -105,7 +105,7 @@ router.post('/', (req, res, next) => {
         db.run(
           'INSERT INTO work_entries (client_id, user_email, hours, description, date) VALUES (?, ?, ?, ?, ?)',
           [clientId, req.userEmail, hours, description || null, date],
-          function(err) {
+          function (err) {
             if (err) {
               console.error('Database error:', err);
               return res.status(500).json({ error: 'Failed to create work entry' });
@@ -122,18 +122,20 @@ router.post('/', (req, res, next) => {
               (err, row) => {
                 if (err) {
                   console.error('Database error:', err);
-                  return res.status(500).json({ error: 'Work entry created but failed to retrieve' });
+                  return res
+                    .status(500)
+                    .json({ error: 'Work entry created but failed to retrieve' });
                 }
 
                 res.status(201).json({
                   message: 'Work entry created successfully',
-                  workEntry: row
+                  workEntry: row,
                 });
-              }
+              },
             );
-          }
+          },
         );
-      }
+      },
     );
   } catch (error) {
     next(error);
@@ -144,7 +146,7 @@ router.post('/', (req, res, next) => {
 router.put('/:id', (req, res, next) => {
   try {
     const workEntryId = parseInt(req.params.id);
-    
+
     if (isNaN(workEntryId)) {
       return res.status(400).json({ error: 'Invalid work entry ID' });
     }
@@ -182,11 +184,13 @@ router.put('/:id', (req, res, next) => {
               }
 
               if (!clientRow) {
-                return res.status(400).json({ error: 'Client not found or does not belong to user' });
+                return res
+                  .status(400)
+                  .json({ error: 'Client not found or does not belong to user' });
               }
 
               performUpdate();
-            }
+            },
           );
         } else {
           performUpdate();
@@ -222,7 +226,7 @@ router.put('/:id', (req, res, next) => {
 
           const query = `UPDATE work_entries SET ${updates.join(', ')} WHERE id = ? AND user_email = ?`;
 
-          db.run(query, values, function(err) {
+          db.run(query, values, function (err) {
             if (err) {
               console.error('Database error:', err);
               return res.status(500).json({ error: 'Failed to update work entry' });
@@ -239,18 +243,20 @@ router.put('/:id', (req, res, next) => {
               (err, row) => {
                 if (err) {
                   console.error('Database error:', err);
-                  return res.status(500).json({ error: 'Work entry updated but failed to retrieve' });
+                  return res
+                    .status(500)
+                    .json({ error: 'Work entry updated but failed to retrieve' });
                 }
 
                 res.json({
                   message: 'Work entry updated successfully',
-                  workEntry: row
+                  workEntry: row,
                 });
-              }
+              },
             );
           });
         }
-      }
+      },
     );
   } catch (error) {
     next(error);
@@ -260,13 +266,13 @@ router.put('/:id', (req, res, next) => {
 // Delete work entry
 router.delete('/:id', (req, res) => {
   const workEntryId = parseInt(req.params.id);
-  
+
   if (isNaN(workEntryId)) {
     return res.status(400).json({ error: 'Invalid work entry ID' });
   }
-  
+
   const db = getDatabase();
-  
+
   // Check if work entry exists and belongs to user
   db.get(
     'SELECT id FROM work_entries WHERE id = ? AND user_email = ?',
@@ -276,25 +282,25 @@ router.delete('/:id', (req, res) => {
         console.error('Database error:', err);
         return res.status(500).json({ error: 'Internal server error' });
       }
-      
+
       if (!row) {
         return res.status(404).json({ error: 'Work entry not found' });
       }
-      
+
       // Delete work entry
       db.run(
         'DELETE FROM work_entries WHERE id = ? AND user_email = ?',
         [workEntryId, req.userEmail],
-        function(err) {
+        function (err) {
           if (err) {
             console.error('Database error:', err);
             return res.status(500).json({ error: 'Failed to delete work entry' });
           }
-          
+
           res.json({ message: 'Work entry deleted successfully' });
-        }
+        },
       );
-    }
+    },
   );
 });
 

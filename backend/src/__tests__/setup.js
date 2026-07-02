@@ -8,7 +8,7 @@ jest.mock('sqlite3', () => {
     }),
     get: jest.fn(),
     all: jest.fn(),
-    close: jest.fn((callback) => callback && callback(null))
+    close: jest.fn((callback) => callback && callback(null)),
   };
 
   return {
@@ -16,7 +16,7 @@ jest.mock('sqlite3', () => {
       Database: jest.fn((path, callback) => {
         if (callback) callback(null);
         return mockDatabase;
-      })
-    }))
+      }),
+    })),
   };
 });

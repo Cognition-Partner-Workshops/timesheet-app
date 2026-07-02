@@ -24,11 +24,7 @@ import {
   MenuItem,
   Chip,
 } from '@mui/material';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-} from '@mui/icons-material';
+import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -60,8 +56,12 @@ const WorkEntriesPage: React.FC = () => {
   });
 
   const createMutation = useMutation({
-    mutationFn: (entryData: { clientId: number; hours: number; description?: string; date: string }) =>
-      apiClient.createWorkEntry(entryData),
+    mutationFn: (entryData: {
+      clientId: number;
+      hours: number;
+      description?: string;
+      date: string;
+    }) => apiClient.createWorkEntry(entryData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workEntries'] });
       handleClose();
@@ -73,8 +73,13 @@ const WorkEntriesPage: React.FC = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { clientId?: number; hours?: number; description?: string; date?: string } }) =>
-      apiClient.updateWorkEntry(id, data),
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: number;
+      data: { clientId?: number; hours?: number; description?: string; date?: string };
+    }) => apiClient.updateWorkEntry(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workEntries'] });
       handleClose();
@@ -171,7 +176,11 @@ const WorkEntriesPage: React.FC = () => {
   };
 
   const handleDelete = (entry: WorkEntry) => {
-    if (window.confirm(`Are you sure you want to delete this ${entry.hours} hour entry for ${entry.client_name}?`)) {
+    if (
+      window.confirm(
+        `Are you sure you want to delete this ${entry.hours} hour entry for ${entry.client_name}?`,
+      )
+    ) {
       deleteMutation.mutate(entry.id);
     }
   };
@@ -237,11 +246,7 @@ const WorkEntriesPage: React.FC = () => {
                           </Typography>
                         </TableCell>
                         <TableCell>
-                          <Chip 
-                            label={`${entry.hours} hours`} 
-                            color="primary" 
-                            variant="outlined" 
-                          />
+                          <Chip label={`${entry.hours} hours`} color="primary" variant="outlined" />
                         </TableCell>
                         <TableCell>
                           {entry.description ? (
@@ -286,9 +291,7 @@ const WorkEntriesPage: React.FC = () => {
         )}
 
         <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-          <DialogTitle>
-            {editingEntry ? 'Edit Work Entry' : 'Add New Work Entry'}
-          </DialogTitle>
+          <DialogTitle>{editingEntry ? 'Edit Work Entry' : 'Add New Work Entry'}</DialogTitle>
           <form onSubmit={handleSubmit}>
             <DialogContent>
               <FormControl fullWidth margin="dense" required>
@@ -344,7 +347,10 @@ const WorkEntriesPage: React.FC = () => {
               />
             </DialogContent>
             <DialogActions>
-              <Button onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
+              <Button
+                onClick={handleClose}
+                disabled={createMutation.isPending || updateMutation.isPending}
+              >
                 Cancel
               </Button>
               <Button
@@ -354,8 +360,10 @@ const WorkEntriesPage: React.FC = () => {
               >
                 {createMutation.isPending || updateMutation.isPending ? (
                   <CircularProgress size={24} />
+                ) : editingEntry ? (
+                  'Update'
                 ) : (
-                  editingEntry ? 'Update' : 'Create'
+                  'Create'
                 )}
               </Button>
             </DialogActions>

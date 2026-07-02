@@ -27,7 +27,7 @@ class ApiClient {
       },
       (error) => {
         return Promise.reject(error);
-      }
+      },
     );
 
     // Response interceptor for error handling
@@ -40,7 +40,7 @@ class ApiClient {
           window.location.href = '/login';
         }
         return Promise.reject(error);
-      }
+      },
     );
   }
 
@@ -66,12 +66,20 @@ class ApiClient {
     return response.data;
   }
 
-  async createClient(clientData: { name: string; description?: string; department?: string; email?: string }) {
+  async createClient(clientData: {
+    name: string;
+    description?: string;
+    department?: string;
+    email?: string;
+  }) {
     const response = await this.client.post('/api/clients', clientData);
     return response.data;
   }
 
-  async updateClient(id: number, clientData: { name?: string; description?: string; department?: string; email?: string }) {
+  async updateClient(
+    id: number,
+    clientData: { name?: string; description?: string; department?: string; email?: string },
+  ) {
     const response = await this.client.put(`/api/clients/${id}`, clientData);
     return response.data;
   }
@@ -98,12 +106,20 @@ class ApiClient {
     return response.data;
   }
 
-  async createWorkEntry(entryData: { clientId: number; hours: number; description?: string; date: string }) {
+  async createWorkEntry(entryData: {
+    clientId: number;
+    hours: number;
+    description?: string;
+    date: string;
+  }) {
     const response = await this.client.post('/api/work-entries', entryData);
     return response.data;
   }
 
-  async updateWorkEntry(id: number, entryData: { clientId?: number; hours?: number; description?: string; date?: string }) {
+  async updateWorkEntry(
+    id: number,
+    entryData: { clientId?: number; hours?: number; description?: string; date?: string },
+  ) {
     const response = await this.client.put(`/api/work-entries/${id}`, entryData);
     return response.data;
   }
