@@ -1,5 +1,6 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fs = require('fs');
 const logger = require('../lib/logger');
 
 let db = null;
@@ -8,11 +9,18 @@ let isClosed = false;
 
 function getDatabase() {
   if (!db) {
-    // Reset state when creating a new database connection
     isClosing = false;
     isClosed = false;
-    // Use in-memory database as specified in requirements
-    db = new sqlite3.Database(':memory:', (err) => {
+    const dbPath = process.env.DATABASE_PATH || ':memory:';
+
+    if (dbPath !== ':memory:') {
+      const dbDir = path.dirname(dbPath);
+      if (!fs.existsSync(dbDir)) {
+        fs.mkdirSync(dbDir, { recursive: true });
+      }
+    }
+
+    db = new sqlite3.Database(dbPath, (err) => {
       if (err) {
         console.error('Error opening database:', err);
         logger.error({ err }, 'error opening database');
@@ -30,7 +38,8 @@ async function initializeDatabase() {
   
   return new Promise((resolve, reject) => {
     database.serialize(() => {
-      // Create users table
+      database.run('PRAGMA foreign_keys = ON');
+
       database.run(`
         CREATE TABLE IF NOT EXISTS users (
           email TEXT PRIMARY KEY,
@@ -38,7 +47,6 @@ async function initializeDatabase() {
         )
       `);
 
-      // Create clients table
       database.run(`
         CREATE TABLE IF NOT EXISTS clients (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -53,7 +61,6 @@ async function initializeDatabase() {
         )
       `);
 
-      // Create work_entries table
       database.run(`
         CREATE TABLE IF NOT EXISTS work_entries (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -69,7 +76,6 @@ async function initializeDatabase() {
         )
       `);
 
-      // Create indexes for better performance
       database.run(`CREATE INDEX IF NOT EXISTS idx_clients_user_email ON clients (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_client_id ON work_entries (client_id)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_user_email ON work_entries (user_email)`);
