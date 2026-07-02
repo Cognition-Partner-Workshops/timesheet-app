@@ -1,0 +1,486 @@
+name: Continuous Quality Pipeline
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  # ──────────────────────────────────────────────
+  # Gate 1: Linting (ESLint + Prettier)
+  # ──────────────────────────────────────────────
+  lint:
+    name: "Gate 1: Lint (ESLint + Prettier)"
+    runs-on: ubuntu-latest
+    outputs:
+      frontend_eslint: ${{ steps.fe_eslint.outcome }}
+      frontend_prettier: ${{ steps.fe_prettier.outcome }}
+      frontend_eslint_output: ${{ steps.fe_eslint.outputs.output }}
+      frontend_prettier_output: ${{ steps.fe_prettier.outputs.output }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Frontend ESLint
+        id: fe_eslint
+        working-directory: frontend
+        continue-on-error: true
+        run: |
+          set +e
+          OUTPUT=$(npx eslint . 2>&1)
+          EXIT=$?
+          {
+            echo "output<<LINT_EOF"
+            echo "$OUTPUT" | tail -30
+            echo "LINT_EOF"
+          } >> "$GITHUB_OUTPUT"
+          exit $EXIT
+
+      - name: Frontend Prettier
+        id: fe_prettier
+        working-directory: frontend
+        continue-on-error: true
+        run: |
+          set +e
+          OUTPUT=$(npx prettier --check "src/**/*.{ts,tsx,css}" 2>&1)
+          EXIT=$?
+          {
+            echo "output<<PRETTIER_EOF"
+            echo "$OUTPUT" | tail -30
+            echo "PRETTIER_EOF"
+          } >> "$GITHUB_OUTPUT"
+          exit $EXIT
+
+  # ──────────────────────────────────────────────
+  # Gate 2: Unit Tests
+  # Gate 3: Code Coverage (>= 80%)
+  # ──────────────────────────────────────────────
+  test:
+    name: "Gate 2+3: Tests & Coverage"
+    runs-on: ubuntu-latest
+    outputs:
+      tests_passed: ${{ steps.run_tests.outcome }}
+      test_summary: ${{ steps.run_tests.outputs.summary }}
+      coverage_stmts: ${{ steps.run_tests.outputs.coverage_stmts }}
+      coverage_branch: ${{ steps.run_tests.outputs.coverage_branch }}
+      coverage_funcs: ${{ steps.run_tests.outputs.coverage_funcs }}
+      coverage_lines: ${{ steps.run_tests.outputs.coverage_lines }}
+      coverage_gate: ${{ steps.coverage_gate.outcome }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Run backend tests with coverage
+        id: run_tests
+        working-directory: backend
+        continue-on-error: true
+        run: |
+          set +e
+          OUTPUT=$(npx jest --coverage --ci --maxWorkers=2 --coverageReporters=json-summary --coverageReporters=text 2>&1)
+          EXIT=$?
+
+          # Extract summary line
+          SUMMARY=$(echo "$OUTPUT" | grep -E "^Tests:|^Test Suites:" | tr '\n' ' ')
+          {
+            echo "summary<<SUMMARY_EOF"
+            echo "$SUMMARY"
+            echo "SUMMARY_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          # Parse coverage from json-summary
+          if [ -f coverage/coverage-summary.json ]; then
+            STMTS=$(jq '.total.statements.pct' coverage/coverage-summary.json)
+            BRANCH=$(jq '.total.branches.pct' coverage/coverage-summary.json)
+            FUNCS=$(jq '.total.functions.pct' coverage/coverage-summary.json)
+            LINES=$(jq '.total.lines.pct' coverage/coverage-summary.json)
+          else
+            STMTS=0; BRANCH=0; FUNCS=0; LINES=0
+          fi
+
+          echo "coverage_stmts=$STMTS" >> "$GITHUB_OUTPUT"
+          echo "coverage_branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "coverage_funcs=$FUNCS" >> "$GITHUB_OUTPUT"
+          echo "coverage_lines=$LINES" >> "$GITHUB_OUTPUT"
+
+          echo "$OUTPUT" | tail -40
+          exit $EXIT
+
+      - name: Coverage gate (>= 80%)
+        id: coverage_gate
+        continue-on-error: true
+        run: |
+          STMTS="${{ steps.run_tests.outputs.coverage_stmts }}"
+          BRANCH="${{ steps.run_tests.outputs.coverage_branch }}"
+          FUNCS="${{ steps.run_tests.outputs.coverage_funcs }}"
+          LINES="${{ steps.run_tests.outputs.coverage_lines }}"
+          THRESHOLD=80
+          FAILED=0
+
+          check() {
+            local name=$1 val=$2
+            result=$(echo "$val >= $THRESHOLD" | bc -l)
+            if [ "$result" -ne 1 ]; then
+              echo "FAIL: $name coverage is ${val}% (threshold: ${THRESHOLD}%)"
+              FAILED=1
+            else
+              echo "PASS: $name coverage is ${val}%"
+            fi
+          }
+
+          check "Statements" "$STMTS"
+          check "Branches"   "$BRANCH"
+          check "Functions"  "$FUNCS"
+          check "Lines"      "$LINES"
+
+          if [ "$FAILED" -eq 1 ]; then
+            exit 1
+          fi
+
+  # ──────────────────────────────────────────────
+  # Gate 4: Security Audit (npm audit)
+  # ──────────────────────────────────────────────
+  security:
+    name: "Gate 4: Security Audit"
+    runs-on: ubuntu-latest
+    outputs:
+      frontend_audit: ${{ steps.fe_audit.outcome }}
+      backend_audit: ${{ steps.be_audit.outcome }}
+      fe_high: ${{ steps.fe_audit.outputs.high }}
+      fe_critical: ${{ steps.fe_audit.outputs.critical }}
+      be_high: ${{ steps.be_audit.outputs.high }}
+      be_critical: ${{ steps.be_audit.outputs.critical }}
+      fe_details: ${{ steps.fe_audit.outputs.details }}
+      be_details: ${{ steps.be_audit.outputs.details }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Frontend npm audit
+        id: fe_audit
+        working-directory: frontend
+        continue-on-error: true
+        run: |
+          npm ci --ignore-scripts
+          set +e
+          AUDIT=$(npm audit --json 2>&1)
+          HIGH=$(echo "$AUDIT" | jq -r '.metadata.vulnerabilities.high // 0')
+          CRITICAL=$(echo "$AUDIT" | jq -r '.metadata.vulnerabilities.critical // 0')
+          echo "high=$HIGH" >> "$GITHUB_OUTPUT"
+          echo "critical=$CRITICAL" >> "$GITHUB_OUTPUT"
+
+          DETAILS=$(echo "$AUDIT" | jq -r '
+            .vulnerabilities // {} | to_entries[] |
+            select(.value.severity == "high" or .value.severity == "critical") |
+            "- [\(.value.severity | ascii_upcase)] \(.key): \(.value.via | if type == "array" then (map(if type == "object" then .title // .url else . end) | join(", ")) else . end)"
+          ' 2>/dev/null | head -20 || echo "")
+          {
+            echo "details<<AUDIT_FE_EOF"
+            echo "$DETAILS"
+            echo "AUDIT_FE_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          TOTAL=$((HIGH + CRITICAL))
+          if [ "$TOTAL" -gt 0 ]; then
+            echo "Found $TOTAL high/critical vulnerabilities in frontend"
+            exit 1
+          fi
+
+      - name: Backend npm audit
+        id: be_audit
+        working-directory: backend
+        continue-on-error: true
+        run: |
+          npm ci --ignore-scripts
+          set +e
+          AUDIT=$(npm audit --json 2>&1)
+          HIGH=$(echo "$AUDIT" | jq -r '.metadata.vulnerabilities.high // 0')
+          CRITICAL=$(echo "$AUDIT" | jq -r '.metadata.vulnerabilities.critical // 0')
+          echo "high=$HIGH" >> "$GITHUB_OUTPUT"
+          echo "critical=$CRITICAL" >> "$GITHUB_OUTPUT"
+
+          DETAILS=$(echo "$AUDIT" | jq -r '
+            .vulnerabilities // {} | to_entries[] |
+            select(.value.severity == "high" or .value.severity == "critical") |
+            "- [\(.value.severity | ascii_upcase)] \(.key): \(.value.via | if type == "array" then (map(if type == "object" then .title // .url else . end) | join(", ")) else . end)"
+          ' 2>/dev/null | head -20 || echo "")
+          {
+            echo "details<<AUDIT_BE_EOF"
+            echo "$DETAILS"
+            echo "AUDIT_BE_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          TOTAL=$((HIGH + CRITICAL))
+          if [ "$TOTAL" -gt 0 ]; then
+            echo "Found $TOTAL high/critical vulnerabilities in backend"
+            exit 1
+          fi
+
+  # ──────────────────────────────────────────────
+  # Gate 5: TypeScript Type Check
+  # ──────────────────────────────────────────────
+  typecheck:
+    name: "Gate 5: TypeScript (tsc --noEmit)"
+    runs-on: ubuntu-latest
+    outputs:
+      typecheck_result: ${{ steps.tsc.outcome }}
+      typecheck_output: ${{ steps.tsc.outputs.output }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run tsc --noEmit
+        id: tsc
+        working-directory: frontend
+        continue-on-error: true
+        run: |
+          set +e
+          OUTPUT=$(npx tsc -b --noEmit 2>&1)
+          EXIT=$?
+          {
+            echo "output<<TSC_EOF"
+            echo "$OUTPUT" | tail -30
+            echo "TSC_EOF"
+          } >> "$GITHUB_OUTPUT"
+          exit $EXIT
+
+  # ──────────────────────────────────────────────
+  # Gate 6: Bundle Size (frontend, <= 10% increase)
+  # ──────────────────────────────────────────────
+  bundle-size:
+    name: "Gate 6: Bundle Size"
+    runs-on: ubuntu-latest
+    outputs:
+      bundle_result: ${{ steps.compare.outcome }}
+      pr_size: ${{ steps.compare.outputs.pr_size }}
+      base_size: ${{ steps.compare.outputs.base_size }}
+      change_pct: ${{ steps.compare.outputs.change_pct }}
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Build PR branch
+        working-directory: frontend
+        run: |
+          npm ci
+          npx vite build
+          PR_SIZE=$(du -sb dist/ | cut -f1)
+          echo "PR_SIZE=$PR_SIZE" >> "$GITHUB_ENV"
+
+      - name: Checkout base branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          clean: false
+
+      - name: Build base branch
+        working-directory: frontend
+        run: |
+          npm ci
+          npx vite build
+          BASE_SIZE=$(du -sb dist/ | cut -f1)
+          echo "BASE_SIZE=$BASE_SIZE" >> "$GITHUB_ENV"
+
+      - name: Compare bundle sizes
+        id: compare
+        continue-on-error: true
+        run: |
+          PR=${{ env.PR_SIZE }}
+          BASE=${{ env.BASE_SIZE }}
+
+          echo "pr_size=$PR" >> "$GITHUB_OUTPUT"
+          echo "base_size=$BASE" >> "$GITHUB_OUTPUT"
+
+          if [ "$BASE" -eq 0 ]; then
+            echo "change_pct=0" >> "$GITHUB_OUTPUT"
+            echo "No base build to compare"
+            exit 0
+          fi
+
+          CHANGE=$(echo "scale=2; (($PR - $BASE) * 100) / $BASE" | bc -l)
+          echo "change_pct=$CHANGE" >> "$GITHUB_OUTPUT"
+          echo "Bundle size: base=${BASE}B, PR=${PR}B, change=${CHANGE}%"
+
+          OVER=$(echo "$CHANGE > 10" | bc -l)
+          if [ "$OVER" -eq 1 ]; then
+            echo "FAIL: Bundle size increased by ${CHANGE}% (threshold: 10%)"
+            exit 1
+          fi
+
+  # ──────────────────────────────────────────────
+  # Quality Dashboard Comment
+  # ──────────────────────────────────────────────
+  quality-dashboard:
+    name: Quality Dashboard
+    if: always()
+    needs: [lint, test, security, typecheck, bundle-size]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Post quality dashboard comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Helper to render pass/fail badge
+            const badge = (ok) => ok ? '`PASS`' : '`FAIL`';
+            const icon  = (ok) => ok ? ':white_check_mark:' : ':x:';
+
+            // Gate 1: Lint
+            const eslintOk   = '${{ needs.lint.outputs.frontend_eslint }}'   === 'success';
+            const prettierOk = '${{ needs.lint.outputs.frontend_prettier }}' === 'success';
+            const lintOk     = eslintOk && prettierOk;
+
+            // Gate 2: Tests
+            const testsOk = '${{ needs.test.outputs.tests_passed }}' === 'success';
+
+            // Gate 3: Coverage
+            const covStmts  = '${{ needs.test.outputs.coverage_stmts }}';
+            const covBranch = '${{ needs.test.outputs.coverage_branch }}';
+            const covFuncs  = '${{ needs.test.outputs.coverage_funcs }}';
+            const covLines  = '${{ needs.test.outputs.coverage_lines }}';
+            const covOk     = '${{ needs.test.outputs.coverage_gate }}' === 'success';
+
+            // Gate 4: Security
+            const feAuditOk = '${{ needs.security.outputs.frontend_audit }}' === 'success';
+            const beAuditOk = '${{ needs.security.outputs.backend_audit }}'  === 'success';
+            const secOk     = feAuditOk && beAuditOk;
+            const feHigh    = '${{ needs.security.outputs.fe_high }}';
+            const feCrit    = '${{ needs.security.outputs.fe_critical }}';
+            const beHigh    = '${{ needs.security.outputs.be_high }}';
+            const beCrit    = '${{ needs.security.outputs.be_critical }}';
+            const feDetails = `${{ needs.security.outputs.fe_details }}`;
+            const beDetails = `${{ needs.security.outputs.be_details }}`;
+
+            // Gate 5: TypeScript
+            const tscOk = '${{ needs.typecheck.outputs.typecheck_result }}' === 'success';
+
+            // Gate 6: Bundle size
+            const bundleOk  = '${{ needs.bundle-size.outputs.bundle_result }}' === 'success';
+            const prSize    = '${{ needs.bundle-size.outputs.pr_size }}';
+            const baseSize  = '${{ needs.bundle-size.outputs.base_size }}';
+            const changePct = '${{ needs.bundle-size.outputs.change_pct }}';
+
+            const allOk = lintOk && testsOk && covOk && secOk && tscOk && bundleOk;
+            const header = allOk
+              ? '## :white_check_mark: Quality Pipeline — All Gates Passed'
+              : '## :x: Quality Pipeline — Some Gates Failed';
+
+            const formatBytes = (b) => {
+              const n = parseInt(b, 10);
+              if (isNaN(n)) return 'N/A';
+              if (n < 1024) return `${n} B`;
+              return `${(n / 1024).toFixed(1)} KB`;
+            };
+
+            let secDetail = '';
+            if (!secOk) {
+              const parts = [];
+              if (feDetails.trim()) parts.push(`**Frontend:**\n${feDetails}`);
+              if (beDetails.trim()) parts.push(`**Backend:**\n${beDetails}`);
+              if (parts.length) {
+                secDetail = `\n<details><summary>Vulnerability details</summary>\n\n${parts.join('\n\n')}\n</details>`;
+              }
+            }
+
+            let tscDetail = '';
+            const tscOutput = `${{ needs.typecheck.outputs.typecheck_output }}`.trim();
+            if (!tscOk && tscOutput) {
+              tscDetail = `\n<details><summary>Type errors</summary>\n\n\`\`\`\n${tscOutput}\n\`\`\`\n</details>`;
+            }
+
+            let eslintDetail = '';
+            const eslintOutput = `${{ needs.lint.outputs.frontend_eslint_output }}`.trim();
+            if (!eslintOk && eslintOutput) {
+              eslintDetail = `\n<details><summary>ESLint errors</summary>\n\n\`\`\`\n${eslintOutput}\n\`\`\`\n</details>`;
+            }
+
+            const body = `${header}
+
+            | Gate | Check | Result | Details |
+            |------|-------|--------|---------|
+            | 1 | **ESLint** | ${icon(eslintOk)} ${badge(eslintOk)} | Frontend linting |
+            | 1 | **Prettier** | ${icon(prettierOk)} ${badge(prettierOk)} | Code formatting |
+            | 2 | **Unit Tests** | ${icon(testsOk)} ${badge(testsOk)} | ${testsOk ? 'All tests passed' : 'Some tests failed'} |
+            | 3 | **Coverage ≥ 80%** | ${icon(covOk)} ${badge(covOk)} | Stmts: ${covStmts}% · Branch: ${covBranch}% · Funcs: ${covFuncs}% · Lines: ${covLines}% |
+            | 4 | **Security (frontend)** | ${icon(feAuditOk)} ${badge(feAuditOk)} | ${feAuditOk ? 'No high/critical CVEs' : `${feHigh} high, ${feCrit} critical`} |
+            | 4 | **Security (backend)** | ${icon(beAuditOk)} ${badge(beAuditOk)} | ${beAuditOk ? 'No high/critical CVEs' : `${beHigh} high, ${beCrit} critical`} |
+            | 5 | **TypeScript** | ${icon(tscOk)} ${badge(tscOk)} | tsc --noEmit |
+            | 6 | **Bundle Size** | ${icon(bundleOk)} ${badge(bundleOk)} | Base: ${formatBytes(baseSize)} → PR: ${formatBytes(prSize)} (${changePct}%) |
+            ${eslintDetail}${tscDetail}${secDetail}
+
+            ---
+            <sub>Quality pipeline powered by GitHub Actions · Thresholds defined in <code>QUALITY_GATES.md</code></sub>`;
+
+            // Find and update existing dashboard comment, or create new one
+            const marker = 'Quality Pipeline';
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c =>
+              c.user.type === 'Bot' && c.body && c.body.includes(marker)
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body,
+              });
+            }
+
+      - name: Fail if any gate failed
+        if: |
+          needs.lint.outputs.frontend_eslint != 'success' ||
+          needs.lint.outputs.frontend_prettier != 'success' ||
+          needs.test.outputs.tests_passed != 'success' ||
+          needs.test.outputs.coverage_gate != 'success' ||
+          needs.security.outputs.frontend_audit != 'success' ||
+          needs.security.outputs.backend_audit != 'success' ||
+          needs.typecheck.outputs.typecheck_result != 'success' ||
+          needs.bundle-size.outputs.bundle_result != 'success'
+        run: |
+          echo "One or more quality gates failed. See the dashboard comment on the PR."
+          exit 1

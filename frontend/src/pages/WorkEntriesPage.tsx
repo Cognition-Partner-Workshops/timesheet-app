@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from 'react'
 import {
   Box,
   Typography,
@@ -23,134 +23,139 @@ import {
   Select,
   MenuItem,
   Chip,
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-} from '@mui/icons-material';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import apiClient from '../api/client';
-import { type WorkEntry } from '../types/api';
+} from '@mui/material'
+import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { DatePicker } from '@mui/x-date-pickers/DatePicker'
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
+import apiClient from '../api/client'
+import { type WorkEntry } from '../types/api'
 
 const WorkEntriesPage: React.FC = () => {
-  const [open, setOpen] = useState(false);
-  const [editingEntry, setEditingEntry] = useState<WorkEntry | null>(null);
+  const [open, setOpen] = useState(false)
+  const [editingEntry, setEditingEntry] = useState<WorkEntry | null>(null)
   const [formData, setFormData] = useState({
     clientId: 0,
     hours: '',
     description: '',
     date: new Date(),
-  });
-  const [error, setError] = useState('');
+  })
+  const [error, setError] = useState('')
 
-  const queryClient = useQueryClient();
+  const queryClient = useQueryClient()
 
   const { data: workEntriesData, isLoading: entriesLoading } = useQuery({
     queryKey: ['workEntries'],
     queryFn: () => apiClient.getWorkEntries(),
-  });
+  })
 
   const { data: clientsData, isLoading: clientsLoading } = useQuery({
     queryKey: ['clients'],
     queryFn: () => apiClient.getClients(),
-  });
+  })
 
   const createMutation = useMutation({
-    mutationFn: (entryData: { clientId: number; hours: number; description?: string; date: string }) =>
-      apiClient.createWorkEntry(entryData),
+    mutationFn: (entryData: {
+      clientId: number
+      hours: number
+      description?: string
+      date: string
+    }) => apiClient.createWorkEntry(entryData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workEntries'] });
-      handleClose();
+      queryClient.invalidateQueries({ queryKey: ['workEntries'] })
+      handleClose()
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to create work entry');
+      const error = err as { response?: { data?: { error?: string } } }
+      setError(error.response?.data?.error || 'Failed to create work entry')
     },
-  });
+  })
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { clientId?: number; hours?: number; description?: string; date?: string } }) =>
-      apiClient.updateWorkEntry(id, data),
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: number
+      data: { clientId?: number; hours?: number; description?: string; date?: string }
+    }) => apiClient.updateWorkEntry(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workEntries'] });
-      handleClose();
+      queryClient.invalidateQueries({ queryKey: ['workEntries'] })
+      handleClose()
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to update work entry');
+      const error = err as { response?: { data?: { error?: string } } }
+      setError(error.response?.data?.error || 'Failed to update work entry')
     },
-  });
+  })
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiClient.deleteWorkEntry(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workEntries'] });
+      queryClient.invalidateQueries({ queryKey: ['workEntries'] })
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to delete work entry');
+      const error = err as { response?: { data?: { error?: string } } }
+      setError(error.response?.data?.error || 'Failed to delete work entry')
     },
-  });
+  })
 
-  const workEntries = workEntriesData?.workEntries || [];
-  const clients = clientsData?.clients || [];
+  const workEntries = workEntriesData?.workEntries || []
+  const clients = clientsData?.clients || []
 
   const handleOpen = (entry?: WorkEntry) => {
     if (entry) {
-      setEditingEntry(entry);
+      setEditingEntry(entry)
       setFormData({
         clientId: entry.client_id,
         hours: entry.hours.toString(),
         description: entry.description || '',
         date: new Date(entry.date),
-      });
+      })
     } else {
-      setEditingEntry(null);
+      setEditingEntry(null)
       setFormData({
         clientId: 0,
         hours: '',
         description: '',
         date: new Date(),
-      });
+      })
     }
-    setError('');
-    setOpen(true);
-  };
+    setError('')
+    setOpen(true)
+  }
 
   const handleClose = () => {
-    setOpen(false);
-    setEditingEntry(null);
+    setOpen(false)
+    setEditingEntry(null)
     setFormData({
       clientId: 0,
       hours: '',
       description: '',
       date: new Date(),
-    });
-    setError('');
-  };
+    })
+    setError('')
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+    e.preventDefault()
+    setError('')
 
     if (!formData.clientId) {
-      setError('Please select a client');
-      return;
+      setError('Please select a client')
+      return
     }
 
-    const hours = parseFloat(formData.hours);
+    const hours = parseFloat(formData.hours)
     if (!hours || hours <= 0 || hours > 24) {
-      setError('Hours must be between 0 and 24');
-      return;
+      setError('Hours must be between 0 and 24')
+      return
     }
 
     if (!formData.date) {
-      setError('Please select a date');
-      return;
+      setError('Please select a date')
+      return
     }
 
     const entryData = {
@@ -158,30 +163,34 @@ const WorkEntriesPage: React.FC = () => {
       hours,
       description: formData.description || undefined,
       date: formData.date.toISOString().split('T')[0],
-    };
+    }
 
     if (editingEntry) {
       updateMutation.mutate({
         id: editingEntry.id,
         data: entryData,
-      });
+      })
     } else {
-      createMutation.mutate(entryData);
+      createMutation.mutate(entryData)
     }
-  };
+  }
 
   const handleDelete = (entry: WorkEntry) => {
-    if (window.confirm(`Are you sure you want to delete this ${entry.hours} hour entry for ${entry.client_name}?`)) {
-      deleteMutation.mutate(entry.id);
+    if (
+      window.confirm(
+        `Are you sure you want to delete this ${entry.hours} hour entry for ${entry.client_name}?`,
+      )
+    ) {
+      deleteMutation.mutate(entry.id)
     }
-  };
+  }
 
   if (entriesLoading || clientsLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
         <CircularProgress />
       </Box>
-    );
+    )
   }
 
   return (
@@ -237,11 +246,7 @@ const WorkEntriesPage: React.FC = () => {
                           </Typography>
                         </TableCell>
                         <TableCell>
-                          <Chip 
-                            label={`${entry.hours} hours`} 
-                            color="primary" 
-                            variant="outlined" 
-                          />
+                          <Chip label={`${entry.hours} hours`} color="primary" variant="outlined" />
                         </TableCell>
                         <TableCell>
                           {entry.description ? (
@@ -286,9 +291,7 @@ const WorkEntriesPage: React.FC = () => {
         )}
 
         <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-          <DialogTitle>
-            {editingEntry ? 'Edit Work Entry' : 'Add New Work Entry'}
-          </DialogTitle>
+          <DialogTitle>{editingEntry ? 'Edit Work Entry' : 'Add New Work Entry'}</DialogTitle>
           <form onSubmit={handleSubmit}>
             <DialogContent>
               <FormControl fullWidth margin="dense" required>
@@ -344,7 +347,10 @@ const WorkEntriesPage: React.FC = () => {
               />
             </DialogContent>
             <DialogActions>
-              <Button onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
+              <Button
+                onClick={handleClose}
+                disabled={createMutation.isPending || updateMutation.isPending}
+              >
                 Cancel
               </Button>
               <Button
@@ -354,8 +360,10 @@ const WorkEntriesPage: React.FC = () => {
               >
                 {createMutation.isPending || updateMutation.isPending ? (
                   <CircularProgress size={24} />
+                ) : editingEntry ? (
+                  'Update'
                 ) : (
-                  editingEntry ? 'Update' : 'Create'
+                  'Create'
                 )}
               </Button>
             </DialogActions>
@@ -363,7 +371,7 @@ const WorkEntriesPage: React.FC = () => {
         </Dialog>
       </Box>
     </LocalizationProvider>
-  );
-};
+  )
+}
 
-export default WorkEntriesPage;
+export default WorkEntriesPage
