@@ -237,22 +237,17 @@ router.put('/:id', (req, res, next) => {
 // Delete all projects for authenticated user
 router.delete('/', (req, res) => {
   const db = getDatabase();
+  const deleteAllSql = 'DELETE FROM projects WHERE user_email = ?';
 
-  db.run(
-    'DELETE FROM projects WHERE user_email = ?',
-    [req.userEmail],
-    function (err) {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ error: 'Failed to delete projects' });
-      }
-
-      res.json({
-        message: 'All projects deleted successfully',
-        deletedCount: this.changes
-      });
+  db.run(deleteAllSql, [req.userEmail], function (err) {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Failed to delete projects' });
     }
-  );
+
+    const deletedCount = this.changes;
+    res.json({ message: 'All projects deleted successfully', deletedCount });
+  });
 });
 
 // Delete project
