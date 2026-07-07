@@ -8,6 +8,61 @@ const router = express.Router();
 // All routes require authentication
 router.use(authenticateUser);
 
+// Apply a validated set of updates to a project and return the refreshed row
+function executeProjectUpdate(db, res, projectId, userEmail, value) {
+  const updates = [];
+  const values = [];
+
+  if (value.name !== undefined) {
+    updates.push('name = ?');
+    values.push(value.name);
+  }
+
+  if (value.description !== undefined) {
+    updates.push('description = ?');
+    values.push(value.description || null);
+  }
+
+  if (value.clientId !== undefined) {
+    updates.push('client_id = ?');
+    values.push(value.clientId || null);
+  }
+
+  if (value.startDate !== undefined) {
+    updates.push('start_date = ?');
+    values.push(value.startDate || null);
+  }
+
+  if (value.status !== undefined) {
+    updates.push('status = ?');
+    values.push(value.status);
+  }
+
+  updates.push('updated_at = CURRENT_TIMESTAMP');
+  values.push(projectId, userEmail);
+
+  const query = `UPDATE projects SET ${updates.join(', ')} WHERE id = ? AND user_email = ?`;
+
+  db.run(query, values, (err) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Failed to update project' });
+    }
+
+    db.get(`${SELECT_FIELDS} WHERE p.id = ?`, [projectId], (err, row) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'Project updated but failed to retrieve' });
+      }
+
+      res.json({
+        message: 'Project updated successfully',
+        project: row
+      });
+    });
+  });
+}
+
 const SELECT_FIELDS = `
   SELECT p.id, p.name, p.description, p.client_id, p.start_date, p.status,
          p.created_at, p.updated_at, c.name as client_name
@@ -35,9 +90,9 @@ router.get('/', (req, res) => {
 
 // Get specific project
 router.get('/:id', (req, res) => {
-  const projectId = parseInt(req.params.id);
+  const projectId = Number.parseInt(req.params.id);
 
-  if (isNaN(projectId)) {
+  if (Number.isNaN(projectId)) {
     return res.status(400).json({ error: 'Invalid project ID' });
   }
 
@@ -130,9 +185,9 @@ router.post('/', (req, res, next) => {
 // Update project
 router.put('/:id', (req, res, next) => {
   try {
-    const projectId = parseInt(req.params.id);
+    const projectId = Number.parseInt(req.params.id);
 
-    if (isNaN(projectId)) {
+    if (Number.isNaN(projectId)) {
       return res.status(400).json({ error: 'Invalid project ID' });
     }
 
@@ -180,61 +235,7 @@ router.put('/:id', (req, res, next) => {
         }
 
         function performUpdate() {
-          const updates = [];
-          const values = [];
-
-          if (value.name !== undefined) {
-            updates.push('name = ?');
-            values.push(value.name);
-          }
-
-          if (value.description !== undefined) {
-            updates.push('description = ?');
-            values.push(value.description || null);
-          }
-
-          if (value.clientId !== undefined) {
-            updates.push('client_id = ?');
-            values.push(value.clientId || null);
-          }
-
-          if (value.startDate !== undefined) {
-            updates.push('start_date = ?');
-            values.push(value.startDate || null);
-          }
-
-          if (value.status !== undefined) {
-            updates.push('status = ?');
-            values.push(value.status);
-          }
-
-          updates.push('updated_at = CURRENT_TIMESTAMP');
-          values.push(projectId, req.userEmail);
-
-          const query = `UPDATE projects SET ${updates.join(', ')} WHERE id = ? AND user_email = ?`;
-
-          db.run(query, values, function (err) {
-            if (err) {
-              console.error('Database error:', err);
-              return res.status(500).json({ error: 'Failed to update project' });
-            }
-
-            db.get(
-              `${SELECT_FIELDS} WHERE p.id = ?`,
-              [projectId],
-              (err, row) => {
-                if (err) {
-                  console.error('Database error:', err);
-                  return res.status(500).json({ error: 'Project updated but failed to retrieve' });
-                }
-
-                res.json({
-                  message: 'Project updated successfully',
-                  project: row
-                });
-              }
-            );
-          });
+          executeProjectUpdate(db, res, projectId, req.userEmail, value);
         }
       }
     );
@@ -266,9 +267,9 @@ router.delete('/', (req, res) => {
 
 // Delete project
 router.delete('/:id', (req, res) => {
-  const projectId = parseInt(req.params.id);
+  const projectId = Number.parseInt(req.params.id);
 
-  if (isNaN(projectId)) {
+  if (Number.isNaN(projectId)) {
     return res.status(400).json({ error: 'Invalid project ID' });
   }
 

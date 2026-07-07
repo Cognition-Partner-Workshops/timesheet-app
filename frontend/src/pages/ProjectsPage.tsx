@@ -199,6 +199,7 @@ const ProjectsPage: React.FC = () => {
   };
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
+  const submitLabel = editingProject ? 'Update' : 'Create';
 
   if (isLoading) {
     return (
@@ -397,7 +398,7 @@ const ProjectsPage: React.FC = () => {
                 Cancel
               </Button>
               <Button type="submit" variant="contained" disabled={isSaving}>
-                {isSaving ? <CircularProgress size={24} /> : editingProject ? 'Update' : 'Create'}
+                {isSaving ? <CircularProgress size={24} /> : submitLabel}
               </Button>
             </DialogActions>
           </form>
