@@ -205,6 +205,19 @@ describe('Validation Schemas', () => {
       const { error } = workEntrySchema.validate(entry);
       expect(error).toBeDefined();
     });
+
+    test('should keep date as an ISO string and not coerce it to a Date', () => {
+      const entry = {
+        clientId: 1,
+        hours: 5,
+        date: '2024-01-15'
+      };
+
+      const { error, value } = workEntrySchema.validate(entry);
+      expect(error).toBeUndefined();
+      expect(typeof value.date).toBe('string');
+      expect(value.date).toBe('2024-01-15');
+    });
   });
 
   describe('updateWorkEntrySchema', () => {
@@ -250,6 +263,17 @@ describe('Validation Schemas', () => {
 
       const { error } = updateWorkEntrySchema.validate(update);
       expect(error).toBeUndefined();
+    });
+
+    test('should keep date as an ISO string and not coerce it to a Date', () => {
+      const update = {
+        date: '2024-02-01'
+      };
+
+      const { error, value } = updateWorkEntrySchema.validate(update);
+      expect(error).toBeUndefined();
+      expect(typeof value.date).toBe('string');
+      expect(value.date).toBe('2024-02-01');
     });
   });
 
