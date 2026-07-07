@@ -19,6 +19,9 @@ export default defineConfig({
     trace: 'on-first-retry',
     video: 'retain-on-failure',
     screenshot: 'only-on-failure',
+    launchOptions: {
+      slowMo: process.env.PW_SLOWMO ? Number(process.env.PW_SLOWMO) : 0,
+    },
   },
   projects: [
     {
