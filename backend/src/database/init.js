@@ -1,5 +1,6 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const { PROJECTS_TABLE } = require('./schema');
 
 let db = null;
 let isClosing = false;
@@ -51,21 +52,7 @@ async function initializeDatabase() {
       `);
 
       // Create projects table
-      database.run(`
-        CREATE TABLE IF NOT EXISTS projects (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          description TEXT,
-          client_id INTEGER,
-          start_date DATE,
-          status TEXT NOT NULL DEFAULT 'active',
-          user_email TEXT NOT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE SET NULL,
-          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
-        )
-      `);
+      database.run(PROJECTS_TABLE);
 
       // Create work_entries table
       database.run(`
