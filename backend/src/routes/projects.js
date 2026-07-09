@@ -25,9 +25,9 @@ function failInternal(res, err) {
   return res.status(500).json({ error: 'Internal server error' });
 }
 
-// Fetch a single project (with client name) and hand it to the caller
-function respondWithProject(db, projectId, res, notFoundStatus, wrap) {
-  db.get(`${PROJECT_SELECT} WHERE p.id = ?`, [projectId], (err, row) => {
+// Fetch a single project (with client name), scoped to the user, and hand it to the caller
+function respondWithProject(db, projectId, userEmail, res, notFoundStatus, wrap) {
+  db.get(`${PROJECT_SELECT} WHERE p.id = ? AND p.user_email = ?`, [projectId, userEmail], (err, row) => {
     if (err) {
       return res.status(500).json({ error: wrap.retrieveError });
     }
@@ -132,7 +132,7 @@ router.post('/', (req, res, next) => {
             return res.status(500).json({ error: 'Failed to create project' });
           }
 
-          respondWithProject(db, this.lastID, res, null, {
+          respondWithProject(db, this.lastID, req.userEmail, res, null, {
             status: 201,
             message: 'Project created successfully',
             retrieveError: 'Project created but failed to retrieve',
@@ -179,7 +179,7 @@ router.put('/:id', (req, res, next) => {
           return res.status(500).json({ error: 'Failed to update project' });
         }
 
-        respondWithProject(db, projectId, res, null, {
+        respondWithProject(db, projectId, req.userEmail, res, null, {
           status: 200,
           message: 'Project updated successfully',
           retrieveError: 'Project updated but failed to retrieve',
