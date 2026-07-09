@@ -327,6 +327,16 @@ describe('Validation Schemas', () => {
       expect(error).toBeDefined();
     });
 
+    test('should accept name of exactly 100 characters', () => {
+      const { error } = projectSchema.validate({ name: 'a'.repeat(100) });
+      expect(error).toBeUndefined();
+    });
+
+    test('should reject name longer than 100 characters', () => {
+      const { error } = projectSchema.validate({ name: 'a'.repeat(101) });
+      expect(error).toBeDefined();
+    });
+
     test('should accept each valid status', () => {
       PROJECT_STATUSES.forEach((status) => {
         const { error } = projectSchema.validate({ name: 'Project', status });
@@ -373,6 +383,11 @@ describe('Validation Schemas', () => {
 
     test('should reject invalid status update', () => {
       const { error } = updateProjectSchema.validate({ status: 'archived' });
+      expect(error).toBeDefined();
+    });
+
+    test('should reject name update longer than 100 characters', () => {
+      const { error } = updateProjectSchema.validate({ name: 'a'.repeat(101) });
       expect(error).toBeDefined();
     });
   });

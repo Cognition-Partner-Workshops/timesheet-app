@@ -190,6 +190,19 @@ describe('Project Routes', () => {
       expect(response.body).toEqual({ error: 'Client not found or does not belong to user' });
     });
 
+    test('should return 400 when clientId references a client that does not exist', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, undefined);
+      });
+
+      const response = await request(app)
+        .post('/api/projects')
+        .send({ name: 'Project', clientId: 424242 });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Client not found or does not belong to user' });
+    });
+
     test('should return 500 on error verifying client', async () => {
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(new Error('Database error'), null);

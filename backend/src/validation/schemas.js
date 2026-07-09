@@ -31,7 +31,7 @@ const updateClientSchema = Joi.object({
 const PROJECT_STATUSES = ['active', 'completed', 'on-hold'];
 
 const projectSchema = Joi.object({
-  name: Joi.string().trim().min(1).max(255).required(),
+  name: Joi.string().trim().min(1).max(100).required(),
   description: Joi.string().trim().max(1000).optional().allow(''),
   clientId: Joi.number().integer().positive().optional().allow(null),
   startDate: Joi.date().iso().optional().allow(null, ''),
@@ -39,7 +39,7 @@ const projectSchema = Joi.object({
 });
 
 const updateProjectSchema = Joi.object({
-  name: Joi.string().trim().min(1).max(255).optional(),
+  name: Joi.string().trim().min(1).max(100).optional(),
   description: Joi.string().trim().max(1000).optional().allow(''),
   clientId: Joi.number().integer().positive().optional().allow(null),
   startDate: Joi.date().iso().optional().allow(null, ''),
