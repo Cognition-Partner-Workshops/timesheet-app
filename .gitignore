@@ -1,0 +1,17 @@
+# Environment variables (never commit real secrets)
+.env
+.env.*
+**/.env
+**/.env.*
+backend/.env
+
+# Keep example/template env files
+!.env.example
+!*.env.example
+!**/.env.example
+
+# Dependencies
+node_modules/
+
+# Logs
+*.log
