@@ -1,0 +1,11 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
+    restart: unless-stopped
