@@ -1,297 +1,162 @@
-# Employee Time Tracking Application
+# InterviewHub - Technical Interview Platform
 
-A full-stack web application for tracking and reporting employee hourly work across different clients.
+A comprehensive technical interview management platform built with React JS and Python FastAPI, inspired by platforms like Karat.
 
-## ⚠️ Important Notes
-
-### Data Persistence
-**This application uses SQLite in-memory database as specified in requirements.**
-- ⚠️ **All data is lost when the backend server restarts**
-- Suitable for development and testing
-- For production use, modify `backend/src/database/init.js` to use file-based SQLite instead of `:memory:`
-
-### Authentication
-- Email-only authentication with JWT tokens
-- No password required - assumes trusted internal network
-- Anyone with a valid email can create an account and log in
-- Consider integrating with company SSO for production use
+![InterviewHub](https://img.shields.io/badge/InterviewHub-v1.0-6366f1)
+![React](https://img.shields.io/badge/React-18-61dafb)
+![Python](https://img.shields.io/badge/Python-FastAPI-009688)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6)
 
 ## Features
 
-- ✅ User authentication (email-based with JWT tokens)
-- ✅ Add, edit, and delete clients
-- ✅ Add, edit, and delete hourly work entries for each client
-- ✅ View hourly reports for each client
-- ✅ Export hourly reports to CSV or PDF
+### Dashboard
+- Real-time overview of interview activities
+- Key metrics: total interviews, upcoming sessions, candidates, average scores
+- Recent activity feed
+- Question bank summary with difficulty distribution
+
+### Interview Management
+- Schedule, track, and manage interviews
+- Filter by status (Scheduled, In Progress, Completed, Cancelled)
+- Assign interviewers and candidates
+- Set duration and meeting links
+- Real-time status updates
+
+### Question Bank
+- Comprehensive coding question library
+- Categorized by difficulty (Easy, Medium, Hard)
+- Organized by topic (Arrays, Linked Lists, Trees, System Design, etc.)
+- Sample inputs/outputs and time limits
+- Tags for easy searchability
+
+### Live Code Editor
+- Monaco Editor integration (same editor as VS Code)
+- Support for Python and JavaScript
+- Real-time code execution
+- Dark/Light theme toggle
+- Syntax highlighting, auto-completion, bracket matching
+- Copy, reset, and fullscreen controls
+
+### Candidate Management
+- Track candidate pipeline
+- View interview history per candidate
+- Search and filter candidates
+- Contact information management
+
+### Reports & Analytics
+- Interview feedback with detailed scoring
+- Technical, Communication, and Problem-Solving score breakdowns
+- Overall rating with star visualization
+- Recommendation tracking (Hire, Next Round, Reject)
+- Score distribution analysis
 
 ## Tech Stack
 
 ### Frontend
-- **React** with TypeScript
-- **Vite** for build tooling
-- **Material UI** for components
-- **React Query** for server state management
+- **React 18** with TypeScript
+- **Material UI (MUI)** for rich UI components
+- **Monaco Editor** for the code editor
 - **React Router** for navigation
-- **Axios** for API calls
+- **Axios** for API communication
+- **Recharts** for data visualization
 
 ### Backend
-- **Node.js** with Express
-- **SQLite** in-memory database
-- **JWT** for authentication
-- **Joi** for validation
-- **PDFKit** for PDF generation
-- **csv-writer** for CSV export
-
-## Project Structure
-
-```
-.
-├── backend/
-│   ├── src/
-│   │   ├── database/
-│   │   │   └── init.js           # Database initialization
-│   │   ├── middleware/
-│   │   │   ├── auth.js           # JWT authentication
-│   │   │   └── errorHandler.js  # Error handling
-│   │   ├── routes/
-│   │   │   ├── auth.js           # Authentication endpoints
-│   │   │   ├── clients.js        # Client CRUD
-│   │   │   ├── workEntries.js    # Work entry CRUD
-│   │   │   └── reports.js        # Reporting & export
-│   │   ├── validation/
-│   │   │   └── schemas.js        # Joi validation schemas
-│   │   └── server.js             # Express server
-│   ├── package.json
-│   └── DEPLOYMENT.md             # Production deployment guide
-│
-└── frontend/
-    ├── src/
-    │   ├── api/
-    │   │   └── client.ts         # API client with JWT
-    │   ├── components/
-    │   │   └── Layout.tsx        # Main layout
-    │   ├── contexts/
-    │   │   └── AuthContext.tsx   # Auth state management
-    │   ├── pages/
-    │   │   ├── LoginPage.tsx     # Login page
-    │   │   ├── DashboardPage.tsx # Dashboard
-    │   │   ├── ClientsPage.tsx   # Client management
-    │   │   ├── WorkEntriesPage.tsx # Work entry management
-    │   │   └── ReportsPage.tsx   # Reports & exports
-    │   ├── types/
-    │   │   └── api.ts            # TypeScript interfaces
-    │   └── App.tsx               # Main app component
-    └── package.json
-```
+- **Python 3** with **FastAPI**
+- **SQLAlchemy** ORM
+- **SQLite** database
+- **JWT** authentication
+- **Pydantic** for data validation
+- Code execution engine (Python & JavaScript)
 
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18+ installed
-- npm or yarn package manager
+- Node.js 18+
+- Python 3.9+
+- npm or yarn
 
 ### Backend Setup
 
-1. Navigate to backend directory:
 ```bash
 cd backend
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
 ```
 
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Create environment file:
-```bash
-cp .env.example .env
-```
-
-4. Update `.env` with your configuration:
-```bash
-PORT=3001
-NODE_ENV=development
-FRONTEND_URL=http://localhost:5173
-JWT_SECRET=your-secure-secret-key-change-this
-```
-
-5. Start the development server:
-```bash
-npm run dev
-```
-
-Backend will be running at `http://localhost:3001`
+The API will be available at `http://localhost:8000`
+API docs at `http://localhost:8000/docs`
 
 ### Frontend Setup
 
-1. Navigate to frontend directory:
 ```bash
 cd frontend
-```
-
-2. Install dependencies:
-```bash
 npm install
+npm start
 ```
 
-3. Create environment file:
-```bash
-cp .env.example .env
+The app will be available at `http://localhost:3000`
+
+### Demo Credentials
+- **Email:** admin@interviewhub.com
+- **Password:** admin123
+
+## Project Structure
+
 ```
-
-4. Update `.env`:
-```bash
-VITE_API_URL=http://localhost:3001
+interview-platform/
+├── backend/
+│   ├── app/
+│   │   ├── routers/         # API route handlers
+│   │   │   ├── auth.py      # Authentication endpoints
+│   │   │   ├── interviews.py # Interview CRUD
+│   │   │   ├── questions.py  # Question bank
+│   │   │   ├── feedback.py   # Interview feedback
+│   │   │   ├── code.py       # Code execution
+│   │   │   ├── users.py      # User management
+│   │   │   └── dashboard.py  # Dashboard stats
+│   │   ├── main.py           # FastAPI app entry
+│   │   ├── models.py         # SQLAlchemy models
+│   │   ├── schemas.py        # Pydantic schemas
+│   │   ├── database.py       # Database config
+│   │   ├── auth.py           # Auth utilities
+│   │   └── seed.py           # Sample data
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── components/       # Reusable components
+│   │   │   └── Layout.tsx    # Main app layout
+│   │   ├── pages/            # Page components
+│   │   │   ├── Dashboard.tsx
+│   │   │   ├── Interviews.tsx
+│   │   │   ├── Questions.tsx
+│   │   │   ├── Candidates.tsx
+│   │   │   ├── CodeEditor.tsx
+│   │   │   ├── Reports.tsx
+│   │   │   └── Login.tsx
+│   │   ├── services/
+│   │   │   └── api.ts        # API service layer
+│   │   └── theme/
+│   │       └── theme.ts      # MUI theme config
+│   └── package.json
+└── README.md
 ```
-
-5. Start the development server:
-```bash
-npm run dev
-```
-
-Frontend will be running at `http://localhost:5173`
-
-## Usage
-
-1. Open `http://localhost:5173` in your browser
-2. Enter any email address to log in (no password required)
-3. Start adding clients and tracking work hours
-4. View reports and export data as CSV or PDF
 
 ## API Endpoints
 
-### Authentication
-- `POST /api/auth/login` - Login with email, returns JWT token
-- `GET /api/auth/me` - Get current user info (requires auth)
-
-### Clients
-- `GET /api/clients` - Get all clients
-- `POST /api/clients` - Create new client
-- `GET /api/clients/:id` - Get specific client
-- `PUT /api/clients/:id` - Update client
-- `DELETE /api/clients/:id` - Delete client
-
-### Work Entries
-- `GET /api/work-entries` - Get all work entries (optional ?clientId filter)
-- `POST /api/work-entries` - Create new work entry
-- `GET /api/work-entries/:id` - Get specific work entry
-- `PUT /api/work-entries/:id` - Update work entry
-- `DELETE /api/work-entries/:id` - Delete work entry
-
-### Reports
-- `GET /api/reports/client/:clientId` - Get hourly report for client
-- `GET /api/reports/export/csv/:clientId` - Export report as CSV
-- `GET /api/reports/export/pdf/:clientId` - Export report as PDF
-
-All authenticated endpoints require `Authorization: Bearer <token>` header.
-
-## Security Features
-
-- JWT-based authentication with 24-hour token expiration
-- Rate limiting on authentication endpoints (5 attempts per 15 minutes)
-- CORS protection
-- Helmet security headers
-- Input validation with Joi schemas
-- SQL injection protection with parameterized queries
-
-## Development
-
-### Backend Development
-```bash
-cd backend
-npm run dev  # Starts with nodemon for auto-reload
-```
-
-### Frontend Development
-```bash
-cd frontend
-npm run dev  # Starts Vite dev server with HMR
-```
-
-### Running Tests
-
-**Backend:**
-```bash
-cd backend
-npm test                    # Run all tests
-npm run test:coverage       # Run tests with coverage report
-npm run test:watch          # Run tests in watch mode
-```
-
-### Test Coverage
-
-The backend has comprehensive test coverage with **161 tests** across 8 test suites:
-
-| File | Statements | Branches | Functions | Lines |
-|------|------------|----------|-----------|-------|
-| **Overall** | **90.16%** | **93.82%** | **92.18%** | **90.35%** |
-| database/init.js | 100% | 100% | 100% | 100% |
-| middleware/auth.js | 100% | 100% | 100% | 100% |
-| middleware/errorHandler.js | 100% | 100% | 100% | 100% |
-| routes/auth.js | 100% | 100% | 100% | 100% |
-| routes/clients.js | 97.89% | 100% | 100% | 97.89% |
-| routes/workEntries.js | 98.41% | 100% | 100% | 98.41% |
-| routes/reports.js | 64.15% | 69.44% | 68.75% | 64.42% |
-| validation/schemas.js | 100% | 100% | 100% | 100% |
-
-Coverage thresholds are configured in `jest.config.js`:
-- Statements: 60%
-- Branches: 60%
-- Functions: 65%
-- Lines: 60%
-
-### Building for Production
-
-**Backend:**
-```bash
-cd backend
-npm start  # Production mode
-```
-
-**Frontend:**
-```bash
-cd frontend
-npm run build  # Creates optimized production build in dist/
-npm run preview  # Preview production build
-```
-
-## Production Deployment
-
-See `backend/DEPLOYMENT.md` for detailed production deployment instructions.
-
-### Quick Production Checklist
-- [ ] Set strong `JWT_SECRET` in environment variables
-- [ ] Configure proper `FRONTEND_URL` for CORS
-- [ ] Consider switching to file-based SQLite for data persistence
-- [ ] Set up HTTPS/SSL certificates
-- [ ] Configure proper logging and monitoring
-- [ ] Set up automated backups (if using persistent storage)
-- [ ] Review and adjust rate limiting settings
-- [ ] Consider integrating with company SSO
-
-## Known Limitations
-
-1. **In-memory database** - All data is lost on server restart
-2. **Email-only auth** - No password protection, assumes trusted network
-3. **No user roles** - All users have equal access to all data
-4. **Single-server architecture** - Not designed for horizontal scaling
-5. **No real-time updates** - Changes require page refresh
-
-## Future Enhancements
-
-- Persistent database storage
-- User roles and permissions
-- Multi-tenancy support
-- Real-time updates with WebSockets
-- Advanced reporting and analytics
-- Email notifications
-- Mobile app
-- Integration with calendar systems
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/login` | User login |
+| POST | `/api/auth/register` | User registration |
+| GET | `/api/dashboard/stats` | Dashboard statistics |
+| GET/POST | `/api/interviews/` | List/Create interviews |
+| PUT/DELETE | `/api/interviews/{id}` | Update/Delete interview |
+| GET/POST | `/api/questions/` | List/Create questions |
+| GET/POST | `/api/feedback/` | List/Create feedback |
+| POST | `/api/code/run` | Execute code |
+| GET | `/api/users/` | List users |
 
 ## License
 
-MIT
-
-## Support
-
-For issues or questions, please contact your system administrator.
+MIT License
