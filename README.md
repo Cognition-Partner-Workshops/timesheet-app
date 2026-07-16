@@ -64,24 +64,32 @@ A full-stack web application for tracking and reporting employee hourly work acr
 │   ├── package.json
 │   └── DEPLOYMENT.md             # Production deployment guide
 │
-└── frontend/
-    ├── src/
-    │   ├── api/
-    │   │   └── client.ts         # API client with JWT
-    │   ├── components/
-    │   │   └── Layout.tsx        # Main layout
-    │   ├── contexts/
-    │   │   └── AuthContext.tsx   # Auth state management
-    │   ├── pages/
-    │   │   ├── LoginPage.tsx     # Login page
-    │   │   ├── DashboardPage.tsx # Dashboard
-    │   │   ├── ClientsPage.tsx   # Client management
-    │   │   ├── WorkEntriesPage.tsx # Work entry management
-    │   │   └── ReportsPage.tsx   # Reports & exports
-    │   ├── types/
-    │   │   └── api.ts            # TypeScript interfaces
-    │   └── App.tsx               # Main app component
-    └── package.json
+├── frontend/
+│   ├── src/
+│   │   ├── api/
+│   │   │   └── client.ts         # API client with JWT
+│   │   ├── components/
+│   │   │   └── Layout.tsx        # Main layout
+│   │   ├── contexts/
+│   │   │   └── AuthContext.tsx   # Auth state management
+│   │   ├── pages/
+│   │   │   ├── LoginPage.tsx     # Login page
+│   │   │   ├── DashboardPage.tsx # Dashboard
+│   │   │   ├── ClientsPage.tsx   # Client management
+│   │   │   ├── WorkEntriesPage.tsx # Work entry management
+│   │   │   └── ReportsPage.tsx   # Reports & exports
+│   │   ├── types/
+│   │   │   └── api.ts            # TypeScript interfaces
+│   │   └── App.tsx               # Main app component
+│   └── package.json
+│
+└── e2e/                          # Playwright E2E tests
+    ├── helpers.ts                # Shared login/cleanup helpers
+    ├── 01-login.spec.ts          # Login flow
+    ├── 02-clients.spec.ts        # Client management
+    ├── 03-work-entries.spec.ts   # Work entry lifecycle
+    ├── 04-reports.spec.ts        # Reporting
+    └── 05-edge-cases.spec.ts     # Edge cases & validation
 ```
 
 ## Getting Started
@@ -188,7 +196,7 @@ All authenticated endpoints require `Authorization: Bearer <token>` header.
 ## Security Features
 
 - JWT-based authentication with 24-hour token expiration
-- Rate limiting on authentication endpoints (5 attempts per 15 minutes)
+- Rate limiting (100 requests per 15 minutes per IP in production; raised to 1000 when `NODE_ENV=development` so E2E test runs are not throttled)
 - CORS protection
 - Helmet security headers
 - Input validation with Joi schemas
@@ -217,6 +225,27 @@ npm test                    # Run all tests
 npm run test:coverage       # Run tests with coverage report
 npm run test:watch          # Run tests in watch mode
 ```
+
+**End-to-End (Playwright):**
+
+E2E tests live in the `e2e/` directory and exercise the full stack through the browser (login, client management, work entry lifecycle, reporting, and edge cases). They run against the app at `http://localhost:5173`, so both servers must be running first.
+
+```bash
+# First-time setup (from the repo root)
+npm install
+npx playwright install chromium
+
+# Start the backend and frontend in separate terminals
+(cd backend && npm run dev)     # http://localhost:3001
+(cd frontend && npm run dev)    # http://localhost:5173
+
+# Run the E2E tests (from the repo root)
+npx playwright test                 # headless
+npx playwright test --headed        # watch in a browser
+npx playwright show-report          # open the HTML report
+```
+
+The suite contains 27 tests across 5 spec files in `e2e/`. Videos and screenshots are captured for every test (configured in `playwright.config.ts`) and written to `test-results/`.
 
 ### Test Coverage
 
