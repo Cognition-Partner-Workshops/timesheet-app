@@ -1,4 +1,9 @@
-const { parseIdParam, handleDbError } = require('../../routes/helpers');
+const {
+  parseIdParam,
+  validateIdParam,
+  buildUpdateSet,
+  handleDbError
+} = require('../../routes/helpers');
 
 describe('Route Helpers', () => {
   describe('parseIdParam', () => {
@@ -28,6 +33,77 @@ describe('Route Helpers', () => {
 
     test('should parse a negative integer string', () => {
       expect(parseIdParam('-5')).toBe(-5);
+    });
+  });
+
+  describe('validateIdParam', () => {
+    let res;
+    let next;
+
+    beforeEach(() => {
+      res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn().mockReturnThis()
+      };
+      next = jest.fn();
+    });
+
+    test('should store the parsed ID on req.parsedId and call next', () => {
+      const req = { params: { id: '12' } };
+
+      validateIdParam('client')(req, res, next);
+
+      expect(req.parsedId).toBe(12);
+      expect(next).toHaveBeenCalled();
+      expect(res.status).not.toHaveBeenCalled();
+    });
+
+    test('should respond with 400 and a labeled message for an invalid ID', () => {
+      const req = { params: { id: 'abc' } };
+
+      validateIdParam('work entry')(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Invalid work entry ID' });
+      expect(next).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('buildUpdateSet', () => {
+    const fieldSpecs = [
+      { column: 'name', key: 'name' },
+      { column: 'description', key: 'description', nullable: true }
+    ];
+
+    test('should include only fields present in the value object', () => {
+      const { setClause, values } = buildUpdateSet(fieldSpecs, { name: 'Acme' });
+
+      expect(setClause).toBe('name = ?, updated_at = CURRENT_TIMESTAMP');
+      expect(values).toEqual(['Acme']);
+    });
+
+    test('should coerce empty nullable fields to null', () => {
+      const { setClause, values } = buildUpdateSet(fieldSpecs, { description: '' });
+
+      expect(setClause).toBe('description = ?, updated_at = CURRENT_TIMESTAMP');
+      expect(values).toEqual([null]);
+    });
+
+    test('should build clauses for multiple fields in spec order', () => {
+      const { setClause, values } = buildUpdateSet(fieldSpecs, {
+        name: 'Acme',
+        description: 'A client'
+      });
+
+      expect(setClause).toBe('name = ?, description = ?, updated_at = CURRENT_TIMESTAMP');
+      expect(values).toEqual(['Acme', 'A client']);
+    });
+
+    test('should only append the timestamp when no fields are present', () => {
+      const { setClause, values } = buildUpdateSet(fieldSpecs, {});
+
+      expect(setClause).toBe('updated_at = CURRENT_TIMESTAMP');
+      expect(values).toEqual([]);
     });
   });
 

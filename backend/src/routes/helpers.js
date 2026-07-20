@@ -14,6 +14,50 @@ function parseIdParam(value) {
 }
 
 /**
+ * Builds Express middleware that validates the `:id` route parameter.
+ * On success the parsed integer is stored on `req.parsedId`; otherwise a
+ * 400 response is sent.
+ *
+ * @param {string} label - Resource name used in the error message (e.g. 'client').
+ * @returns {import('express').RequestHandler} Validation middleware.
+ */
+function validateIdParam(label) {
+  return (req, res, next) => {
+    const id = parseIdParam(req.params.id);
+    if (id === null) {
+      return res.status(400).json({ error: `Invalid ${label} ID` });
+    }
+    req.parsedId = id;
+    next();
+  };
+}
+
+/**
+ * Builds the SET clause and bound values for a partial UPDATE from the
+ * validated request body. Always appends `updated_at = CURRENT_TIMESTAMP`.
+ *
+ * @param {Array<{column: string, key: string, nullable?: boolean}>} fieldSpecs -
+ *   Mapping of DB columns to request-body keys; nullable fields coerce
+ *   empty values to NULL.
+ * @param {Object} value - Validated request body.
+ * @returns {{setClause: string, values: Array}} SQL fragment and bind values.
+ */
+function buildUpdateSet(fieldSpecs, value) {
+  const updates = [];
+  const values = [];
+
+  for (const { column, key, nullable } of fieldSpecs) {
+    if (value[key] !== undefined) {
+      updates.push(`${column} = ?`);
+      values.push(nullable ? value[key] || null : value[key]);
+    }
+  }
+
+  updates.push('updated_at = CURRENT_TIMESTAMP');
+  return { setClause: updates.join(', '), values };
+}
+
+/**
  * Logs a database error and sends a 500 JSON error response.
  *
  * @param {import('express').Response} res - Express response object.
@@ -35,6 +79,8 @@ const WORK_ENTRY_SELECT = `
 
 module.exports = {
   parseIdParam,
+  validateIdParam,
+  buildUpdateSet,
   handleDbError,
   WORK_ENTRY_SELECT,
 };
