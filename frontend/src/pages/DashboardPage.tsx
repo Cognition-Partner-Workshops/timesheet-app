@@ -16,21 +16,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import apiClient, { type SummaryReportResponse } from '../api/client';
-
-// TODO(DJ-46 parent): remove mock, call apiClient.getSummaryReport(days)
-const fetchSummaryReport = async (days: number): Promise<SummaryReportResponse> => {
-  void days;
-  void apiClient.getSummaryReport;
-  return {
-    summary: [
-      { client_id: 1, client_name: 'Acme Corp', total_hours: 42.5, entry_count: 8 },
-      { client_id: 2, client_name: 'Globex Inc', total_hours: 25, entry_count: 5 },
-      { client_id: 3, client_name: 'Initech', total_hours: 10.25, entry_count: 3 },
-    ],
-    total_hours: 77.75,
-  };
-};
+import apiClient from '../api/client';
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -47,7 +33,7 @@ const DashboardPage: React.FC = () => {
 
   const { data: summaryData } = useQuery({
     queryKey: ['reports', 'summary', 30],
-    queryFn: () => fetchSummaryReport(30),
+    queryFn: () => apiClient.getSummaryReport(30),
   });
 
   const clients = clientsData?.clients || [];

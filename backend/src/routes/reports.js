@@ -28,7 +28,10 @@ router.get('/summary', (req, res) => {
             SUM(we.hours) AS total_hours, COUNT(we.id) AS entry_count
      FROM work_entries we
      JOIN clients c ON we.client_id = c.id
-     WHERE we.user_email = ? AND we.date >= date('now', '-' || ? || ' days')
+     WHERE we.user_email = ?
+       AND (CASE WHEN typeof(we.date) IN ('integer', 'real')
+                 THEN date(we.date / 1000, 'unixepoch')
+                 ELSE date(we.date) END) >= date('now', '-' || ? || ' days')
      GROUP BY c.id, c.name
      ORDER BY total_hours DESC`,
     [req.userEmail, days],
