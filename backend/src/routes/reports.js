@@ -1,6 +1,7 @@
 const express = require('express');
 const { getDatabase } = require('../database/init');
 const { authenticateUser } = require('../middleware/auth');
+const { reportSummarySchema } = require('../validation/schemas');
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 const PDFDocument = require('pdfkit');
 const path = require('path');
@@ -10,6 +11,51 @@ const router = express.Router();
 
 // All routes require authentication
 router.use(authenticateUser);
+
+// Get hours-by-client summary for the authenticated user
+router.get('/summary', (req, res, next) => {
+  try {
+    const { error, value } = reportSummarySchema.validate(req.query);
+    if (error) {
+      return next(error);
+    }
+
+    const { days } = value;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    const cutoffTimestamp = cutoff.getTime();
+
+    const db = getDatabase();
+
+    db.all(
+      `SELECT c.id as clientId, c.name as clientName, SUM(we.hours) as totalHours
+       FROM work_entries we
+       JOIN clients c ON we.client_id = c.id
+       WHERE we.user_email = ? AND we.date >= ?
+       GROUP BY c.id, c.name
+       ORDER BY totalHours DESC`,
+      [req.userEmail, cutoffTimestamp],
+      (err, rows) => {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ error: 'Internal server error' });
+        }
+
+        const clients = rows.map((row) => ({
+          clientId: row.clientId,
+          clientName: row.clientName,
+          totalHours: parseFloat(row.totalHours)
+        }));
+
+        const totalHours = clients.reduce((sum, client) => sum + client.totalHours, 0);
+
+        res.json({ clients, totalHours, days });
+      }
+    );
+  } catch (error) {
+    next(error);
+  }
+});
 
 // Get hourly report for specific client
 router.get('/client/:clientId', (req, res) => {

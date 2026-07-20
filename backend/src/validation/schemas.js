@@ -32,10 +32,15 @@ const emailSchema = Joi.object({
   email: Joi.string().email().required()
 });
 
+const reportSummarySchema = Joi.object({
+  days: Joi.number().integer().min(1).max(365).default(30)
+});
+
 module.exports = {
   clientSchema,
   workEntrySchema,
   updateWorkEntrySchema,
   updateClientSchema,
-  emailSchema
+  emailSchema,
+  reportSummarySchema
 };

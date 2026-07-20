@@ -119,6 +119,11 @@ class ApiClient {
     return response.data;
   }
 
+  async getReportSummary(days = 30) {
+    const response = await this.client.get('/api/reports/summary', { params: { days } });
+    return response.data;
+  }
+
   async exportClientReportCsv(clientId: number) {
     const response = await this.client.get(`/api/reports/export/csv/${clientId}`, {
       responseType: 'blob',

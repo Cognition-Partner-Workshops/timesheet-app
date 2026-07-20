@@ -31,8 +31,21 @@ const DashboardPage: React.FC = () => {
     queryFn: () => apiClient.getWorkEntries(),
   });
 
+  const { data: summaryData } = useQuery({
+    queryKey: ['reportSummary'],
+    queryFn: () => apiClient.getReportSummary(),
+  });
+
   const clients = clientsData?.clients || [];
   const workEntries = workEntriesData?.workEntries || [];
+
+  const summaryClients: { clientId: number; clientName: string; totalHours: number }[] =
+    summaryData?.clients || [];
+  const summaryTotalHours: number = summaryData?.totalHours || 0;
+  const maxClientHours = summaryClients.reduce(
+    (max: number, client: { totalHours: number }) => Math.max(max, client.totalHours),
+    0
+  );
 
   const totalHours = workEntries.reduce((sum: number, entry: { hours: number }) => sum + entry.hours, 0);
   const recentEntries = workEntries.slice(0, 5);
@@ -108,6 +121,40 @@ const DashboardPage: React.FC = () => {
           </Grid>
         ))}
       </Grid>
+
+      <Paper sx={{ p: 3, mb: 4 }}>
+        <Typography variant="h6" mb={2}>
+          Hours by Client (last {summaryData?.days ?? 30} days)
+        </Typography>
+        {summaryClients.length > 0 ? (
+          summaryClients.map((client) => (
+            <Box key={client.clientId} sx={{ mb: 2 }}>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
+                <Typography variant="subtitle1">{client.clientName}</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {client.totalHours.toFixed(2)} hours (
+                  {summaryTotalHours > 0
+                    ? ((client.totalHours / summaryTotalHours) * 100).toFixed(1)
+                    : '0.0'}
+                  %)
+                </Typography>
+              </Box>
+              <Box sx={{ backgroundColor: '#eee', borderRadius: 1, height: 10 }}>
+                <Box
+                  sx={{
+                    backgroundColor: '#1976d2',
+                    borderRadius: 1,
+                    height: '100%',
+                    width: `${maxClientHours > 0 ? (client.totalHours / maxClientHours) * 100 : 0}%`,
+                  }}
+                />
+              </Box>
+            </Box>
+          ))
+        ) : (
+          <Typography color="text.secondary">No hours logged yet</Typography>
+        )}
+      </Paper>
 
       <Grid container spacing={3}>
         {/* @ts-expect-error - MUI Grid item prop type issue */}

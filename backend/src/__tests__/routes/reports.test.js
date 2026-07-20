@@ -37,6 +37,13 @@ jest.mock('../../middleware/auth', () => ({
 const app = express();
 app.use(express.json());
 app.use('/api/reports', reportRoutes);
+// Add error handler for Joi validation
+app.use((err, req, res, next) => {
+  if (err.isJoi) {
+    return res.status(400).json({ error: 'Validation error' });
+  }
+  res.status(500).json({ error: 'Internal server error' });
+});
 
 describe('Report Routes', () => {
   let mockDb;
@@ -56,6 +63,103 @@ describe('Report Routes', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe('GET /api/reports/summary', () => {
+    test('should return per-client totals and grand total sorted by hours', async () => {
+      const mockRows = [
+        { clientId: 2, clientName: 'Client B', totalHours: 12.5 },
+        { clientId: 1, clientName: 'Client A', totalHours: 7.5 }
+      ];
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, mockRows);
+      });
+
+      const response = await request(app).get('/api/reports/summary');
+
+      expect(response.status).toBe(200);
+      expect(response.body.clients).toEqual([
+        { clientId: 2, clientName: 'Client B', totalHours: 12.5 },
+        { clientId: 1, clientName: 'Client A', totalHours: 7.5 }
+      ]);
+      expect(response.body.totalHours).toBe(20);
+      expect(response.body.days).toBe(30);
+    });
+
+    test('should return empty array and zero total when no entries', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, []);
+      });
+
+      const response = await request(app).get('/api/reports/summary');
+
+      expect(response.status).toBe(200);
+      expect(response.body.clients).toEqual([]);
+      expect(response.body.totalHours).toBe(0);
+    });
+
+    test('should default days to 30 when omitted', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, []);
+      });
+
+      const response = await request(app).get('/api/reports/summary');
+
+      expect(response.status).toBe(200);
+      expect(response.body.days).toBe(30);
+    });
+
+    test('should use provided days value', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, []);
+      });
+
+      const response = await request(app).get('/api/reports/summary?days=7');
+
+      expect(response.status).toBe(200);
+      expect(response.body.days).toBe(7);
+    });
+
+    test('should return 400 for non-numeric days', async () => {
+      const response = await request(app).get('/api/reports/summary?days=abc');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Validation error' });
+    });
+
+    test('should return 400 for out-of-range days', async () => {
+      const response = await request(app).get('/api/reports/summary?days=400');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Validation error' });
+    });
+
+    test('should handle database error', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(new Error('Database error'), null);
+      });
+
+      const response = await request(app).get('/api/reports/summary');
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Internal server error' });
+    });
+
+    test('should filter summary by authenticated user email', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        expect(params).toContain('test@example.com');
+        callback(null, []);
+      });
+
+      await request(app).get('/api/reports/summary');
+
+      expect(mockDb.all).toHaveBeenCalledWith(
+        expect.stringContaining('WHERE we.user_email = ?'),
+        expect.arrayContaining(['test@example.com']),
+        expect.any(Function)
+      );
+    });
   });
 
   describe('GET /api/reports/client/:clientId', () => {
