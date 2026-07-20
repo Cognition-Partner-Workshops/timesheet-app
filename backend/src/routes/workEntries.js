@@ -2,6 +2,7 @@ const express = require('express');
 const { getDatabase } = require('../database/init');
 const { authenticateUser } = require('../middleware/auth');
 const { workEntrySchema, updateWorkEntrySchema } = require('../validation/schemas');
+const { parseIdParam, handleDbError, WORK_ENTRY_SELECT } = require('./helpers');
 
 const router = express.Router();
 
@@ -13,19 +14,13 @@ router.get('/', (req, res) => {
   const { clientId } = req.query;
   const db = getDatabase();
   
-  let query = `
-    SELECT we.id, we.client_id, we.hours, we.description, we.date, 
-           we.created_at, we.updated_at, c.name as client_name
-    FROM work_entries we
-    JOIN clients c ON we.client_id = c.id
-    WHERE we.user_email = ?
-  `;
+  let query = `${WORK_ENTRY_SELECT} WHERE we.user_email = ?`;
   
   const params = [req.userEmail];
   
   if (clientId) {
-    const clientIdNum = parseInt(clientId);
-    if (isNaN(clientIdNum)) {
+    const clientIdNum = parseIdParam(clientId);
+    if (clientIdNum === null) {
       return res.status(400).json({ error: 'Invalid client ID' });
     }
     query += ' AND we.client_id = ?';
@@ -36,8 +31,7 @@ router.get('/', (req, res) => {
   
   db.all(query, params, (err, rows) => {
     if (err) {
-      console.error('Database error:', err);
-      return res.status(500).json({ error: 'Internal server error' });
+      return handleDbError(res, err);
     }
     
     res.json({ workEntries: rows });
@@ -46,25 +40,20 @@ router.get('/', (req, res) => {
 
 // Get specific work entry
 router.get('/:id', (req, res) => {
-  const workEntryId = parseInt(req.params.id);
+  const workEntryId = parseIdParam(req.params.id);
   
-  if (isNaN(workEntryId)) {
+  if (workEntryId === null) {
     return res.status(400).json({ error: 'Invalid work entry ID' });
   }
   
   const db = getDatabase();
   
   db.get(
-    `SELECT we.id, we.client_id, we.hours, we.description, we.date, 
-            we.created_at, we.updated_at, c.name as client_name
-     FROM work_entries we
-     JOIN clients c ON we.client_id = c.id
-     WHERE we.id = ? AND we.user_email = ?`,
+    `${WORK_ENTRY_SELECT} WHERE we.id = ? AND we.user_email = ?`,
     [workEntryId, req.userEmail],
     (err, row) => {
       if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ error: 'Internal server error' });
+        return handleDbError(res, err);
       }
       
       if (!row) {
@@ -93,8 +82,7 @@ router.post('/', (req, res, next) => {
       [clientId, req.userEmail],
       (err, row) => {
         if (err) {
-          console.error('Database error:', err);
-          return res.status(500).json({ error: 'Internal server error' });
+          return handleDbError(res, err);
         }
 
         if (!row) {
@@ -107,22 +95,16 @@ router.post('/', (req, res, next) => {
           [clientId, req.userEmail, hours, description || null, date],
           function(err) {
             if (err) {
-              console.error('Database error:', err);
-              return res.status(500).json({ error: 'Failed to create work entry' });
+              return handleDbError(res, err, 'Failed to create work entry');
             }
 
             // Return the created work entry with client name
             db.get(
-              `SELECT we.id, we.client_id, we.hours, we.description, we.date, 
-                      we.created_at, we.updated_at, c.name as client_name
-               FROM work_entries we
-               JOIN clients c ON we.client_id = c.id
-               WHERE we.id = ?`,
+              `${WORK_ENTRY_SELECT} WHERE we.id = ?`,
               [this.lastID],
               (err, row) => {
                 if (err) {
-                  console.error('Database error:', err);
-                  return res.status(500).json({ error: 'Work entry created but failed to retrieve' });
+                  return handleDbError(res, err, 'Work entry created but failed to retrieve');
                 }
 
                 res.status(201).json({
@@ -143,9 +125,9 @@ router.post('/', (req, res, next) => {
 // Update work entry
 router.put('/:id', (req, res, next) => {
   try {
-    const workEntryId = parseInt(req.params.id);
+    const workEntryId = parseIdParam(req.params.id);
     
-    if (isNaN(workEntryId)) {
+    if (workEntryId === null) {
       return res.status(400).json({ error: 'Invalid work entry ID' });
     }
 
@@ -162,8 +144,7 @@ router.put('/:id', (req, res, next) => {
       [workEntryId, req.userEmail],
       (err, row) => {
         if (err) {
-          console.error('Database error:', err);
-          return res.status(500).json({ error: 'Internal server error' });
+          return handleDbError(res, err);
         }
 
         if (!row) {
@@ -177,8 +158,7 @@ router.put('/:id', (req, res, next) => {
             [value.clientId, req.userEmail],
             (err, clientRow) => {
               if (err) {
-                console.error('Database error:', err);
-                return res.status(500).json({ error: 'Internal server error' });
+                return handleDbError(res, err);
               }
 
               if (!clientRow) {
@@ -224,22 +204,16 @@ router.put('/:id', (req, res, next) => {
 
           db.run(query, values, function(err) {
             if (err) {
-              console.error('Database error:', err);
-              return res.status(500).json({ error: 'Failed to update work entry' });
+              return handleDbError(res, err, 'Failed to update work entry');
             }
 
             // Return updated work entry with client name
             db.get(
-              `SELECT we.id, we.client_id, we.hours, we.description, we.date, 
-                      we.created_at, we.updated_at, c.name as client_name
-               FROM work_entries we
-               JOIN clients c ON we.client_id = c.id
-               WHERE we.id = ?`,
+              `${WORK_ENTRY_SELECT} WHERE we.id = ?`,
               [workEntryId],
               (err, row) => {
                 if (err) {
-                  console.error('Database error:', err);
-                  return res.status(500).json({ error: 'Work entry updated but failed to retrieve' });
+                  return handleDbError(res, err, 'Work entry updated but failed to retrieve');
                 }
 
                 res.json({
@@ -259,9 +233,9 @@ router.put('/:id', (req, res, next) => {
 
 // Delete work entry
 router.delete('/:id', (req, res) => {
-  const workEntryId = parseInt(req.params.id);
+  const workEntryId = parseIdParam(req.params.id);
   
-  if (isNaN(workEntryId)) {
+  if (workEntryId === null) {
     return res.status(400).json({ error: 'Invalid work entry ID' });
   }
   
@@ -273,8 +247,7 @@ router.delete('/:id', (req, res) => {
     [workEntryId, req.userEmail],
     (err, row) => {
       if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ error: 'Internal server error' });
+        return handleDbError(res, err);
       }
       
       if (!row) {
@@ -287,8 +260,7 @@ router.delete('/:id', (req, res) => {
         [workEntryId, req.userEmail],
         function(err) {
           if (err) {
-            console.error('Database error:', err);
-            return res.status(500).json({ error: 'Failed to delete work entry' });
+            return handleDbError(res, err, 'Failed to delete work entry');
           }
           
           res.json({ message: 'Work entry deleted successfully' });
