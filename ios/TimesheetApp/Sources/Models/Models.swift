@@ -37,6 +37,18 @@ struct WorkEntry: Codable, Identifiable, Hashable {
     var dateValue: Date? {
         DateParsing.parse(date)
     }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        clientId = try c.decode(Int.self, forKey: .clientId)
+        hours = try c.decode(Double.self, forKey: .hours)
+        description = try c.decodeIfPresent(String.self, forKey: .description)
+        date = try DateParsing.decodeDateString(from: c, forKey: .date)
+        clientName = try c.decodeIfPresent(String.self, forKey: .clientName)
+        createdAt = try c.decodeIfPresent(String.self, forKey: .createdAt)
+        updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
+    }
 }
 
 struct ReportEntry: Codable, Identifiable, Hashable {
@@ -51,6 +63,16 @@ struct ReportEntry: Codable, Identifiable, Hashable {
         case id, hours, description, date
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        hours = try c.decode(Double.self, forKey: .hours)
+        description = try c.decodeIfPresent(String.self, forKey: .description)
+        date = try DateParsing.decodeDateString(from: c, forKey: .date)
+        createdAt = try c.decodeIfPresent(String.self, forKey: .createdAt)
+        updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     }
 }
 
@@ -106,6 +128,22 @@ enum DateParsing {
         f.locale = Locale(identifier: "en_US_POSIX")
         return f
     }()
+
+    static let utcDayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f
+    }()
+
+    static func decodeDateString<K: CodingKey>(from container: KeyedDecodingContainer<K>, forKey key: K) throws -> String {
+        if let s = try? container.decode(String.self, forKey: key) {
+            return s
+        }
+        let ms = try container.decode(Double.self, forKey: key)
+        return utcDayFormatter.string(from: Date(timeIntervalSince1970: ms / 1000))
+    }
 
     static func parse(_ raw: String) -> Date? {
         if let d = dayFormatter.date(from: String(raw.prefix(10))) {
