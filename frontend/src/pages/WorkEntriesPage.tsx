@@ -34,7 +34,13 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import apiClient from '../api/client';
-import { type WorkEntry } from '../types/api';
+import { getApiErrorMessage } from '../api/errors';
+import {
+  type CreateWorkEntryRequest,
+  type UpdateWorkEntryRequest,
+  type WorkEntry,
+  type WorkEntryWithClient,
+} from '../types/api';
 
 const WorkEntriesPage: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -60,28 +66,25 @@ const WorkEntriesPage: React.FC = () => {
   });
 
   const createMutation = useMutation({
-    mutationFn: (entryData: { clientId: number; hours: number; description?: string; date: string }) =>
-      apiClient.createWorkEntry(entryData),
+    mutationFn: (entryData: CreateWorkEntryRequest) => apiClient.createWorkEntry(entryData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workEntries'] });
       handleClose();
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to create work entry');
+      setError(getApiErrorMessage(err, 'Failed to create work entry'));
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { clientId?: number; hours?: number; description?: string; date?: string } }) =>
+    mutationFn: ({ id, data }: { id: number; data: UpdateWorkEntryRequest }) =>
       apiClient.updateWorkEntry(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workEntries'] });
       handleClose();
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to update work entry');
+      setError(getApiErrorMessage(err, 'Failed to update work entry'));
     },
   });
 
@@ -91,8 +94,7 @@ const WorkEntriesPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['workEntries'] });
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to delete work entry');
+      setError(getApiErrorMessage(err, 'Failed to delete work entry'));
     },
   });
 
@@ -170,7 +172,7 @@ const WorkEntriesPage: React.FC = () => {
     }
   };
 
-  const handleDelete = (entry: WorkEntry) => {
+  const handleDelete = (entry: WorkEntryWithClient) => {
     if (window.confirm(`Are you sure you want to delete this ${entry.hours} hour entry for ${entry.client_name}?`)) {
       deleteMutation.mutate(entry.id);
     }
@@ -224,7 +226,7 @@ const WorkEntriesPage: React.FC = () => {
                 </TableHead>
                 <TableBody>
                   {workEntries.length > 0 ? (
-                    workEntries.map((entry: WorkEntry) => (
+                    workEntries.map((entry) => (
                       <TableRow key={entry.id}>
                         <TableCell>
                           <Typography variant="subtitle1" fontWeight="medium">
@@ -298,7 +300,7 @@ const WorkEntriesPage: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, clientId: Number(e.target.value) })}
                   disabled={createMutation.isPending || updateMutation.isPending}
                 >
-                  {clients.map((client: { id: number; name: string }) => (
+                  {clients.map((client) => (
                     <MenuItem key={client.id} value={client.id}>
                       {client.name}
                     </MenuItem>
