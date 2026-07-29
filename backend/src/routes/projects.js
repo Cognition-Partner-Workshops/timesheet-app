@@ -20,6 +20,30 @@ function toDateOnly(value) {
   return new Date(value).toISOString().split('T')[0];
 }
 
+// Runs onVerified once the (optional) client is confirmed to belong to the user
+function verifyClient(db, clientId, userEmail, res, onVerified) {
+  if (!clientId) {
+    return onVerified();
+  }
+
+  db.get(
+    'SELECT id FROM clients WHERE id = ? AND user_email = ?',
+    [clientId, userEmail],
+    (err, clientRow) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      if (!clientRow) {
+        return res.status(400).json({ error: 'Client not found or does not belong to user' });
+      }
+
+      onVerified();
+    }
+  );
+}
+
 // All routes require authentication
 router.use(authenticateUser);
 
@@ -87,7 +111,7 @@ router.post('/', (req, res, next) => {
     const { name, description, clientId, startDate, status } = value;
     const db = getDatabase();
 
-    const insertProject = () => {
+    verifyClient(db, clientId, req.userEmail, res, () => {
       db.run(
         'INSERT INTO projects (name, description, client_id, start_date, status, user_email) VALUES (?, ?, ?, ?, ?, ?)',
         [name, description || null, clientId || null, toDateOnly(startDate), status || 'active', req.userEmail],
@@ -115,29 +139,7 @@ router.post('/', (req, res, next) => {
           );
         }
       );
-    };
-
-    if (!clientId) {
-      return insertProject();
-    }
-
-    // Verify client exists and belongs to user
-    db.get(
-      'SELECT id FROM clients WHERE id = ? AND user_email = ?',
-      [clientId, req.userEmail],
-      (err, row) => {
-        if (err) {
-          console.error('Database error:', err);
-          return res.status(500).json({ error: 'Internal server error' });
-        }
-
-        if (!row) {
-          return res.status(400).json({ error: 'Client not found or does not belong to user' });
-        }
-
-        insertProject();
-      }
-    );
+    });
   } catch (error) {
     next(error);
   }
@@ -173,29 +175,7 @@ router.put('/:id', (req, res, next) => {
           return res.status(404).json({ error: 'Project not found' });
         }
 
-        // If clientId is being set, verify it belongs to user
-        if (value.clientId) {
-          db.get(
-            'SELECT id FROM clients WHERE id = ? AND user_email = ?',
-            [value.clientId, req.userEmail],
-            (err, clientRow) => {
-              if (err) {
-                console.error('Database error:', err);
-                return res.status(500).json({ error: 'Internal server error' });
-              }
-
-              if (!clientRow) {
-                return res.status(400).json({ error: 'Client not found or does not belong to user' });
-              }
-
-              performUpdate();
-            }
-          );
-        } else {
-          performUpdate();
-        }
-
-        function performUpdate() {
+        verifyClient(db, value.clientId, req.userEmail, res, () => {
           // Build update query dynamically
           const updates = [];
           const values = [];
@@ -253,7 +233,7 @@ router.put('/:id', (req, res, next) => {
               }
             );
           });
-        }
+        });
       }
     );
   } catch (error) {

@@ -113,6 +113,7 @@ const ProjectsPage: React.FC = () => {
     },
   });
 
+  const isSaving = createMutation.isPending || updateMutation.isPending;
   const projects = projectsData?.projects || [];
   const clients = clientsData?.clients || [];
 
@@ -313,7 +314,7 @@ const ProjectsPage: React.FC = () => {
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                disabled={createMutation.isPending || updateMutation.isPending}
+                disabled={isSaving}
               />
 
               <FormControl fullWidth margin="dense">
@@ -322,7 +323,7 @@ const ProjectsPage: React.FC = () => {
                   label="Client"
                   value={formData.clientId}
                   onChange={(e) => setFormData({ ...formData, clientId: Number(e.target.value) })}
-                  disabled={createMutation.isPending || updateMutation.isPending}
+                  disabled={isSaving}
                 >
                   <MenuItem value={0}>Unassigned</MenuItem>
                   {clients.map((client: { id: number; name: string }) => (
@@ -341,7 +342,7 @@ const ProjectsPage: React.FC = () => {
                   textField: {
                     fullWidth: true,
                     margin: 'dense',
-                    disabled: createMutation.isPending || updateMutation.isPending,
+                    disabled: isSaving,
                   },
                 }}
               />
@@ -352,7 +353,7 @@ const ProjectsPage: React.FC = () => {
                   label="Status"
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value as ProjectStatus })}
-                  disabled={createMutation.isPending || updateMutation.isPending}
+                  disabled={isSaving}
                 >
                   {statusOptions.map((option) => (
                     <MenuItem key={option.value} value={option.value}>
@@ -370,23 +371,19 @@ const ProjectsPage: React.FC = () => {
                 rows={3}
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                disabled={createMutation.isPending || updateMutation.isPending}
+                disabled={isSaving}
               />
             </DialogContent>
             <DialogActions>
-              <Button onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
+              <Button onClick={handleClose} disabled={isSaving}>
                 Cancel
               </Button>
               <Button
                 type="submit"
                 variant="contained"
-                disabled={createMutation.isPending || updateMutation.isPending}
+                disabled={isSaving}
               >
-                {createMutation.isPending || updateMutation.isPending ? (
-                  <CircularProgress size={24} />
-                ) : (
-                  editingProject ? 'Update' : 'Create'
-                )}
+                {isSaving ? <CircularProgress size={24} /> : editingProject ? 'Update' : 'Create'}
               </Button>
             </DialogActions>
           </form>
