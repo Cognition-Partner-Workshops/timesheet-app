@@ -22,6 +22,11 @@ const UPDATABLE_COLUMNS = {
   status: 'status'
 };
 
+// Joi coerces ISO dates to Date objects; store them as YYYY-MM-DD strings
+function toDateString(date) {
+  return new Date(date).toISOString().split('T')[0];
+}
+
 function parseProjectId(req, res) {
   const projectId = parseInt(req.params.id);
 
@@ -152,7 +157,7 @@ router.post('/', (req, res, next) => {
     withOwnedClient(req, res, clientId, () => {
       getDatabase().run(
         'INSERT INTO projects (name, description, client_id, user_email, start_date, status) VALUES (?, ?, ?, ?, ?, ?)',
-        [name, description || null, clientId, req.userEmail, startDate, status || 'active'],
+        [name, description || null, clientId, req.userEmail, toDateString(startDate), status || 'active'],
         function(err) {
           if (err) {
             return handleDbError(res, err, 'Failed to create project');
@@ -192,7 +197,7 @@ router.put('/:id', (req, res, next) => {
       Object.entries(UPDATABLE_COLUMNS).forEach(([field, column]) => {
         if (value[field] !== undefined) {
           updates.push(`${column} = ?`);
-          values.push(value[field] || null);
+          values.push(field === 'startDate' ? toDateString(value[field]) : value[field] || null);
         }
       });
 

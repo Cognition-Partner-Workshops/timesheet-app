@@ -171,7 +171,7 @@ describe('Project Routes', () => {
       expect(response.status).toBe(201);
       expect(mockDb.run).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO projects'),
-        ['No Status', null, 1, 'test@example.com', expect.anything(), 'active'],
+        ['No Status', null, 1, 'test@example.com', '2024-01-01', 'active'],
         expect.any(Function)
       );
     });
@@ -342,6 +342,21 @@ describe('Project Routes', () => {
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ error: 'Project updated but failed to retrieve' });
+    });
+
+    test('should store startDate as a YYYY-MM-DD string', async () => {
+      mockGetOnce(null, { id: 1 });
+      mockRunOnce(null);
+      mockGetOnce(null, { id: 1, start_date: '2024-05-06' });
+
+      const response = await request(app).put('/api/projects/1').send({ startDate: '2024-05-06' });
+
+      expect(response.status).toBe(200);
+      expect(mockDb.run).toHaveBeenCalledWith(
+        expect.stringContaining('start_date = ?'),
+        ['2024-05-06', 1, 'test@example.com'],
+        expect.any(Function)
+      );
     });
 
     test('should set description to null when empty string provided', async () => {
