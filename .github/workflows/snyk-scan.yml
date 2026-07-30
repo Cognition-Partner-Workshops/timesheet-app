@@ -1,0 +1,91 @@
+name: Snyk Security Scan
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Weekly on Monday at 9 AM UTC
+  pull_request:
+    branches: [main]
+    paths:
+      - '**/package.json'
+      - '**/package-lock.json'
+  workflow_dispatch:  # Allow manual triggers
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  snyk-backend:
+    name: Snyk - Backend Dependencies
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install backend dependencies
+        run: cd backend && npm ci
+
+      - name: Run Snyk Open Source scan
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --project-name=app-timesheet-backend
+          command: test
+
+      - name: Run npm audit (fallback)
+        if: env.SNYK_TOKEN == ''
+        working-directory: backend
+        run: |
+          npm audit --audit-level=high || true
+
+  snyk-frontend:
+    name: Snyk - Frontend Dependencies
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
+
+      - name: Run Snyk Open Source scan
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --project-name=app-timesheet-frontend
+          command: test
+
+      - name: Run npm audit (fallback)
+        if: env.SNYK_TOKEN == ''
+        working-directory: frontend
+        run: |
+          npm audit --audit-level=high || true
+
+  snyk-code:
+    name: Snyk - Code Security (SAST)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    if: github.event_name != 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Snyk Code scan
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          command: code test
+          args: --severity-threshold=high
