@@ -253,6 +253,7 @@ const ClientsPage: React.FC = () => {
                         onClick={() => handleOpen(client)}
                         color="primary"
                         size="small"
+                        aria-label={`Edit ${client.name}`}
                       >
                         <EditIcon />
                       </IconButton>
@@ -260,6 +261,7 @@ const ClientsPage: React.FC = () => {
                         onClick={() => handleDelete(client)}
                         color="error"
                         size="small"
+                        aria-label={`Delete ${client.name}`}
                       >
                         <DeleteIcon />
                       </IconButton>

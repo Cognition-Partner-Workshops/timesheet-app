@@ -126,8 +126,9 @@ const ReportsPage: React.FC = () => {
             <Grid container spacing={3} alignItems="center">
               <Grid size={{ xs: 12, md: 6 }}>
                 <FormControl fullWidth>
-                  <InputLabel>Select Client</InputLabel>
+                  <InputLabel id="report-client-select-label">Select Client</InputLabel>
                   <Select
+                    labelId="report-client-select-label"
                     value={selectedClientId}
                     onChange={(e) => setSelectedClientId(Number(e.target.value))}
                     label="Select Client"
@@ -149,6 +150,7 @@ const ReportsPage: React.FC = () => {
                       disabled={!selectedClientId || reportLoading}
                       color="primary"
                       size="large"
+                      aria-label="Export as CSV"
                     >
                       <CsvIcon />
                     </IconButton>
@@ -159,6 +161,7 @@ const ReportsPage: React.FC = () => {
                       disabled={!selectedClientId || reportLoading}
                       color="error"
                       size="large"
+                      aria-label="Export as PDF"
                     >
                       <PdfIcon />
                     </IconButton>

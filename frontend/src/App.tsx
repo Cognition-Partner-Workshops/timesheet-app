@@ -15,10 +15,65 @@ import ReportsPage from './pages/ReportsPage';
 const theme = createTheme({
   palette: {
     primary: {
-      main: '#1976d2',
+      main: '#0d47a1',
+      contrastText: '#ffffff',
     },
     secondary: {
       main: '#dc004e',
+    },
+    text: {
+      secondary: '#424242',
+    },
+  },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          fontWeight: 600,
+        },
+        textPrimary: {
+          color: '#0d47a1',
+        },
+        containedPrimary: {
+          color: '#ffffff',
+        },
+      },
+    },
+    MuiInputLabel: {
+      styleOverrides: {
+        root: {
+          '&&': {
+            color: '#444444',
+          },
+          '&&.Mui-focused': {
+            color: '#0d47a1',
+          },
+        },
+      },
+    },
+    MuiFormLabel: {
+      styleOverrides: {
+        root: {
+          '&&': {
+            color: '#444444',
+          },
+          '&&.Mui-focused': {
+            color: '#0d47a1',
+          },
+        },
+      },
+    },
+    MuiDialog: {
+      styleOverrides: {
+        root: {
+          '& .MuiBackdrop-root': {
+            backgroundColor: 'transparent',
+          },
+        },
+        paper: {
+          boxShadow: '0px 11px 15px -7px rgba(0,0,0,0.2), 0px 24px 38px 3px rgba(0,0,0,0.14), 0px 9px 46px 8px rgba(0,0,0,0.12)',
+        },
+      },
     },
   },
 });
