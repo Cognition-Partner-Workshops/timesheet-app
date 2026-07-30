@@ -5,10 +5,11 @@ A full-stack web application for tracking and reporting employee hourly work acr
 ## ⚠️ Important Notes
 
 ### Data Persistence
-**This application uses SQLite in-memory database as specified in requirements.**
-- ⚠️ **All data is lost when the backend server restarts**
-- Suitable for development and testing
-- For production use, modify `backend/src/database/init.js` to use file-based SQLite instead of `:memory:`
+**This application uses a persistent file-based SQLite database managed with Knex migrations.**
+- Data survives backend server restarts
+- Database file location is controlled by the `DATABASE_PATH` environment variable (default: `backend/data/timesheet.db` in development, `/app/data/timesheet.db` in the Docker image)
+- Tests run against an in-memory SQLite database (`NODE_ENV=test`)
+- Schema changes are managed via Knex migrations in `backend/src/database/migrations/` (run automatically at server startup, or manually with `npm run migrate`; create new ones with `npm run migrate:make <name>`)
 
 ### Authentication
 - Email-only authentication with JWT tokens
@@ -36,7 +37,7 @@ A full-stack web application for tracking and reporting employee hourly work acr
 
 ### Backend
 - **Node.js** with Express
-- **SQLite** in-memory database
+- **SQLite** file-based database with **Knex** migrations
 - **JWT** for authentication
 - **Joi** for validation
 - **PDFKit** for PDF generation
@@ -262,7 +263,7 @@ See `backend/DEPLOYMENT.md` for detailed production deployment instructions.
 ### Quick Production Checklist
 - [ ] Set strong `JWT_SECRET` in environment variables
 - [ ] Configure proper `FRONTEND_URL` for CORS
-- [ ] Consider switching to file-based SQLite for data persistence
+- [ ] Set `DATABASE_PATH` to a persistent volume location
 - [ ] Set up HTTPS/SSL certificates
 - [ ] Configure proper logging and monitoring
 - [ ] Set up automated backups (if using persistent storage)
@@ -271,15 +272,13 @@ See `backend/DEPLOYMENT.md` for detailed production deployment instructions.
 
 ## Known Limitations
 
-1. **In-memory database** - All data is lost on server restart
-2. **Email-only auth** - No password protection, assumes trusted network
-3. **No user roles** - All users have equal access to all data
-4. **Single-server architecture** - Not designed for horizontal scaling
-5. **No real-time updates** - Changes require page refresh
+1. **Email-only auth** - No password protection, assumes trusted network
+2. **No user roles** - All users have equal access to all data
+3. **Single-server architecture** - Not designed for horizontal scaling
+4. **No real-time updates** - Changes require page refresh
 
 ## Future Enhancements
 
-- Persistent database storage
 - User roles and permissions
 - Multi-tenancy support
 - Real-time updates with WebSockets

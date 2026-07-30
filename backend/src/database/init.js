@@ -1,124 +1,75 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const knex = require('knex');
+const path = require('node:path');
+const fs = require('node:fs');
+const knexConfig = require('../../knexfile');
 
-let db = null;
-let isClosing = false;
-let isClosed = false;
+let knexInstance = null;
+let rawDb = null;
+
+function getKnex() {
+  if (!knexInstance) {
+    const env = process.env.NODE_ENV || 'development';
+    const config = knexConfig[env] || knexConfig.development;
+
+    const { filename } = config.connection;
+    if (filename !== ':memory:') {
+      const dbDir = path.dirname(filename);
+      if (!fs.existsSync(dbDir)) {
+        fs.mkdirSync(dbDir, { recursive: true });
+      }
+    }
+
+    knexInstance = knex(config);
+  }
+  return knexInstance;
+}
 
 function getDatabase() {
-  if (!db) {
-    // Reset state when creating a new database connection
-    isClosing = false;
-    isClosed = false;
-    // Use in-memory database as specified in requirements
-    db = new sqlite3.Database(':memory:', (err) => {
-      if (err) {
-        console.error('Error opening database:', err);
-        throw err;
-      }
-      console.log('Connected to SQLite in-memory database');
-    });
+  if (!rawDb) {
+    throw new Error('Database not initialized. Call initializeDatabase() first.');
   }
-  return db;
+  return rawDb;
 }
 
 async function initializeDatabase() {
-  const database = getDatabase();
-  
-  return new Promise((resolve, reject) => {
-    database.serialize(() => {
-      // Create users table
-      database.run(`
-        CREATE TABLE IF NOT EXISTS users (
-          email TEXT PRIMARY KEY,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
+  const k = getKnex();
 
-      // Create clients table
-      database.run(`
-        CREATE TABLE IF NOT EXISTS clients (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          description TEXT,
-          department TEXT,
-          email TEXT,
-          user_email TEXT NOT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
-        )
-      `);
+  await k.migrate.latest();
 
-      // Create work_entries table
-      database.run(`
-        CREATE TABLE IF NOT EXISTS work_entries (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          client_id INTEGER NOT NULL,
-          user_email TEXT NOT NULL,
-          hours DECIMAL(5,2) NOT NULL,
-          description TEXT,
-          date DATE NOT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE,
-          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
-        )
-      `);
+  // Capture the single pooled sqlite3 connection (pool is min:1/max:1) so
+  // callers can use the raw sqlite3 API (db.run/get/all) against the
+  // migrated database, then release it so Knex queries can still run
+  if (!rawDb) {
+    const conn = await k.client.acquireConnection();
+    rawDb = conn;
+    k.client.releaseConnection(conn);
+  }
 
-      // Create indexes for better performance
-      database.run(`CREATE INDEX IF NOT EXISTS idx_clients_user_email ON clients (user_email)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_client_id ON work_entries (client_id)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_user_email ON work_entries (user_email)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_date ON work_entries (date)`);
-
-      console.log('Database tables created successfully');
-      resolve();
-    });
-  });
+  const { filename } = k.client.config.connection;
+  const dbType = filename === ':memory:' ? 'in-memory' : `file: ${filename}`;
+  console.log(`Connected to SQLite database (${dbType})`);
+  console.log('Database migrations applied successfully');
 }
 
-function closeDatabase() {
-  return new Promise((resolve, reject) => {
-    if (isClosed) {
-      // Already closed, resolve immediately
-      resolve();
-      return;
-    }
-    
-    if (isClosing) {
-      // Currently closing, wait for it to complete
-      const checkClosed = setInterval(() => {
-        if (isClosed) {
-          clearInterval(checkClosed);
-          resolve();
-        }
-      }, 10);
-      return;
-    }
-    
-    if (!db) {
-      // No database connection, resolve immediately
-      resolve();
-      return;
-    }
-    
-    isClosing = true;
-    db.close((err) => {
-      isClosed = true;
-      isClosing = false;
-      db = null;
-      if (err) {
-        console.error('Error closing database:', err);
-      } else {
-        console.log('Database connection closed');
-      }
-      resolve();
-    });
-  });
+async function closeDatabase() {
+  if (!knexInstance) {
+    return;
+  }
+
+  rawDb = null;
+
+  try {
+    await knexInstance.destroy();
+    console.log('Database connection closed');
+  } catch (err) {
+    console.error('Error closing database:', err);
+  } finally {
+    knexInstance = null;
+  }
 }
 
 module.exports = {
+  getKnex,
   getDatabase,
   initializeDatabase,
   closeDatabase
