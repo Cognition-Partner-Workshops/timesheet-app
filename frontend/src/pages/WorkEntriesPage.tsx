@@ -34,6 +34,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import apiClient from '../api/client';
+import LoadingState from '../components/LoadingState';
 import { type Project, type WorkEntry } from '../types/api';
 
 const emptyForm = {
@@ -179,11 +180,7 @@ const WorkEntriesPage: React.FC = () => {
   };
 
   if (entriesLoading || clientsLoading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
-      </Box>
-    );
+    return <LoadingState />;
   }
 
   return (

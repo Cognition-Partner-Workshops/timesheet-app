@@ -2,6 +2,14 @@ const express = require('express');
 const { getDatabase } = require('../database/init');
 const { authenticateUser } = require('../middleware/auth');
 const { workEntrySchema, updateWorkEntrySchema } = require('../validation/schemas');
+const {
+  internalError,
+  findOwnedRow,
+  requireReference,
+  sendRow,
+  buildUpdates,
+  parseIdParam
+} = require('../utils/dbHelpers');
 
 const router = express.Router();
 
@@ -18,22 +26,39 @@ router.use(authenticateUser);
 
 // Verify the project exists, belongs to the user and belongs to the given client
 function verifyProjectOwnership(db, projectId, clientId, userEmail, res, onSuccess) {
-  db.get(
+  requireReference(
+    db,
     'SELECT id FROM projects WHERE id = ? AND user_email = ? AND client_id = ?',
     [projectId, userEmail, clientId],
-    (err, row) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ error: 'Internal server error' });
-      }
-
-      if (!row) {
-        return res.status(400).json({ error: 'Project not found or does not belong to the client' });
-      }
-
-      onSuccess();
-    }
+    res,
+    'Project not found or does not belong to the client',
+    onSuccess
   );
+}
+
+// Verify the client exists and belongs to the user
+function verifyClientOwnership(db, clientId, userEmail, res, onSuccess) {
+  requireReference(
+    db,
+    'SELECT id FROM clients WHERE id = ? AND user_email = ?',
+    [clientId, userEmail],
+    res,
+    'Client not found or does not belong to user',
+    onSuccess
+  );
+}
+
+function parseWorkEntryId(req, res) {
+  return parseIdParam(req, res, 'id', 'Invalid work entry ID');
+}
+
+function sendWorkEntry(db, workEntryId, res, action, status) {
+  sendRow(db, `${WORK_ENTRY_SELECT} WHERE we.id = ?`, [workEntryId], res, {
+    key: 'workEntry',
+    entity: 'Work entry',
+    action,
+    status
+  });
 }
 
 // Get all work entries for authenticated user (with optional client and project filters)
@@ -69,8 +94,7 @@ router.get('/', (req, res) => {
   
   db.all(query, params, (err, rows) => {
     if (err) {
-      console.error('Database error:', err);
-      return res.status(500).json({ error: 'Internal server error' });
+      return internalError(res, err);
     }
     
     res.json({ workEntries: rows });
@@ -79,29 +103,18 @@ router.get('/', (req, res) => {
 
 // Get specific work entry
 router.get('/:id', (req, res) => {
-  const workEntryId = parseInt(req.params.id);
-  
-  if (isNaN(workEntryId)) {
-    return res.status(400).json({ error: 'Invalid work entry ID' });
+  const workEntryId = parseWorkEntryId(req, res);
+  if (workEntryId === null) {
+    return;
   }
-  
-  const db = getDatabase();
-  
-  db.get(
+
+  findOwnedRow(
+    getDatabase(),
     `${WORK_ENTRY_SELECT} WHERE we.id = ? AND we.user_email = ?`,
     [workEntryId, req.userEmail],
-    (err, row) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ error: 'Internal server error' });
-      }
-      
-      if (!row) {
-        return res.status(404).json({ error: 'Work entry not found' });
-      }
-      
-      res.json({ workEntry: row });
-    }
+    res,
+    'Work entry not found',
+    (row) => res.json({ workEntry: row })
   );
 });
 
@@ -126,47 +139,18 @@ router.post('/', (req, res, next) => {
             return res.status(500).json({ error: 'Failed to create work entry' });
           }
 
-          // Return the created work entry with client and project names
-          db.get(
-            `${WORK_ENTRY_SELECT} WHERE we.id = ?`,
-            [this.lastID],
-            (err, row) => {
-              if (err) {
-                console.error('Database error:', err);
-                return res.status(500).json({ error: 'Work entry created but failed to retrieve' });
-              }
-
-              res.status(201).json({
-                message: 'Work entry created successfully',
-                workEntry: row
-              });
-            }
-          );
+          sendWorkEntry(db, this.lastID, res, 'created', 201);
         }
       );
     };
 
-    // Verify client exists and belongs to user
-    db.get(
-      'SELECT id FROM clients WHERE id = ? AND user_email = ?',
-      [clientId, req.userEmail],
-      (err, row) => {
-        if (err) {
-          console.error('Database error:', err);
-          return res.status(500).json({ error: 'Internal server error' });
-        }
-
-        if (!row) {
-          return res.status(400).json({ error: 'Client not found or does not belong to user' });
-        }
-
-        if (projectId) {
-          verifyProjectOwnership(db, projectId, clientId, req.userEmail, res, createEntry);
-        } else {
-          createEntry();
-        }
+    verifyClientOwnership(db, clientId, req.userEmail, res, () => {
+      if (projectId) {
+        verifyProjectOwnership(db, projectId, clientId, req.userEmail, res, createEntry);
+      } else {
+        createEntry();
       }
-    );
+    });
   } catch (error) {
     next(error);
   }
@@ -175,10 +159,9 @@ router.post('/', (req, res, next) => {
 // Update work entry
 router.put('/:id', (req, res, next) => {
   try {
-    const workEntryId = parseInt(req.params.id);
-    
-    if (isNaN(workEntryId)) {
-      return res.status(400).json({ error: 'Invalid work entry ID' });
+    const workEntryId = parseWorkEntryId(req, res);
+    if (workEntryId === null) {
+      return;
     }
 
     const { error, value } = updateWorkEntrySchema.validate(req.body);
@@ -189,20 +172,37 @@ router.put('/:id', (req, res, next) => {
     const db = getDatabase();
 
     // Check if work entry exists and belongs to user
-    db.get(
+    findOwnedRow(
+      db,
       'SELECT id, client_id FROM work_entries WHERE id = ? AND user_email = ?',
       [workEntryId, req.userEmail],
-      (err, row) => {
-        if (err) {
-          console.error('Database error:', err);
-          return res.status(500).json({ error: 'Internal server error' });
-        }
-
-        if (!row) {
-          return res.status(404).json({ error: 'Work entry not found' });
-        }
-
+      res,
+      'Work entry not found',
+      (row) => {
         const targetClientId = value.clientId || row.client_id;
+
+        const performUpdate = () => {
+          const { updates, values } = buildUpdates(value, {
+            clientId: ['client_id', false],
+            projectId: ['project_id', true],
+            hours: ['hours', false],
+            description: ['description', true],
+            date: ['date', false]
+          });
+
+          values.push(workEntryId, req.userEmail);
+
+          const query = `UPDATE work_entries SET ${updates.join(', ')} WHERE id = ? AND user_email = ?`;
+
+          db.run(query, values, function(err) {
+            if (err) {
+              console.error('Database error:', err);
+              return res.status(500).json({ error: 'Failed to update work entry' });
+            }
+
+            sendWorkEntry(db, workEntryId, res, 'updated', 200);
+          });
+        };
 
         const verifyProjectThenUpdate = () => {
           if (value.projectId) {
@@ -214,84 +214,9 @@ router.put('/:id', (req, res, next) => {
 
         // If clientId is being updated, verify it belongs to user
         if (value.clientId) {
-          db.get(
-            'SELECT id FROM clients WHERE id = ? AND user_email = ?',
-            [value.clientId, req.userEmail],
-            (err, clientRow) => {
-              if (err) {
-                console.error('Database error:', err);
-                return res.status(500).json({ error: 'Internal server error' });
-              }
-
-              if (!clientRow) {
-                return res.status(400).json({ error: 'Client not found or does not belong to user' });
-              }
-
-              verifyProjectThenUpdate();
-            }
-          );
+          verifyClientOwnership(db, value.clientId, req.userEmail, res, verifyProjectThenUpdate);
         } else {
           verifyProjectThenUpdate();
-        }
-
-        function performUpdate() {
-          // Build update query dynamically
-          const updates = [];
-          const values = [];
-
-          if (value.clientId !== undefined) {
-            updates.push('client_id = ?');
-            values.push(value.clientId);
-          }
-
-          if (value.projectId !== undefined) {
-            updates.push('project_id = ?');
-            values.push(value.projectId || null);
-          }
-
-          if (value.hours !== undefined) {
-            updates.push('hours = ?');
-            values.push(value.hours);
-          }
-
-          if (value.description !== undefined) {
-            updates.push('description = ?');
-            values.push(value.description || null);
-          }
-
-          if (value.date !== undefined) {
-            updates.push('date = ?');
-            values.push(value.date);
-          }
-
-          updates.push('updated_at = CURRENT_TIMESTAMP');
-          values.push(workEntryId, req.userEmail);
-
-          const query = `UPDATE work_entries SET ${updates.join(', ')} WHERE id = ? AND user_email = ?`;
-
-          db.run(query, values, function(err) {
-            if (err) {
-              console.error('Database error:', err);
-              return res.status(500).json({ error: 'Failed to update work entry' });
-            }
-
-            // Return updated work entry with client and project names
-            db.get(
-              `${WORK_ENTRY_SELECT} WHERE we.id = ?`,
-              [workEntryId],
-              (err, row) => {
-                if (err) {
-                  console.error('Database error:', err);
-                  return res.status(500).json({ error: 'Work entry updated but failed to retrieve' });
-                }
-
-                res.json({
-                  message: 'Work entry updated successfully',
-                  workEntry: row
-                });
-              }
-            );
-          });
         }
       }
     );
@@ -302,29 +227,21 @@ router.put('/:id', (req, res, next) => {
 
 // Delete work entry
 router.delete('/:id', (req, res) => {
-  const workEntryId = parseInt(req.params.id);
-  
-  if (isNaN(workEntryId)) {
-    return res.status(400).json({ error: 'Invalid work entry ID' });
+  const workEntryId = parseWorkEntryId(req, res);
+  if (workEntryId === null) {
+    return;
   }
-  
+
   const db = getDatabase();
-  
+
   // Check if work entry exists and belongs to user
-  db.get(
+  findOwnedRow(
+    db,
     'SELECT id FROM work_entries WHERE id = ? AND user_email = ?',
     [workEntryId, req.userEmail],
-    (err, row) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ error: 'Internal server error' });
-      }
-      
-      if (!row) {
-        return res.status(404).json({ error: 'Work entry not found' });
-      }
-      
-      // Delete work entry
+    res,
+    'Work entry not found',
+    () => {
       db.run(
         'DELETE FROM work_entries WHERE id = ? AND user_email = ?',
         [workEntryId, req.userEmail],
@@ -333,7 +250,7 @@ router.delete('/:id', (req, res) => {
             console.error('Database error:', err);
             return res.status(500).json({ error: 'Failed to delete work entry' });
           }
-          
+
           res.json({ message: 'Work entry deleted successfully' });
         }
       );

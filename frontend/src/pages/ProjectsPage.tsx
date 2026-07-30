@@ -31,6 +31,7 @@ import {
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
+import LoadingState from '../components/LoadingState';
 import { type Client, type Project } from '../types/api';
 
 const emptyForm = { clientId: 0, name: '', description: '' };
@@ -152,11 +153,7 @@ const ProjectsPage: React.FC = () => {
   };
 
   if (isLoading || clientsLoading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
-      </Box>
-    );
+    return <LoadingState />;
   }
 
   return (

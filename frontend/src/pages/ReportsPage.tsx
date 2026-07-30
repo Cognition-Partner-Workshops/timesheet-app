@@ -29,6 +29,7 @@ import {
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
+import LoadingState from '../components/LoadingState';
 import { type ClientReport, type Project } from '../types/api';
 
 const ReportsPage: React.FC = () => {
@@ -100,11 +101,7 @@ const ReportsPage: React.FC = () => {
   const selectedClient = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
 
   if (clientsLoading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
-      </Box>
-    );
+    return <LoadingState />;
   }
 
   return (
