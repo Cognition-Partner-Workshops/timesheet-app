@@ -48,6 +48,11 @@ const statusColors: Record<ProjectStatus, 'success' | 'default' | 'warning'> = {
   'on-hold': 'warning',
 };
 
+const formatDateOnly = (dateString: string) => {
+  const [year, month, day] = dateString.slice(0, 10).split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString();
+};
+
 const emptyForm = {
   name: '',
   description: '',
@@ -233,7 +238,7 @@ const ProjectsPage: React.FC = () => {
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" color="text.secondary">
-                        {new Date(project.start_date).toLocaleDateString()}
+                        {formatDateOnly(project.start_date)}
                       </Typography>
                     </TableCell>
                     <TableCell>
