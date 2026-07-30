@@ -126,8 +126,9 @@ const ReportsPage: React.FC = () => {
             <Grid container spacing={3} alignItems="center">
               <Grid size={{ xs: 12, md: 6 }}>
                 <FormControl fullWidth>
-                  <InputLabel>Select Client</InputLabel>
+                  <InputLabel id="report-client-select-label">Select Client</InputLabel>
                   <Select
+                    labelId="report-client-select-label"
                     value={selectedClientId}
                     onChange={(e) => setSelectedClientId(Number(e.target.value))}
                     label="Select Client"

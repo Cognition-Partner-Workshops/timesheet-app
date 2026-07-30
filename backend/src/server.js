@@ -23,9 +23,10 @@ app.use(cors({
 }));
 
 // Rate limiting
+const isProduction = process.env.NODE_ENV === 'production';
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  max: isProduction ? 100 : 10000 // stricter limit in production, relaxed for development/testing
 });
 app.use(limiter);
 
