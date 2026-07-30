@@ -173,7 +173,7 @@ const ProjectsPage: React.FC = () => {
 
     const projectData = {
       name: formData.name,
-      description: formData.description || undefined,
+      description: formData.description,
       clientId: formData.clientId || null,
       startDate: formData.startDate ? formData.startDate.toISOString().split('T')[0] : null,
       status: formData.status,

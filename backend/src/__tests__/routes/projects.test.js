@@ -265,6 +265,30 @@ describe('Project Routes', () => {
       expect(response.body.project).toEqual(updatedProject);
     });
 
+    test('should clear project description', async () => {
+      const updatedProject = { id: 1, name: 'Project', description: null };
+
+      mockDb.get
+        .mockImplementationOnce((query, params, callback) => callback(null, { id: 1 }))
+        .mockImplementationOnce((query, params, callback) => callback(null, updatedProject));
+
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+
+      const response = await request(app)
+        .put('/api/projects/1')
+        .send({ description: '' });
+
+      expect(response.status).toBe(200);
+      expect(mockDb.run).toHaveBeenCalledWith(
+        expect.stringContaining('description = ?'),
+        [null, 1, 'test@example.com'],
+        expect.any(Function)
+      );
+      expect(response.body.project).toEqual(updatedProject);
+    });
+
     test('should update client assignment after verifying ownership', async () => {
       const updatedProject = { id: 1, name: 'P', client_id: 3, client_name: 'Client Y' };
 
