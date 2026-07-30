@@ -5,20 +5,20 @@ A full-stack web application for tracking and reporting employee hourly work acr
 ## ⚠️ Important Notes
 
 ### Data Persistence
-**This application uses SQLite in-memory database as specified in requirements.**
-- ⚠️ **All data is lost when the backend server restarts**
-- Suitable for development and testing
-- For production use, modify `backend/src/database/init.js` to use file-based SQLite instead of `:memory:`
+**This application uses MySQL for persistent data storage.**
+- A running MySQL server is required
+- Data persists across server restarts
+- Configure connection details via environment variables (see Backend Setup)
 
 ### Authentication
-- Email-only authentication with JWT tokens
+- Email-only authentication via `x-user-email` header
 - No password required - assumes trusted internal network
 - Anyone with a valid email can create an account and log in
 - Consider integrating with company SSO for production use
 
 ## Features
 
-- ✅ User authentication (email-based with JWT tokens)
+- ✅ User authentication (email-based)
 - ✅ Add, edit, and delete clients
 - ✅ Add, edit, and delete hourly work entries for each client
 - ✅ View hourly reports for each client
@@ -35,12 +35,11 @@ A full-stack web application for tracking and reporting employee hourly work acr
 - **Axios** for API calls
 
 ### Backend
-- **Node.js** with Express
-- **SQLite** in-memory database
-- **JWT** for authentication
-- **Joi** for validation
-- **PDFKit** for PDF generation
-- **csv-writer** for CSV export
+- **Python** with FastAPI
+- **MySQL** database (via PyMySQL)
+- **Pydantic** for validation
+- **fpdf2** for PDF generation
+- **uvicorn** as ASGI server
 
 ## Project Structure
 
@@ -48,30 +47,28 @@ A full-stack web application for tracking and reporting employee hourly work acr
 .
 ├── backend/
 │   ├── src/
-│   │   ├── database/
-│   │   │   └── init.js           # Database initialization
-│   │   ├── middleware/
-│   │   │   ├── auth.js           # JWT authentication
-│   │   │   └── errorHandler.js  # Error handling
-│   │   ├── routes/
-│   │   │   ├── auth.js           # Authentication endpoints
-│   │   │   ├── clients.js        # Client CRUD
-│   │   │   ├── workEntries.js    # Work entry CRUD
-│   │   │   └── reports.js        # Reporting & export
-│   │   ├── validation/
-│   │   │   └── schemas.js        # Joi validation schemas
-│   │   └── server.js             # Express server
-│   ├── package.json
-│   └── DEPLOYMENT.md             # Production deployment guide
+│   │   ├── app.py              # FastAPI application
+│   │   ├── config.py           # Environment configuration
+│   │   ├── database.py         # MySQL connection & schema
+│   │   ├── dependencies.py     # Auth dependency
+│   │   ├── schemas.py          # Pydantic validation models
+│   │   └── routes/
+│   │       ├── auth.py         # Authentication endpoints
+│   │       ├── clients.py      # Client CRUD
+│   │       ├── work_entries.py # Work entry CRUD
+│   │       └── reports.py      # Reporting & export
+│   ├── tests/                  # Pytest test suite
+│   ├── requirements.txt
+│   └── DEPLOYMENT.md           # Production deployment guide
 │
 └── frontend/
     ├── src/
     │   ├── api/
-    │   │   └── client.ts         # API client with JWT
+    │   │   └── client.ts       # API client
     │   ├── components/
-    │   │   └── Layout.tsx        # Main layout
+    │   │   └── Layout.tsx      # Main layout
     │   ├── contexts/
-    │   │   └── AuthContext.tsx   # Auth state management
+    │   │   └── AuthContext.tsx  # Auth state management
     │   ├── pages/
     │   │   ├── LoginPage.tsx     # Login page
     │   │   ├── DashboardPage.tsx # Dashboard
@@ -79,16 +76,20 @@ A full-stack web application for tracking and reporting employee hourly work acr
     │   │   ├── WorkEntriesPage.tsx # Work entry management
     │   │   └── ReportsPage.tsx   # Reports & exports
     │   ├── types/
-    │   │   └── api.ts            # TypeScript interfaces
-    │   └── App.tsx               # Main app component
+    │   │   └── api.ts          # TypeScript interfaces
+    │   └── App.tsx             # Main app component
     └── package.json
 ```
 
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18+ installed
-- npm or yarn package manager
+- Python 3.12+
+- Node.js 18+ (for the frontend)
+- MySQL server running with a `timesheet` database:
+  ```sql
+  CREATE DATABASE IF NOT EXISTS timesheet;
+  ```
 
 ### Backend Setup
 
@@ -99,7 +100,7 @@ cd backend
 
 2. Install dependencies:
 ```bash
-npm install
+pip install -r requirements.txt
 ```
 
 3. Create environment file:
@@ -110,14 +111,19 @@ cp .env.example .env
 4. Update `.env` with your configuration:
 ```bash
 PORT=3001
-NODE_ENV=development
 FRONTEND_URL=http://localhost:5173
-JWT_SECRET=your-secure-secret-key-change-this
+
+# MySQL Database Configuration
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=
+DB_NAME=timesheet
 ```
 
 5. Start the development server:
 ```bash
-npm run dev
+uvicorn src.app:app --host 0.0.0.0 --port 3001 --reload
 ```
 
 Backend will be running at `http://localhost:3001`
@@ -161,45 +167,44 @@ Frontend will be running at `http://localhost:5173`
 ## API Endpoints
 
 ### Authentication
-- `POST /api/auth/login` - Login with email, returns JWT token
-- `GET /api/auth/me` - Get current user info (requires auth)
+- `POST /api/auth/login` - Login with email
+- `GET /api/auth/me` - Get current user info (requires `x-user-email` header)
 
 ### Clients
 - `GET /api/clients` - Get all clients
 - `POST /api/clients` - Create new client
-- `GET /api/clients/:id` - Get specific client
-- `PUT /api/clients/:id` - Update client
-- `DELETE /api/clients/:id` - Delete client
+- `GET /api/clients/{id}` - Get specific client
+- `PUT /api/clients/{id}` - Update client
+- `DELETE /api/clients/{id}` - Delete client
+- `DELETE /api/clients` - Delete all clients
 
 ### Work Entries
-- `GET /api/work-entries` - Get all work entries (optional ?clientId filter)
+- `GET /api/work-entries` - Get all work entries (optional `?clientId` filter)
 - `POST /api/work-entries` - Create new work entry
-- `GET /api/work-entries/:id` - Get specific work entry
-- `PUT /api/work-entries/:id` - Update work entry
-- `DELETE /api/work-entries/:id` - Delete work entry
+- `GET /api/work-entries/{id}` - Get specific work entry
+- `PUT /api/work-entries/{id}` - Update work entry
+- `DELETE /api/work-entries/{id}` - Delete work entry
 
 ### Reports
-- `GET /api/reports/client/:clientId` - Get hourly report for client
-- `GET /api/reports/export/csv/:clientId` - Export report as CSV
-- `GET /api/reports/export/pdf/:clientId` - Export report as PDF
+- `GET /api/reports/client/{clientId}` - Get hourly report for client
+- `GET /api/reports/export/csv/{clientId}` - Export report as CSV
+- `GET /api/reports/export/pdf/{clientId}` - Export report as PDF
 
-All authenticated endpoints require `Authorization: Bearer <token>` header.
+All authenticated endpoints require `x-user-email` header.
 
 ## Security Features
 
-- JWT-based authentication with 24-hour token expiration
-- Rate limiting on authentication endpoints (5 attempts per 15 minutes)
 - CORS protection
-- Helmet security headers
-- Input validation with Joi schemas
+- Input validation with Pydantic schemas
 - SQL injection protection with parameterized queries
+- MySQL connection pooling
 
 ## Development
 
 ### Backend Development
 ```bash
 cd backend
-npm run dev  # Starts with nodemon for auto-reload
+uvicorn src.app:app --host 0.0.0.0 --port 3001 --reload
 ```
 
 ### Frontend Development
@@ -213,40 +218,10 @@ npm run dev  # Starts Vite dev server with HMR
 **Backend:**
 ```bash
 cd backend
-npm test                    # Run all tests
-npm run test:coverage       # Run tests with coverage report
-npm run test:watch          # Run tests in watch mode
+python -m pytest tests/ -v
 ```
-
-### Test Coverage
-
-The backend has comprehensive test coverage with **161 tests** across 8 test suites:
-
-| File | Statements | Branches | Functions | Lines |
-|------|------------|----------|-----------|-------|
-| **Overall** | **90.16%** | **93.82%** | **92.18%** | **90.35%** |
-| database/init.js | 100% | 100% | 100% | 100% |
-| middleware/auth.js | 100% | 100% | 100% | 100% |
-| middleware/errorHandler.js | 100% | 100% | 100% | 100% |
-| routes/auth.js | 100% | 100% | 100% | 100% |
-| routes/clients.js | 97.89% | 100% | 100% | 97.89% |
-| routes/workEntries.js | 98.41% | 100% | 100% | 98.41% |
-| routes/reports.js | 64.15% | 69.44% | 68.75% | 64.42% |
-| validation/schemas.js | 100% | 100% | 100% | 100% |
-
-Coverage thresholds are configured in `jest.config.js`:
-- Statements: 60%
-- Branches: 60%
-- Functions: 65%
-- Lines: 60%
 
 ### Building for Production
-
-**Backend:**
-```bash
-cd backend
-npm start  # Production mode
-```
 
 **Frontend:**
 ```bash
@@ -260,26 +235,22 @@ npm run preview  # Preview production build
 See `backend/DEPLOYMENT.md` for detailed production deployment instructions.
 
 ### Quick Production Checklist
-- [ ] Set strong `JWT_SECRET` in environment variables
+- [ ] Configure proper MySQL credentials via environment variables
 - [ ] Configure proper `FRONTEND_URL` for CORS
-- [ ] Consider switching to file-based SQLite for data persistence
 - [ ] Set up HTTPS/SSL certificates
 - [ ] Configure proper logging and monitoring
-- [ ] Set up automated backups (if using persistent storage)
-- [ ] Review and adjust rate limiting settings
+- [ ] Set up automated MySQL backups
 - [ ] Consider integrating with company SSO
 
 ## Known Limitations
 
-1. **In-memory database** - All data is lost on server restart
-2. **Email-only auth** - No password protection, assumes trusted network
-3. **No user roles** - All users have equal access to all data
-4. **Single-server architecture** - Not designed for horizontal scaling
-5. **No real-time updates** - Changes require page refresh
+1. **Email-only auth** - No password protection, assumes trusted network
+2. **No user roles** - All users have equal access to all data
+3. **Single-server architecture** - Not designed for horizontal scaling
+4. **No real-time updates** - Changes require page refresh
 
 ## Future Enhancements
 
-- Persistent database storage
 - User roles and permissions
 - Multi-tenancy support
 - Real-time updates with WebSockets

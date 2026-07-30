@@ -2,17 +2,16 @@
 
 ## ⚠️ Important Security & Data Considerations
 
-### Data Persistence Warning
-**This application uses SQLite in-memory database as specified in requirements.** 
-- All data will be lost when the server restarts
-- Not suitable for production use without modification
-- For production, consider switching to file-based SQLite or a proper database
+### Data Persistence
+**This application uses MySQL for data storage.**
+- A running MySQL server is required
+- Data persists across server restarts
+- Configure connection details via environment variables
 
 ### Authentication Security
 - Email-only authentication assumes trusted network environment
 - No password protection - anyone with a valid company email can access
 - Consider integrating with company SSO for production use
-- JWT tokens expire after 24 hours
 
 ## Environment Configuration
 
@@ -21,52 +20,40 @@
 cp .env.example .env
 ```
 
-2. **Set strong JWT secret:**
+2. **Update .env file:**
 ```bash
-# Generate a secure random secret (32+ characters recommended)
-JWT_SECRET=$(openssl rand -base64 32)
-```
-
-3. **Update .env file:**
-```bash
-NODE_ENV=production
 PORT=3001
 FRONTEND_URL=https://your-frontend-domain.com
-JWT_SECRET=your-generated-secret-key-here
+
+# MySQL Database Configuration
+DB_HOST=your-mysql-host
+DB_PORT=3306
+DB_USER=your-db-user
+DB_PASSWORD=your-db-password
+DB_NAME=timesheet
 ```
 
 ## Production Deployment Steps
 
-### Option 1: Simple PM2 Deployment
+### Option 1: Direct Deployment
 ```bash
-# Install PM2 globally
-npm install -g pm2
-
 # Install dependencies
-npm install --production
+pip install -r requirements.txt
 
-# Start with PM2
-pm2 start src/server.js --name "time-tracker-api"
-
-# Save PM2 configuration
-pm2 save
-pm2 startup
+# Start with uvicorn
+uvicorn src.app:app --host 0.0.0.0 --port 3001 --workers 4
 ```
 
 ### Option 2: Docker Deployment
-```dockerfile
-FROM node:18-alpine
+```bash
+# Build the image
+docker build -f docker/Dockerfile -t timesheet-app .
 
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm ci --only=production
-
-COPY src/ ./src/
-
-EXPOSE 3001
-
-CMD ["node", "src/server.js"]
+# Run with MySQL credentials
+docker run -p 3001:3001 \
+  -e DB_HOST=your-mysql-host \
+  -e DB_PASSWORD=your-db-password \
+  timesheet-app
 ```
 
 ### Option 3: Systemd Service
@@ -78,11 +65,11 @@ After=network.target
 
 [Service]
 Type=simple
-User=nodejs
-WorkingDirectory=/path/to/app
-ExecStart=/usr/bin/node src/server.js
+User=appuser
+WorkingDirectory=/path/to/app/backend
+ExecStart=/usr/bin/uvicorn src.app:app --host 0.0.0.0 --port 3001 --workers 4
 Restart=always
-Environment=NODE_ENV=production
+EnvironmentFile=/path/to/app/backend/.env
 
 [Install]
 WantedBy=multi-user.target
@@ -92,24 +79,26 @@ WantedBy=multi-user.target
 
 1. **Use HTTPS in production**
 2. **Set up proper CORS for your domain**
-3. **Consider rate limiting adjustments**
-4. **Monitor for unusual authentication patterns**
-5. **Regular security updates for dependencies**
+3. **Monitor for unusual authentication patterns**
+4. **Regular security updates for dependencies**
 
 ## Monitoring & Logging
 
-- Application logs go to console
-- Consider using Winston or similar for structured logging
-- Set up log rotation for production
+- Application logs go to stdout
 - Monitor server health via `/health` endpoint
+- FastAPI provides automatic OpenAPI docs at `/docs`
 
 ## Scaling Considerations
 
-- In-memory database cannot be scaled horizontally
-- Consider load balancer for multiple frontend instances
-- Database persistence required for horizontal scaling
+- MySQL supports horizontal scaling via read replicas
+- Use multiple uvicorn workers for CPU-bound tasks
+- Consider load balancer for multiple instances
 
 ## Backup Strategy
 
-**Not applicable for in-memory database** - data is ephemeral.
-For production with persistent storage, implement regular database backups.
+Implement regular MySQL database backups:
+```bash
+# Example daily backup
+mysqldump -u $DB_USER -p$DB_PASSWORD $DB_NAME > backup_$(date +%Y%m%d).sql
+```
+Consider setting up automated backups and point-in-time recovery.
