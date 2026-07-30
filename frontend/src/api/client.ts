@@ -86,9 +86,43 @@ class ApiClient {
     return response.data;
   }
 
-  // Work entry endpoints
-  async getWorkEntries(clientId?: number) {
+  // Project endpoints
+  async getProjects(clientId?: number) {
     const params = clientId ? { clientId } : {};
+    const response = await this.client.get('/api/projects', { params });
+    return response.data;
+  }
+
+  async getProject(id: number) {
+    const response = await this.client.get(`/api/projects/${id}`);
+    return response.data;
+  }
+
+  async createProject(projectData: { clientId: number; name: string; description?: string }) {
+    const response = await this.client.post('/api/projects', projectData);
+    return response.data;
+  }
+
+  async updateProject(id: number, projectData: { clientId?: number; name?: string; description?: string }) {
+    const response = await this.client.put(`/api/projects/${id}`, projectData);
+    return response.data;
+  }
+
+  async deleteProject(id: number) {
+    const response = await this.client.delete(`/api/projects/${id}`);
+    return response.data;
+  }
+
+  async deleteAllProjects() {
+    const response = await this.client.delete('/api/projects');
+    return response.data;
+  }
+
+  // Work entry endpoints
+  async getWorkEntries(clientId?: number, projectId?: number) {
+    const params: { clientId?: number; projectId?: number } = {};
+    if (clientId) params.clientId = clientId;
+    if (projectId) params.projectId = projectId;
     const response = await this.client.get('/api/work-entries', { params });
     return response.data;
   }
@@ -98,12 +132,12 @@ class ApiClient {
     return response.data;
   }
 
-  async createWorkEntry(entryData: { clientId: number; hours: number; description?: string; date: string }) {
+  async createWorkEntry(entryData: { clientId: number; projectId?: number; hours: number; description?: string; date: string }) {
     const response = await this.client.post('/api/work-entries', entryData);
     return response.data;
   }
 
-  async updateWorkEntry(id: number, entryData: { clientId?: number; hours?: number; description?: string; date?: string }) {
+  async updateWorkEntry(id: number, entryData: { clientId?: number; projectId?: number | null; hours?: number; description?: string; date?: string }) {
     const response = await this.client.put(`/api/work-entries/${id}`, entryData);
     return response.data;
   }
@@ -114,20 +148,24 @@ class ApiClient {
   }
 
   // Report endpoints
-  async getClientReport(clientId: number) {
-    const response = await this.client.get(`/api/reports/client/${clientId}`);
+  async getClientReport(clientId: number, projectId?: number) {
+    const response = await this.client.get(`/api/reports/client/${clientId}`, {
+      params: projectId ? { projectId } : {},
+    });
     return response.data;
   }
 
-  async exportClientReportCsv(clientId: number) {
+  async exportClientReportCsv(clientId: number, projectId?: number) {
     const response = await this.client.get(`/api/reports/export/csv/${clientId}`, {
+      params: projectId ? { projectId } : {},
       responseType: 'blob',
     });
     return response.data;
   }
 
-  async exportClientReportPdf(clientId: number) {
+  async exportClientReportPdf(clientId: number, projectId?: number) {
     const response = await this.client.get(`/api/reports/export/pdf/${clientId}`, {
+      params: projectId ? { projectId } : {},
       responseType: 'blob',
     });
     return response.data;

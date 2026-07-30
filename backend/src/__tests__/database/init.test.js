@@ -88,6 +88,7 @@ describe('Database Initialization', () => {
       
       expect(queries.some(q => q.includes('CREATE TABLE IF NOT EXISTS users'))).toBe(true);
       expect(queries.some(q => q.includes('CREATE TABLE IF NOT EXISTS clients'))).toBe(true);
+      expect(queries.some(q => q.includes('CREATE TABLE IF NOT EXISTS projects'))).toBe(true);
       expect(queries.some(q => q.includes('CREATE TABLE IF NOT EXISTS work_entries'))).toBe(true);
     });
 
@@ -99,7 +100,10 @@ describe('Database Initialization', () => {
       const queries = runCalls.map(call => call[0]);
       
       expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_clients_user_email'))).toBe(true);
+      expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_projects_client_id'))).toBe(true);
+      expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_projects_user_email'))).toBe(true);
       expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_work_entries_client_id'))).toBe(true);
+      expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_work_entries_project_id'))).toBe(true);
       expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_work_entries_user_email'))).toBe(true);
       expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_work_entries_date'))).toBe(true);
     });
@@ -171,6 +175,22 @@ describe('Database Initialization', () => {
       expect(clientTableQuery[0]).toContain('FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE');
     });
 
+    test('projects table should have foreign keys to clients and users', async () => {
+      const db = getDatabase();
+      await initializeDatabase();
+
+      const projectTableQuery = db.run.mock.calls.find(call =>
+        call[0].includes('CREATE TABLE IF NOT EXISTS projects')
+      );
+
+      expect(projectTableQuery).toBeDefined();
+      expect(projectTableQuery[0]).toContain('client_id INTEGER NOT NULL');
+      expect(projectTableQuery[0]).toContain('name TEXT NOT NULL');
+      expect(projectTableQuery[0]).toContain('user_email TEXT NOT NULL');
+      expect(projectTableQuery[0]).toContain('FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE');
+      expect(projectTableQuery[0]).toContain('FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE');
+    });
+
     test('work_entries table should have foreign keys', async () => {
       const db = getDatabase();
       await initializeDatabase();
@@ -182,6 +202,19 @@ describe('Database Initialization', () => {
       expect(workEntriesQuery).toBeDefined();
       expect(workEntriesQuery[0]).toContain('FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE');
       expect(workEntriesQuery[0]).toContain('FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE');
+    });
+
+    test('work_entries table should have a nullable project reference', async () => {
+      const db = getDatabase();
+      await initializeDatabase();
+
+      const workEntriesQuery = db.run.mock.calls.find(call =>
+        call[0].includes('CREATE TABLE IF NOT EXISTS work_entries')
+      );
+
+      expect(workEntriesQuery).toBeDefined();
+      expect(workEntriesQuery[0]).toContain('project_id INTEGER,');
+      expect(workEntriesQuery[0]).toContain('FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE SET NULL');
     });
   });
 });

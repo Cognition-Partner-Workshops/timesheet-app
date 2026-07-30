@@ -1,5 +1,7 @@
 const {
   clientSchema,
+  projectSchema,
+  updateProjectSchema,
   workEntrySchema,
   updateWorkEntrySchema,
   updateClientSchema,
@@ -82,6 +84,56 @@ describe('Validation Schemas', () => {
 
       const { value } = clientSchema.validate(client);
       expect(value.name).toBe('Test Client');
+    });
+  });
+
+  describe('projectSchema', () => {
+    test('should validate valid project data', () => {
+      const { error } = projectSchema.validate({
+        clientId: 1,
+        name: 'Website redesign',
+        description: 'Phase one'
+      });
+
+      expect(error).toBeUndefined();
+    });
+
+    test('should allow missing description', () => {
+      const { error } = projectSchema.validate({ clientId: 1, name: 'Website redesign' });
+
+      expect(error).toBeUndefined();
+    });
+
+    test('should reject missing clientId', () => {
+      const { error } = projectSchema.validate({ name: 'Website redesign' });
+
+      expect(error).toBeDefined();
+    });
+
+    test('should reject missing name', () => {
+      const { error } = projectSchema.validate({ clientId: 1 });
+
+      expect(error).toBeDefined();
+    });
+
+    test('should reject non-positive clientId', () => {
+      const { error } = projectSchema.validate({ clientId: 0, name: 'Website redesign' });
+
+      expect(error).toBeDefined();
+    });
+  });
+
+  describe('updateProjectSchema', () => {
+    test('should validate partial update', () => {
+      const { error } = updateProjectSchema.validate({ name: 'New name' });
+
+      expect(error).toBeUndefined();
+    });
+
+    test('should reject empty update', () => {
+      const { error } = updateProjectSchema.validate({});
+
+      expect(error).toBeDefined();
     });
   });
 

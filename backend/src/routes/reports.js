@@ -11,6 +11,17 @@ const router = express.Router();
 // All routes require authentication
 router.use(authenticateUser);
 
+// Build the optional project filter for work entry queries
+function projectFilter(projectId) {
+  const projectIdNum = parseInt(projectId);
+
+  if (!projectId || isNaN(projectIdNum)) {
+    return { clause: '', params: [] };
+  }
+
+  return { clause: ' AND project_id = ?', params: [projectIdNum] };
+}
+
 // Get hourly report for specific client
 router.get('/client/:clientId', (req, res) => {
   const clientId = parseInt(req.params.clientId);
@@ -36,12 +47,13 @@ router.get('/client/:clientId', (req, res) => {
       }
       
       // Get work entries for this client
+      const filter = projectFilter(req.query.projectId);
       db.all(
         `SELECT id, hours, description, date, created_at, updated_at
          FROM work_entries 
-         WHERE client_id = ? AND user_email = ? 
+         WHERE client_id = ? AND user_email = ?${filter.clause} 
          ORDER BY date DESC`,
-        [clientId, req.userEmail],
+        [clientId, req.userEmail, ...filter.params],
         (err, workEntries) => {
           if (err) {
             console.error('Database error:', err);
@@ -88,12 +100,13 @@ router.get('/export/csv/:clientId', (req, res) => {
       }
       
       // Get work entries
+      const filter = projectFilter(req.query.projectId);
       db.all(
         `SELECT hours, description, date, created_at
          FROM work_entries 
-         WHERE client_id = ? AND user_email = ? 
+         WHERE client_id = ? AND user_email = ?${filter.clause} 
          ORDER BY date DESC`,
-        [clientId, req.userEmail],
+        [clientId, req.userEmail, ...filter.params],
         (err, workEntries) => {
           if (err) {
             console.error('Database error:', err);
@@ -171,12 +184,13 @@ router.get('/export/pdf/:clientId', (req, res) => {
       }
       
       // Get work entries
+      const filter = projectFilter(req.query.projectId);
       db.all(
         `SELECT hours, description, date, created_at
          FROM work_entries 
-         WHERE client_id = ? AND user_email = ? 
+         WHERE client_id = ? AND user_email = ?${filter.clause} 
          ORDER BY date DESC`,
-        [clientId, req.userEmail],
+        [clientId, req.userEmail, ...filter.params],
         (err, workEntries) => {
           if (err) {
             console.error('Database error:', err);

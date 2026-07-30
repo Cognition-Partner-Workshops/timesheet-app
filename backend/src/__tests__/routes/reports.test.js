@@ -165,6 +165,69 @@ describe('Report Routes', () => {
     });
   });
 
+  describe('Project filtering', () => {
+    beforeEach(() => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { id: 1, name: 'Test Client' });
+      });
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, []);
+      });
+    });
+
+    test('should filter report entries by project', async () => {
+      const response = await request(app).get('/api/reports/client/1?projectId=5');
+
+      expect(response.status).toBe(200);
+      expect(mockDb.all).toHaveBeenCalledWith(
+        expect.stringContaining('AND project_id = ?'),
+        [1, 'test@example.com', 5],
+        expect.any(Function)
+      );
+    });
+
+    test('should ignore an invalid project filter', async () => {
+      const response = await request(app).get('/api/reports/client/1?projectId=invalid');
+
+      expect(response.status).toBe(200);
+      expect(mockDb.all).toHaveBeenCalledWith(
+        expect.not.stringContaining('AND project_id = ?'),
+        [1, 'test@example.com'],
+        expect.any(Function)
+      );
+    });
+
+    test('should filter CSV export entries by project', async () => {
+      const csvWriter = require('csv-writer');
+      csvWriter.createObjectCsvWriter.mockReturnValue({
+        writeRecords: jest.fn().mockRejectedValue(new Error('Write failed'))
+      });
+
+      await request(app).get('/api/reports/export/csv/1?projectId=5');
+
+      expect(mockDb.all).toHaveBeenCalledWith(
+        expect.stringContaining('AND project_id = ?'),
+        [1, 'test@example.com', 5],
+        expect.any(Function)
+      );
+    });
+
+    test('should filter PDF export entries by project', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(new Error('Database error'), null);
+      });
+
+      await request(app).get('/api/reports/export/pdf/1?projectId=5');
+
+      expect(mockDb.all).toHaveBeenCalledWith(
+        expect.stringContaining('AND project_id = ?'),
+        [1, 'test@example.com', 5],
+        expect.any(Function)
+      );
+    });
+  });
+
   describe('GET /api/reports/export/csv/:clientId', () => {
     test('should return 400 for invalid client ID', async () => {
       const response = await request(app).get('/api/reports/export/csv/invalid');
