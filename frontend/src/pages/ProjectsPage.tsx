@@ -36,6 +36,12 @@ const STATUS_OPTIONS: { value: ProjectStatus; label: string; color: 'success' | 
   { value: 'on-hold', label: 'On Hold', color: 'warning' },
 ];
 
+// Date-only strings must be parsed as local time to avoid a UTC day shift
+const formatStartDate = (startDate: string) => {
+  const [year, month, day] = startDate.slice(0, 10).split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString();
+};
+
 const emptyForm = { name: '', description: '', clientId: '', startDate: '', status: 'active' as ProjectStatus };
 
 const ProjectsPage: React.FC = () => {
@@ -201,7 +207,7 @@ const ProjectsPage: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" color="text.secondary">
-                          {project.start_date ? new Date(project.start_date).toLocaleDateString() : '-'}
+                          {project.start_date ? formatStartDate(project.start_date) : '-'}
                         </Typography>
                       </TableCell>
                       <TableCell>
