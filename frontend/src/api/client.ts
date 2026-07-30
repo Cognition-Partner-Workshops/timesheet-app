@@ -1,4 +1,5 @@
 import axios, { type AxiosInstance, type AxiosResponse } from 'axios';
+import type { UpdateProjectRequest } from '../types/api';
 
 // Use empty string to make requests relative to the current origin
 // Vite proxy will forward /api requests to the backend
@@ -103,7 +104,7 @@ class ApiClient {
     return response.data;
   }
 
-  async updateProject(id: number, projectData: { clientId?: number; name?: string; description?: string }) {
+  async updateProject(id: number, projectData: UpdateProjectRequest) {
     const response = await this.client.put(`/api/projects/${id}`, projectData);
     return response.data;
   }

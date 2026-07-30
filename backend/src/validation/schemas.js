@@ -1,4 +1,5 @@
 const Joi = require('joi');
+const { PROJECT_STATUSES } = require('./projectStatus');
 
 const clientSchema = Joi.object({
   name: Joi.string().trim().min(1).max(255).required(),
@@ -16,7 +17,8 @@ const projectSchema = Joi.object({
 const updateProjectSchema = Joi.object({
   clientId: Joi.number().integer().positive().optional(),
   name: Joi.string().trim().min(1).max(255).optional(),
-  description: Joi.string().trim().max(1000).optional().allow('')
+  description: Joi.string().trim().max(1000).optional().allow(''),
+  status: Joi.string().valid(...PROJECT_STATUSES).optional()
 }).min(1); // At least one field must be provided
 
 const workEntrySchema = Joi.object({

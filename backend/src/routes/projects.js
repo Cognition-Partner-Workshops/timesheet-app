@@ -2,6 +2,7 @@ const express = require('express');
 const { getDatabase } = require('../database/init');
 const { authenticateUser } = require('../middleware/auth');
 const { projectSchema, updateProjectSchema } = require('../validation/schemas');
+const { PROJECT_STATUS_TRANSITIONS, isValidStatusTransition } = require('../validation/projectStatus');
 const {
   internalError,
   findOwnedRow,
@@ -13,8 +14,8 @@ const {
 
 const router = express.Router();
 
-const PROJECT_COLUMNS = 'id, client_id, name, description, created_at, updated_at';
-const OWNED_PROJECT = 'SELECT id FROM projects WHERE id = ? AND user_email = ?';
+const PROJECT_COLUMNS = 'id, client_id, name, description, status, created_at, updated_at';
+const OWNED_PROJECT = 'SELECT id, status FROM projects WHERE id = ? AND user_email = ?';
 
 // All routes require authentication
 router.use(authenticateUser);
@@ -137,12 +138,20 @@ router.put('/:id', (req, res, next) => {
 
     const db = getDatabase();
 
-    findProject(req, res, projectId, () => {
+    findProject(req, res, projectId, (project) => {
+      if (value.status !== undefined && !isValidStatusTransition(project.status, value.status)) {
+        return res.status(400).json({
+          error: `Cannot change project status from '${project.status}' to '${value.status}'`,
+          allowedTransitions: PROJECT_STATUS_TRANSITIONS[project.status] || []
+        });
+      }
+
       const performUpdate = () => {
         const { updates, values } = buildUpdates(value, {
           clientId: ['client_id', false],
           name: ['name', false],
-          description: ['description', true]
+          description: ['description', true],
+          status: ['status', false]
         });
 
         values.push(projectId, req.userEmail);

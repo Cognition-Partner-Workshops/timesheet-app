@@ -70,6 +70,7 @@ async function initializeDatabase() {
           client_id INTEGER NOT NULL,
           name TEXT NOT NULL,
           description TEXT,
+          status TEXT NOT NULL DEFAULT 'active',
           user_email TEXT NOT NULL,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,

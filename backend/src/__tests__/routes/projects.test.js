@@ -304,6 +304,73 @@ describe('Project Routes', () => {
       expect(response.body).toEqual({ error: 'Client not found or does not belong to user' });
     });
 
+    test('should allow a valid status transition', async () => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1, status: 'active' });
+      });
+
+      mockDb.run.mockImplementation((query, params, callback) => {
+        expect(query).toContain('status = ?');
+        expect(params).toContain('on_hold');
+        callback(null);
+      });
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1, client_id: 1, name: 'Project', status: 'on_hold' });
+      });
+
+      const response = await request(app)
+        .put('/api/projects/1')
+        .send({ status: 'on_hold' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.project.status).toBe('on_hold');
+    });
+
+    test('should allow re-applying the current status', async () => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1, status: 'archived' });
+      });
+
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1, client_id: 1, name: 'Project', status: 'archived' });
+      });
+
+      const response = await request(app)
+        .put('/api/projects/1')
+        .send({ status: 'archived' });
+
+      expect(response.status).toBe(200);
+    });
+
+    test('should return 400 for an invalid status transition', async () => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1, status: 'archived' });
+      });
+
+      const response = await request(app)
+        .put('/api/projects/1')
+        .send({ status: 'completed' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe("Cannot change project status from 'archived' to 'completed'");
+      expect(response.body.allowedTransitions).toEqual(['active']);
+      expect(mockDb.run).not.toHaveBeenCalled();
+    });
+
+    test('should reject an unknown status value', async () => {
+      const response = await request(app)
+        .put('/api/projects/1')
+        .send({ status: 'paused' });
+
+      expect(response.status).toBe(400);
+      expect(mockDb.run).not.toHaveBeenCalled();
+    });
+
     test('should set description to null when empty string provided', async () => {
       mockDb.get.mockImplementationOnce((query, params, callback) => {
         callback(null, { id: 1 });

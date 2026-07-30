@@ -186,6 +186,7 @@ describe('Database Initialization', () => {
       expect(projectTableQuery).toBeDefined();
       expect(projectTableQuery[0]).toContain('client_id INTEGER NOT NULL');
       expect(projectTableQuery[0]).toContain('name TEXT NOT NULL');
+      expect(projectTableQuery[0]).toContain("status TEXT NOT NULL DEFAULT 'active'");
       expect(projectTableQuery[0]).toContain('user_email TEXT NOT NULL');
       expect(projectTableQuery[0]).toContain('FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE');
       expect(projectTableQuery[0]).toContain('FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE');

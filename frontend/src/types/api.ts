@@ -13,11 +13,14 @@ export interface Client {
   updated_at: string;
 }
 
+export type ProjectStatus = 'active' | 'on_hold' | 'completed' | 'archived';
+
 export interface Project {
   id: number;
   client_id: number;
   name: string;
   description: string | null;
+  status: ProjectStatus;
   created_at: string;
   updated_at: string;
 }
@@ -70,6 +73,7 @@ export interface UpdateProjectRequest {
   clientId?: number;
   name?: string;
   description?: string;
+  status?: ProjectStatus;
 }
 
 export interface CreateWorkEntryRequest {

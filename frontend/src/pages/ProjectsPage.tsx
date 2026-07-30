@@ -32,9 +32,14 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
 import LoadingState from '../components/LoadingState';
-import { type Client, type Project } from '../types/api';
+import { type Client, type Project, type ProjectStatus, type UpdateProjectRequest } from '../types/api';
+import {
+  PROJECT_STATUS_COLORS,
+  PROJECT_STATUS_LABELS,
+  allowedStatuses,
+} from '../constants/projectStatus';
 
-const emptyForm = { clientId: 0, name: '', description: '' };
+const emptyForm = { clientId: 0, name: '', description: '', status: 'active' as ProjectStatus };
 
 const ProjectsPage: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -74,7 +79,7 @@ const ProjectsPage: React.FC = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { clientId?: number; name?: string; description?: string } }) =>
+    mutationFn: ({ id, data }: { id: number; data: UpdateProjectRequest }) =>
       apiClient.updateProject(id, data),
     onSuccess: () => {
       invalidateProjects();
@@ -103,6 +108,7 @@ const ProjectsPage: React.FC = () => {
         clientId: project.client_id,
         name: project.name,
         description: project.description || '',
+        status: project.status,
       });
     } else {
       setEditingProject(null);
@@ -140,7 +146,10 @@ const ProjectsPage: React.FC = () => {
     };
 
     if (editingProject) {
-      updateMutation.mutate({ id: editingProject.id, data: projectData });
+      updateMutation.mutate({
+        id: editingProject.id,
+        data: { ...projectData, status: formData.status },
+      });
     } else {
       createMutation.mutate(projectData);
     }
@@ -194,6 +203,7 @@ const ProjectsPage: React.FC = () => {
                   <TableCell>Name</TableCell>
                   <TableCell>Client</TableCell>
                   <TableCell>Description</TableCell>
+                  <TableCell>Status</TableCell>
                   <TableCell>Created</TableCell>
                   <TableCell align="right">Actions</TableCell>
                 </TableRow>
@@ -222,6 +232,13 @@ const ProjectsPage: React.FC = () => {
                         )}
                       </TableCell>
                       <TableCell>
+                        <Chip
+                          label={PROJECT_STATUS_LABELS[project.status]}
+                          color={PROJECT_STATUS_COLORS[project.status]}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
                         <Typography variant="body2" color="text.secondary">
                           {new Date(project.created_at).toLocaleDateString()}
                         </Typography>
@@ -238,7 +255,7 @@ const ProjectsPage: React.FC = () => {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={5} align="center">
+                    <TableCell colSpan={6} align="center">
                       <Typography color="text.secondary" sx={{ py: 3 }}>
                         No projects found. Create your first project to get started.
                       </Typography>
@@ -290,6 +307,23 @@ const ProjectsPage: React.FC = () => {
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               disabled={isSaving}
             />
+            {editingProject && (
+              <FormControl fullWidth margin="dense">
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={formData.status}
+                  label="Status"
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value as ProjectStatus })}
+                  disabled={isSaving}
+                >
+                  {allowedStatuses(editingProject.status).map((status) => (
+                    <MenuItem key={status} value={status}>
+                      {PROJECT_STATUS_LABELS[status]}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
           </DialogContent>
           <DialogActions>
             <Button onClick={handleClose} disabled={isSaving}>
