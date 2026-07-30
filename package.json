@@ -1,0 +1,31 @@
+{
+  "name": "timesheet-app",
+  "private": true,
+  "description": "Multi-tier time-tracking and client management application",
+  "scripts": {
+    "lint": "npm run lint:frontend && npm run lint:backend",
+    "lint:frontend": "cd frontend && npx eslint .",
+    "lint:backend": "cd backend && npx eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.4.3",
+    "prettier": "^3.5.3"
+  },
+  "lint-staged": {
+    "frontend/**/*.{ts,tsx}": [
+      "prettier --write",
+      "bash -c 'cd frontend && npx eslint --fix'"
+    ],
+    "backend/**/*.js": [
+      "prettier --write",
+      "bash -c 'cd backend && npx eslint --fix'"
+    ],
+    "*.{json,md,yml,yaml,css,html}": [
+      "prettier --write"
+    ]
+  }
+}

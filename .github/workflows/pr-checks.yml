@@ -11,6 +11,41 @@ permissions:
   pull-requests: write
 
 jobs:
+  lint:
+    name: Lint & Format Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Run Prettier format check
+        run: npx prettier --check .
+
+      - name: Run frontend ESLint
+        working-directory: frontend
+        run: npx eslint .
+
+      - name: Run backend ESLint
+        working-directory: backend
+        run: npx eslint .
+
   security-audit:
     name: Security Audit (CVE Check)
     if: "!contains(github.event.pull_request.user.login, 'devin')"
@@ -189,7 +224,6 @@ jobs:
           )
 
           gh pr comment ${{ github.event.pull_request.number }} --body "$COMMENT"
-
 
   trigger-devin-cve-fix:
     name: Trigger Devin CVE Auto-Fix

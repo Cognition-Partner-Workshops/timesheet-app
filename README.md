@@ -5,12 +5,15 @@ A full-stack web application for tracking and reporting employee hourly work acr
 ## ⚠️ Important Notes
 
 ### Data Persistence
+
 **This application uses SQLite in-memory database as specified in requirements.**
+
 - ⚠️ **All data is lost when the backend server restarts**
 - Suitable for development and testing
 - For production use, modify `backend/src/database/init.js` to use file-based SQLite instead of `:memory:`
 
 ### Authentication
+
 - Email-only authentication with JWT tokens
 - No password required - assumes trusted internal network
 - Anyone with a valid email can create an account and log in
@@ -27,6 +30,7 @@ A full-stack web application for tracking and reporting employee hourly work acr
 ## Tech Stack
 
 ### Frontend
+
 - **React** with TypeScript
 - **Vite** for build tooling
 - **Material UI** for components
@@ -35,6 +39,7 @@ A full-stack web application for tracking and reporting employee hourly work acr
 - **Axios** for API calls
 
 ### Backend
+
 - **Node.js** with Express
 - **SQLite** in-memory database
 - **JWT** for authentication
@@ -87,27 +92,32 @@ A full-stack web application for tracking and reporting employee hourly work acr
 ## Getting Started
 
 ### Prerequisites
+
 - Node.js 18+ installed
 - npm or yarn package manager
 
 ### Backend Setup
 
 1. Navigate to backend directory:
+
 ```bash
 cd backend
 ```
 
 2. Install dependencies:
+
 ```bash
 npm install
 ```
 
 3. Create environment file:
+
 ```bash
 cp .env.example .env
 ```
 
 4. Update `.env` with your configuration:
+
 ```bash
 PORT=3001
 NODE_ENV=development
@@ -116,6 +126,7 @@ JWT_SECRET=your-secure-secret-key-change-this
 ```
 
 5. Start the development server:
+
 ```bash
 npm run dev
 ```
@@ -125,26 +136,31 @@ Backend will be running at `http://localhost:3001`
 ### Frontend Setup
 
 1. Navigate to frontend directory:
+
 ```bash
 cd frontend
 ```
 
 2. Install dependencies:
+
 ```bash
 npm install
 ```
 
 3. Create environment file:
+
 ```bash
 cp .env.example .env
 ```
 
 4. Update `.env`:
+
 ```bash
 VITE_API_URL=http://localhost:3001
 ```
 
 5. Start the development server:
+
 ```bash
 npm run dev
 ```
@@ -161,10 +177,12 @@ Frontend will be running at `http://localhost:5173`
 ## API Endpoints
 
 ### Authentication
+
 - `POST /api/auth/login` - Login with email, returns JWT token
 - `GET /api/auth/me` - Get current user info (requires auth)
 
 ### Clients
+
 - `GET /api/clients` - Get all clients
 - `POST /api/clients` - Create new client
 - `GET /api/clients/:id` - Get specific client
@@ -172,6 +190,7 @@ Frontend will be running at `http://localhost:5173`
 - `DELETE /api/clients/:id` - Delete client
 
 ### Work Entries
+
 - `GET /api/work-entries` - Get all work entries (optional ?clientId filter)
 - `POST /api/work-entries` - Create new work entry
 - `GET /api/work-entries/:id` - Get specific work entry
@@ -179,6 +198,7 @@ Frontend will be running at `http://localhost:5173`
 - `DELETE /api/work-entries/:id` - Delete work entry
 
 ### Reports
+
 - `GET /api/reports/client/:clientId` - Get hourly report for client
 - `GET /api/reports/export/csv/:clientId` - Export report as CSV
 - `GET /api/reports/export/pdf/:clientId` - Export report as PDF
@@ -197,12 +217,14 @@ All authenticated endpoints require `Authorization: Bearer <token>` header.
 ## Development
 
 ### Backend Development
+
 ```bash
 cd backend
 npm run dev  # Starts with nodemon for auto-reload
 ```
 
 ### Frontend Development
+
 ```bash
 cd frontend
 npm run dev  # Starts Vite dev server with HMR
@@ -211,6 +233,7 @@ npm run dev  # Starts Vite dev server with HMR
 ### Running Tests
 
 **Backend:**
+
 ```bash
 cd backend
 npm test                    # Run all tests
@@ -222,19 +245,20 @@ npm run test:watch          # Run tests in watch mode
 
 The backend has comprehensive test coverage with **161 tests** across 8 test suites:
 
-| File | Statements | Branches | Functions | Lines |
-|------|------------|----------|-----------|-------|
-| **Overall** | **90.16%** | **93.82%** | **92.18%** | **90.35%** |
-| database/init.js | 100% | 100% | 100% | 100% |
-| middleware/auth.js | 100% | 100% | 100% | 100% |
-| middleware/errorHandler.js | 100% | 100% | 100% | 100% |
-| routes/auth.js | 100% | 100% | 100% | 100% |
-| routes/clients.js | 97.89% | 100% | 100% | 97.89% |
-| routes/workEntries.js | 98.41% | 100% | 100% | 98.41% |
-| routes/reports.js | 64.15% | 69.44% | 68.75% | 64.42% |
-| validation/schemas.js | 100% | 100% | 100% | 100% |
+| File                       | Statements | Branches   | Functions  | Lines      |
+| -------------------------- | ---------- | ---------- | ---------- | ---------- |
+| **Overall**                | **90.16%** | **93.82%** | **92.18%** | **90.35%** |
+| database/init.js           | 100%       | 100%       | 100%       | 100%       |
+| middleware/auth.js         | 100%       | 100%       | 100%       | 100%       |
+| middleware/errorHandler.js | 100%       | 100%       | 100%       | 100%       |
+| routes/auth.js             | 100%       | 100%       | 100%       | 100%       |
+| routes/clients.js          | 97.89%     | 100%       | 100%       | 97.89%     |
+| routes/workEntries.js      | 98.41%     | 100%       | 100%       | 98.41%     |
+| routes/reports.js          | 64.15%     | 69.44%     | 68.75%     | 64.42%     |
+| validation/schemas.js      | 100%       | 100%       | 100%       | 100%       |
 
 Coverage thresholds are configured in `jest.config.js`:
+
 - Statements: 60%
 - Branches: 60%
 - Functions: 65%
@@ -243,12 +267,14 @@ Coverage thresholds are configured in `jest.config.js`:
 ### Building for Production
 
 **Backend:**
+
 ```bash
 cd backend
 npm start  # Production mode
 ```
 
 **Frontend:**
+
 ```bash
 cd frontend
 npm run build  # Creates optimized production build in dist/
@@ -260,6 +286,7 @@ npm run preview  # Preview production build
 See `backend/DEPLOYMENT.md` for detailed production deployment instructions.
 
 ### Quick Production Checklist
+
 - [ ] Set strong `JWT_SECRET` in environment variables
 - [ ] Configure proper `FRONTEND_URL` for CORS
 - [ ] Consider switching to file-based SQLite for data persistence
