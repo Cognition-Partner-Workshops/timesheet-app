@@ -8,6 +8,48 @@ const fs = require('fs');
 
 const router = express.Router();
 
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+// Validates optional startDate/endDate query params; sends a 400 response and
+// returns null when invalid, otherwise returns the parsed range.
+function parseDateRange(req, res) {
+  const { startDate, endDate } = req.query;
+
+  if (startDate && !DATE_REGEX.test(startDate)) {
+    res.status(400).json({ error: 'Invalid startDate format. Expected YYYY-MM-DD' });
+    return null;
+  }
+
+  if (endDate && !DATE_REGEX.test(endDate)) {
+    res.status(400).json({ error: 'Invalid endDate format. Expected YYYY-MM-DD' });
+    return null;
+  }
+
+  if (startDate && endDate && startDate > endDate) {
+    res.status(400).json({ error: 'startDate must not be after endDate' });
+    return null;
+  }
+
+  return { startDate, endDate };
+}
+
+function buildDateFilter(startDate, endDate) {
+  let clause = '';
+  const params = [];
+
+  if (startDate) {
+    clause += ' AND date >= ?';
+    params.push(startDate);
+  }
+
+  if (endDate) {
+    clause += ' AND date <= ?';
+    params.push(endDate);
+  }
+
+  return { clause, params };
+}
+
 // All routes require authentication
 router.use(authenticateUser);
 
@@ -18,6 +60,12 @@ router.get('/client/:clientId', (req, res) => {
   if (isNaN(clientId)) {
     return res.status(400).json({ error: 'Invalid client ID' });
   }
+  
+  const dateRange = parseDateRange(req, res);
+  if (!dateRange) {
+    return;
+  }
+  const dateFilter = buildDateFilter(dateRange.startDate, dateRange.endDate);
   
   const db = getDatabase();
   
@@ -39,9 +87,9 @@ router.get('/client/:clientId', (req, res) => {
       db.all(
         `SELECT id, hours, description, date, created_at, updated_at
          FROM work_entries 
-         WHERE client_id = ? AND user_email = ? 
+         WHERE client_id = ? AND user_email = ?${dateFilter.clause} 
          ORDER BY date DESC`,
-        [clientId, req.userEmail],
+        [clientId, req.userEmail, ...dateFilter.params],
         (err, workEntries) => {
           if (err) {
             console.error('Database error:', err);
@@ -71,6 +119,12 @@ router.get('/export/csv/:clientId', (req, res) => {
     return res.status(400).json({ error: 'Invalid client ID' });
   }
   
+  const dateRange = parseDateRange(req, res);
+  if (!dateRange) {
+    return;
+  }
+  const dateFilter = buildDateFilter(dateRange.startDate, dateRange.endDate);
+  
   const db = getDatabase();
   
   // Verify client belongs to user and get data
@@ -91,9 +145,9 @@ router.get('/export/csv/:clientId', (req, res) => {
       db.all(
         `SELECT hours, description, date, created_at
          FROM work_entries 
-         WHERE client_id = ? AND user_email = ? 
+         WHERE client_id = ? AND user_email = ?${dateFilter.clause} 
          ORDER BY date DESC`,
-        [clientId, req.userEmail],
+        [clientId, req.userEmail, ...dateFilter.params],
         (err, workEntries) => {
           if (err) {
             console.error('Database error:', err);
@@ -154,6 +208,12 @@ router.get('/export/pdf/:clientId', (req, res) => {
     return res.status(400).json({ error: 'Invalid client ID' });
   }
   
+  const dateRange = parseDateRange(req, res);
+  if (!dateRange) {
+    return;
+  }
+  const dateFilter = buildDateFilter(dateRange.startDate, dateRange.endDate);
+  
   const db = getDatabase();
   
   // Verify client belongs to user and get data
@@ -174,9 +234,9 @@ router.get('/export/pdf/:clientId', (req, res) => {
       db.all(
         `SELECT hours, description, date, created_at
          FROM work_entries 
-         WHERE client_id = ? AND user_email = ? 
+         WHERE client_id = ? AND user_email = ?${dateFilter.clause} 
          ORDER BY date DESC`,
-        [clientId, req.userEmail],
+        [clientId, req.userEmail, ...dateFilter.params],
         (err, workEntries) => {
           if (err) {
             console.error('Database error:', err);
