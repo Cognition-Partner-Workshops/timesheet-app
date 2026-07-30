@@ -6,8 +6,8 @@ WORKDIR /app/frontend
 # Copy frontend package files
 COPY frontend/package*.json ./
 
-# Install frontend dependencies
-RUN npm ci
+# Install frontend dependencies (lifecycle scripts disabled for supply-chain safety)
+RUN npm ci --ignore-scripts && npm rebuild esbuild
 
 # Copy frontend source
 COPY frontend/ ./
@@ -23,8 +23,8 @@ WORKDIR /app/backend
 # Copy backend package files
 COPY backend/package*.json ./
 
-# Install production dependencies only
-RUN npm ci --only=production
+# Install production dependencies only (lifecycle scripts disabled for supply-chain safety)
+RUN npm ci --only=production --ignore-scripts && npm rebuild sqlite3
 
 # Production stage
 FROM node:20-alpine AS production
