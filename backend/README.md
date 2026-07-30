@@ -1,6 +1,6 @@
 # Time Tracking Backend API
 
-A Node.js/Express backend API for employee time tracking application with SQLite in-memory database.
+A Node.js/Express backend API for employee time tracking application with a persistent file-based SQLite database managed via Knex migrations.
 
 ## Features
 
