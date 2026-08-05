@@ -76,12 +76,12 @@ const ProjectsPage: React.FC = () => {
 
   const queryClient = useQueryClient();
 
-  const { data: projectsData, isLoading } = useQuery({
+  const { data: projectsData, isLoading: projectsLoading } = useQuery({
     queryKey: ['projects'],
     queryFn: () => apiClient.getProjects(),
   });
 
-  const { data: clientsData } = useQuery({
+  const { data: clientsData, isLoading: clientsLoading } = useQuery({
     queryKey: ['clients'],
     queryFn: () => apiClient.getClients(),
   });
@@ -201,7 +201,7 @@ const ProjectsPage: React.FC = () => {
   const isSaving = createMutation.isPending || updateMutation.isPending;
   const submitLabel = editingProject ? 'Update' : 'Create';
 
-  if (isLoading) {
+  if (projectsLoading || clientsLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
         <CircularProgress />
