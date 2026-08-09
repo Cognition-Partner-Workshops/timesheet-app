@@ -2,144 +2,173 @@
 
 ## Executive summary
 
-The fixed code removes the repeated authenticated-user lookup for known users
-with a bounded, per-database in-process cache. In the short isolated
-attribution run, p95 fell from 15.29 ms to 9.60 ms and throughput rose from
-1,083.13 to 1,140.74 requests/s. The other three candidate changes did not
-show a measurable gain in their isolated runs and were not retained as
-performance fixes.
+The corrected-harness canonical baseline at 50 VUs was **p95 81.35–94.89 ms,
+0.00% HTTP failures, and 640.77–671.43 requests/s** across two workflow
+repeats. The fixed cache build measured **p95 96.81–97.42 ms, 0.00% failures,
+and 675.62–677.14 requests/s**. The p95 change is therefore **-2.0% to
++19.8%** across repeats and is not a stable latency improvement; throughput
+was **+0.6% to +5.4%**.
 
-The full fixed breaking run reached approximately 185 active VUs before the
-latency threshold aborted it, versus approximately 169 VUs in the baseline.
-The failure mode remained latency-threshold failure, not an HTTP error storm:
-the HTTP failure rate at the break was 0.00%.
+The short ramp profile stayed below the 500 ms threshold through 100 VUs in
+all repeats. Its baseline p95 was **112.42–133.24 ms** and fixed p95 was
+**98.60–105.64 ms**, an observed **5.9%–26.0% reduction**, with 0.00%
+failures in every run. The short breaking profile completed its 200-VU stage
+without an HTTP error storm in all four runs; aggregate p95 was
+**254.87–283.08 ms baseline** versus **243.01–243.93 ms fixed**, an observed
+**4.3%–14.2% reduction**. Because the short profile does not trigger the
+canonical abort point, this does not establish a higher breaking concurrency.
+
+The deployment-critical finding is independent of those capacity results:
+the shipped default global limiter allows only **100 requests per 15 minutes
+per IP**. In a shared-egress deployment, many users appear as one IP and
+will receive 429 responses at roughly 100 requests, long before backend
+concurrency becomes the limit. Load runs explicitly set `RATE_LIMIT_MAX=0`.
+
+The retained change is the bounded per-database authentication cache. The
+composite index, SQL report aggregation, and disabling Morgan logging did not
+show a reliable isolated gain and were not retained as performance fixes.
 
 ## Methodology and environment
 
-- Machine: 8 CPU cores and 31 GB RAM.
-- Backend: Express, single-process Node.js, in-memory SQLite database.
-- Load generator: k6 v2.1.0.
-- The k6 process and backend were co-located on the same machine, so their
-  resource use competes; these are not isolated server-capacity measurements.
-- Each run started a fresh backend and seeded 20 clients with 150 work entries
-  per client (3,000 entries).
-- Load runs set `RATE_LIMIT_MAX=0`. The application default remains 100
-  requests per 15 minutes per IP.
-- SLO thresholds were p95 HTTP duration under 500 ms and HTTP failure rate
-  under 1%. The breaking scenario aborts when the latency threshold fails.
-- Baseline values below are read from the saved `baseline-*.json` summaries.
-  Fixed values are read from the saved `phase2-fixed-*.json` summaries; no
-  baseline scenario was rerun.
+- 8 CPU cores and 31 GB RAM; k6 v2.1.0.
+- Express/single-process Node backend with an in-memory SQLite database.
+- k6 and the backend were co-located, so these are not isolated server
+  capacity measurements or projections for another topology.
+- Every run started a fresh database with 20 clients and 3,000 work entries.
+- Every measured iteration used the same mix: login, create entry, list
+  entries, list clients, and view report, followed by a 0.2-second pause.
+- Workflow repeats ran 50 VUs for 3 minutes. Ramp and breaking repeats used
+  explicitly marked short profiles (75 and 80 seconds respectively) to make
+  repeat measurement practical. The default five-minute ramp and full
+  breaking profiles remain available in the harness.
+- Baseline-equivalent runs used `AUTH_CACHE_ENABLED=0`,
+  `RATE_LIMIT_MAX=0`, and combined Morgan logging. Fixed runs enabled the
+  cache. No candidate index or SQL aggregation change was active.
+- Thresholds were p95 HTTP duration under 500 ms and HTTP failure rate under
+  1%. All repeated runs reported 0.00% HTTP failures.
+- Raw backend logs and CPU profiles remain ignored; only JSON/TXT summaries
+  are committed.
 
-The harness now measures `listClients()` inside every measured iteration.
-The earlier breaking baseline called it only during setup, so its
-`endpoint_list_clients` value is not apples-to-apples with the fixed run.
-The earlier ramp also called it conditionally. The workflow baseline already
-included the call in each iteration.
+## Corrected-harness repeated results
 
-## Baseline and fixed scenario results
+### Workflow: 50 VUs for 3 minutes
 
-| Scenario | HTTP requests | Throughput (req/s) | p95 (ms) | p99 (ms) | HTTP failure rate |
+| Version | Requests | Throughput (req/s) | p95 (ms) | p99 (ms) | Error rate |
 |---|---:|---:|---:|---:|---:|
-| Baseline workflow, 50 VUs / 3 min | 121,472 | 673.16 | 82.81 | 103.15 | 0.00% |
-| Fixed workflow, 50 VUs / 3 min | 132,022 | 731.86 | 77.55 | 104.84 | 0.00% |
-| Baseline ramp, 1→100 VUs / 5 min | 133,713 | 444.36 | 264.82 | 334.47 | 0.00% |
-| Fixed ramp, 1→100 VUs / 5 min | 147,077 | 488.20 | 277.08 | 421.55 | 0.00% |
-| Baseline breaking | 127,512 | 439.61 | 504.02 | 658.02 | 0.00% |
-| Fixed breaking | 167,794 | 517.82 | 503.99 | 718.10 | 0.00% |
+| Baseline repeat 1 | 115,627 | 640.77 | 94.89 | 132.97 | 0.00% |
+| Baseline repeat 2 | 121,137 | 671.43 | 81.35 | 107.73 | 0.00% |
+| Fixed repeat 1 | 122,262 | 677.14 | 96.81 | 143.24 | 0.00% |
+| Fixed repeat 2 | 122,007 | 675.62 | 97.42 | 141.00 | 0.00% |
 
-The workflow and ramp runs are time-based, so request totals and throughput
-are directly reported measurements but are affected by normal run-to-run
-variation. The fixed ramp's p95 is slightly higher than the baseline despite
-higher throughput; this is not presented as a universal improvement.
+### Ramp: short profile, 1→100 VUs
 
-## Endpoint latency
+| Version | Requests | Throughput (req/s) | p95 (ms) | p99 (ms) | Error rate |
+|---|---:|---:|---:|---:|---:|
+| Baseline repeat 1 | 56,877 | 752.87 | 133.24 | 177.43 | 0.00% |
+| Baseline repeat 2 | 57,952 | 766.19 | 112.42 | 142.89 | 0.00% |
+| Fixed repeat 1 | 61,567 | 814.68 | 105.64 | 143.19 | 0.00% |
+| Fixed repeat 2 | 62,012 | 820.72 | 98.60 | 128.49 | 0.00% |
 
-Values are p95 milliseconds from the saved summaries.
+### Breaking: short profile, 1→200 VUs
 
-| Endpoint | Baseline workflow | Fixed workflow | Baseline ramp | Fixed ramp | Baseline breaking | Fixed breaking |
-|---|---:|---:|---:|---:|---:|---:|
-| Login | 44.60 | 55.67 | 175.01 | 306.35 | 304.15 | 543.17 |
-| Create entry | 100.15 | 101.48 | 317.77 | 298.01 | 609.72 | 509.56 |
-| List clients | 64.04 | 58.05 | 223.35 | 241.68 | 1.11* | 382.25 |
-| List entries | 71.03 | 58.29 | 240.06 | 285.19 | 444.38 | 582.60 |
-| Report | 83.54 | 84.15 | 273.68 | 186.94† | 520.49 | 419.27 |
+The short profile completed the staged run through 200 VUs in every repeat,
+so no threshold-defined breaking concurrency was observed.
 
-\* The breaking baseline list-clients call was setup-only and is not
-comparable.
-† The ramp scenario calls the report conditionally, so endpoint counts and
-mix differ from the fixed breaking/workflow scenarios.
+| Version | Requests | Throughput (req/s) | p95 (ms) | p99 (ms) | Error rate |
+|---|---:|---:|---:|---:|---:|
+| Baseline repeat 1 | 65,407 | 804.77 | 283.08 | 397.25 | 0.00% |
+| Baseline repeat 2 | 65,997 | 812.47 | 254.87 | 376.84 | 0.00% |
+| Fixed repeat 1 | 62,997 | 777.28 | 243.93 | 293.87 | 0.00% |
+| Fixed repeat 2 | 62,382 | 770.51 | 243.01 | 310.79 | 0.00% |
 
-The corrected fixed summaries contain real endpoint request counts through
-dedicated Counter metrics. For example, the fixed workflow recorded 26,404
-create-entry calls, 26,405 list-client calls, 26,404 list-entry calls, 26,405
-login calls, and 26,404 report calls. Trend metrics themselves do not expose a
-sample count in k6's summary `values` object; the old writer incorrectly read
-`values.count`, which produced zero.
+The earlier full-profile result (approximately 169 VUs baseline versus 185
+VUs fixed) is retired as a canonical comparison because it used the
+pre-correction workload. The corrected short repeats do not support claiming
+that the breaking-point shift is real; with these measurements, it is
+**not distinguishable from run-to-run variance**.
 
-## Breaking point and evidence
+## Endpoint p95 ranges
 
-The baseline breaking run aborted while ramping from 150 toward 175 VUs,
-around 169 active VUs, at p95 504.02 ms. The fixed run continued through the
-175-VU stage and aborted later at approximately 185 active VUs, at p95
-503.99 ms. In both runs, the HTTP failure rate was 0.00%; this was a
-latency-threshold failure, not an error storm, timeout storm, connection-reset
-storm, or 5xx storm.
+These are min–max ranges across the two corrected repeats for each version.
 
-The baseline 30-second CPU sampling run recorded 36 backend samples, averaging
-73.4% CPU and reaching 90.3%. This indicates the single Node process was
-approaching one fully utilized core. No usable Node `.cpuprofile` was
-captured: the `--cpu-prof` attempt did not emit one on the signal shutdown
-path. The bottleneck assessment therefore rests on endpoint latency,
-response-size, and CPU-utilization evidence, not a CPU profile.
+| Scenario | Version | Login | Create entry | List clients | List entries | Report |
+|---|---|---:|---:|---:|---:|---:|
+| Workflow | Baseline | 45.30–54.95 | 96.33–121.76 | 64.20–75.03 | 71.60–87.91 | 82.74–99.78 |
+| Workflow | Fixed | 70.21–72.95 | 136.23–137.73 | 69.49–70.94 | 73.08–74.13 | 102.50–104.47 |
+| Ramp short | Baseline | 76.12–81.34 | 136.27–169.99 | 87.64–107.81 | 113.86–118.66 | 111.87–138.99 |
+| Ramp short | Fixed | 78.83–79.00 | 126.32–139.38 | 73.83–74.04 | 76.81–81.88 | 105.17–107.55 |
+| Breaking short | Baseline | 213.15–235.77 | 248.38–257.01 | 217.69–247.37 | 359.76–388.93 | 246.39–256.38 |
+| Breaking short | Fixed | 196.92–212.99 | 290.63–304.18 | 182.71–187.58 | 216.80–231.89 | 226.30–226.96 |
 
-The saved summaries report substantial response traffic. For example, the
-baseline workflow received approximately 42.7 MB/s, or about 7.7 GB across
-121,472 requests; the fixed workflow received approximately 49.6 MB/s, or
-about 8.9 GB across 132,022 requests. Large unpaginated list/report payloads
-remain an important part of the measured cost.
+## Login regression analysis
+
+The login trend measures `POST /api/auth/login`. It is not bypassed by the
+authenticated-user middleware cache, which protects the other workflow
+requests. In the corrected full workflow repeats, login p95 was 45.30–54.95
+ms baseline and 70.21–72.95 ms fixed; in the short ramp it was 76.12–81.34 ms
+baseline and 78.83–79.00 ms fixed; in short breaking it was 213.15–235.77 ms
+baseline and 196.92–212.99 ms fixed.
+
+The apparent regression from the old single-run table is therefore not
+reproduced consistently by the corrected repeats. The cache increased
+throughput in the workflow and ramp runs, changing queueing and the number of
+concurrent requests observed by the uncached login route. The summaries
+support queueing/workload interaction as a plausible explanation, not a
+direct cache slowdown of `/api/auth/login`; they do not prove a causal
+mechanism.
+
+The dedicated 30-second attribution repeats show the cache effect clearly:
+
+| Version | Throughput (req/s) | p95 (ms) | Login p95 (ms) | Error rate |
+|---|---:|---:|---:|---:|
+| Control repeat 1 | 752.54 | 63.24 | 37.90 | 0.00% |
+| Control repeat 2 | 924.43 | 29.26 | 15.92 | 0.00% |
+| Cache repeat 1 | 871.55 | 44.75 | 31.50 | 0.00% |
+| Cache repeat 2 | 1,019.64 | 20.71 | 14.89 | 0.00% |
+
+Across these repeats, cache p95 was 20.71–44.75 ms versus control
+29.26–63.24 ms, and throughput was 871.55–1,019.64 versus 752.54–924.43
+requests/s. The overlap means the short-run improvement should be reported as
+a range, not a single guaranteed percentage.
 
 ## Candidate attribution
 
-Each candidate was measured in isolation in a short 30-second, 50-VU workflow
-run against the same seeded volume. These attribution runs are shorter and
-more sensitive to noise than the canonical scenario runs, so they establish
-direction and attribution rather than a production capacity projection.
+The prior isolated candidate summaries remain saved and document the
+discarded options:
 
-| Run | Change isolated | Requests | Throughput (req/s) | p95 (ms) | Result |
-|---|---|---:|---:|---:|---|
-| `phase2-control` | All candidates disabled; combined logging | 32,782 | 1,083.13 | 15.29 | Control |
-| `phase2-index` | Composite `(user_email, client_id, date, created_at)` index | 32,702 | 1,081.00 | 15.64 | Discarded; no gain |
-| `phase2-sql-total` | SQL window aggregation for report total | 30,932 | 1,022.24 | 21.83 | Discarded; slower |
-| `phase2-auth-cache` | Bounded known-email cache | 34,482 | 1,140.74 | 9.60 | **Retained** |
-| `phase2-logging-off` | Morgan logging disabled | 32,987 | 1,089.39 | 17.86 | Discarded; no measurable gain |
+| Candidate | Result |
+|---|---|
+| Composite `(user_email, client_id, date, created_at)` index | Discarded; 15.64 ms p95 and 1,081.00 req/s versus 15.29 ms and 1,083.13 req/s control |
+| SQL report total aggregation | Discarded; slower at 21.83 ms p95 and 1,022.24 req/s |
+| Bounded known-email auth cache | Retained; 9.60 ms p95 and 1,140.74 req/s in the original isolated attribution run |
+| Morgan logging disabled | Discarded as a performance claim; 17.86 ms p95 and 1,089.39 req/s |
 
-Candidate A's composite index was removed after the isolated run did not
-improve p95 or throughput; the existing single-column indexes remain.
-Candidate B's window expression made this workload slower, so the existing
-response shape and JavaScript reduction remain. Candidate D's configurable
-Morgan format is retained as an operational option, with `combined` still the
-default, but disabling logging was not retained as a claimed performance
-fix. Candidate C is retained: it uses a maximum size of 1,000 entries, scopes
-the cache to the database object, and only caches users confirmed by a
-successful database lookup. Unknown users still follow the existing insert
-path.
+The cache is bounded at 1,000 entries per database object. Cache-enabled
+logic is centralized in one helper, and newly inserted users are remembered
+after successful insertion. Unknown-user creation and response shapes remain
+unchanged. Morgan remains configurable, with `combined` as the default.
+
+## Breaking-point evidence and limitations
+
+The canonical full breaking run previously failed by crossing the p95
+500 ms threshold, not through an HTTP error storm; the fixed run's HTTP
+failure rate at that point was 0.00%. That old pair is not used for the
+corrected before/after claim above. The corrected short profile completed
+200 VUs with 0.00% failures, so its result is a bounded repeatability check,
+not a replacement for a full canonical breaking-point run.
+
+The earlier CPU sample captured 36 backend samples, averaging 73.4% and
+peaking at 90.3% CPU. No usable Node `.cpuprofile` was captured after the
+signal-based shutdown. Bottleneck ranking therefore rests on endpoint
+latencies, response sizes, and CPU sampling rather than a CPU profile.
 
 ## Areas not fixed
 
-The following remain recommendations for a future capacity project:
-
-- Replace in-memory SQLite for durable or multi-process deployments and
-  address its single serialized SQLite connection.
-- Consider a single-process Node deployment with clustering or multiple
-  workers.
-- Add pagination or another bounded response strategy for the large report
-  and work-entry list payloads (not done here because it changes the API
-  contract).
-- Avoid writing a temporary CSV file before `res.download`.
-- Revisit the default global rate limit of 100 requests per 15 minutes per IP.
-  A real 50-user deployment would hit this shared-IP limit first unless the
-  limit is redesigned or configured appropriately.
-
-These results are measurements on the co-located 8-core/31-GB test machine,
-not projections for a different deployment topology.
+- Replace in-memory SQLite and its single serialized connection for durable or
+  multi-process deployments.
+- Consider clustering or multiple Node workers; the app remains single-process.
+- Bound the large unpaginated list and report payloads. Pagination was not
+  added because it changes the API contract.
+- Avoid writing a temporary CSV file to disk before `res.download`.
+- Revisit the default global 100-requests/15-minutes-per-IP limiter, which is
+  the practical shared-egress limit in deployment.

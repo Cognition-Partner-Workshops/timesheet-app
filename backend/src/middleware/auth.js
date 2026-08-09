@@ -23,6 +23,10 @@ function rememberUser(db, email) {
   }
 }
 
+function isAuthCacheEnabled() {
+  return process.env.AUTH_CACHE_ENABLED !== '0';
+}
+
 // Simple email-based authentication middleware
 function authenticateUser(req, res, next) {
   const userEmail = req.headers['x-user-email'];
@@ -39,7 +43,7 @@ function authenticateUser(req, res, next) {
 
   const db = getDatabase();
   const knownUsers = getKnownUsers(db);
-  if (process.env.AUTH_CACHE_ENABLED !== '0' && knownUsers.has(userEmail)) {
+  if (isAuthCacheEnabled() && knownUsers.has(userEmail)) {
     req.userEmail = userEmail;
     return next();
   }
@@ -59,11 +63,14 @@ function authenticateUser(req, res, next) {
           return res.status(500).json({ error: 'Failed to create user' });
         }
         
+        if (isAuthCacheEnabled()) {
+          rememberUser(db, userEmail);
+        }
         req.userEmail = userEmail;
         next();
       });
     } else {
-      if (process.env.AUTH_CACHE_ENABLED !== '0') {
+      if (isAuthCacheEnabled()) {
         rememberUser(db, userEmail);
       }
       req.userEmail = userEmail;

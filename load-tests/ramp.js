@@ -5,7 +5,13 @@ export const options = {
     ramp_up: {
       executor: 'ramping-vus',
       startVUs: 1,
-      stages: [
+      stages: __ENV.RAMP_PROFILE === 'short' ? [
+        { duration: '15s', target: 25 },
+        { duration: '15s', target: 50 },
+        { duration: '15s', target: 75 },
+        { duration: '15s', target: 100 },
+        { duration: '15s', target: 100 },
+      ] : [
         { duration: '1m', target: 25 },
         { duration: '1m', target: 50 },
         { duration: '1m', target: 75 },
@@ -33,7 +39,7 @@ export default function (clientIds) {
   createWorkEntry(clientId);
   listWorkEntries(clientId);
   listClients();
-  if (__ITER % 2 === 0) viewReport(clientId);
+  viewReport(clientId);
   pause(0.2);
 }
 
