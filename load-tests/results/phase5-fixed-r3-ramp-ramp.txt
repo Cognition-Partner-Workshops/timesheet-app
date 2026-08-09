@@ -1,0 +1,14 @@
+Scenario: ramp
+Run: phase5-fixed-r3-ramp
+HTTP requests: 159257
+Throughput (requests/s): 528.95
+HTTP p95 (ms): 231.83
+HTTP p99 (ms): 287.29
+HTTP failure rate: 0.00%
+
+Endpoint trends:
+endpoint_create_entry: count=31851 p95=275.29ms p99=324.09ms
+endpoint_list_clients: count=31852 p95=181.02ms p99=243.03ms
+endpoint_list_entries: count=31851 p95=230.00ms p99=271.34ms
+endpoint_login: count=31852 p95=207.52ms p99=257.71ms
+endpoint_report: count=31851 p95=211.11ms p99=262.14ms
