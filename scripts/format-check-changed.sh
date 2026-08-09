@@ -25,4 +25,10 @@ if [ "${#changed_files[@]}" -eq 0 ]; then
   exit 0
 fi
 
-backend/node_modules/.bin/prettier --check "${changed_files[@]}"
+for candidate in frontend/node_modules/.bin/prettier backend/node_modules/.bin/prettier; do
+  if [ -x "$candidate" ]; then
+    exec "$candidate" --check "${changed_files[@]}"
+  fi
+done
+
+exec npx --yes prettier --check "${changed_files[@]}"
