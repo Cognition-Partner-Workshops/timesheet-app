@@ -63,7 +63,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: frontend
-        run: npm ci --ignore-scripts
+        run: npm ci
 
       - name: Run npm audit
         id: audit
@@ -153,7 +153,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: frontend
-        run: npm ci --ignore-scripts
+        run: npm ci
 
       - name: Run tests with coverage
         id: coverage
