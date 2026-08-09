@@ -1,0 +1,14 @@
+Scenario: workflow
+Run: phase5-etag-off-a1
+HTTP requests: 33387
+Throughput (requests/s): 1104.69
+HTTP p95 (ms): 13.88
+HTTP p99 (ms): 25.32
+HTTP failure rate: 0.00%
+
+Endpoint trends:
+endpoint_create_entry: count=6677 p95=18.40ms p99=32.67ms
+endpoint_list_clients: count=6678 p95=9.78ms p99=20.29ms
+endpoint_list_entries: count=6677 p95=10.62ms p99=21.87ms
+endpoint_login: count=6678 p95=9.48ms p99=16.06ms
+endpoint_report: count=6677 p95=14.53ms p99=31.93ms

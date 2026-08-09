@@ -14,6 +14,9 @@ const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+if (process.env.ETAG_ENABLED !== '1') {
+  app.disable('etag');
+}
 
 // Security middleware
 app.use(helmet());

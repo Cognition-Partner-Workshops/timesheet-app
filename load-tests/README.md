@@ -41,3 +41,5 @@ PROFILE_WRAPPER=1 PROFILE_DURATION_MS=120000 DURATION=60s \
 ```
 
 Set `BREAKING_PROFILE=extended` for the staged 25-to-500-VU breaking run.
+API ETags are disabled by default by the runner; set `ETAG_ENABLED=1` for the
+comparison/control behavior.
