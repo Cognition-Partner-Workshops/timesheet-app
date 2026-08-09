@@ -47,7 +47,7 @@ describe('Report Routes', () => {
       get: jest.fn()
     };
     getDatabase.mockReturnValue(mockDb);
-
+    
     // Mock fs methods
     fs.existsSync = jest.fn().mockReturnValue(true);
     fs.mkdirSync = jest.fn();
@@ -271,7 +271,11 @@ describe('Report Routes', () => {
       });
 
       mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, [{ hours: 2.5 }, { hours: 3.75 }, { hours: 1.25 }]);
+        callback(null, [
+          { hours: 2.5 },
+          { hours: 3.75 },
+          { hours: 1.25 }
+        ]);
       });
 
       const response = await request(app).get('/api/reports/client/1');
@@ -285,7 +289,10 @@ describe('Report Routes', () => {
       });
 
       mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, [{ hours: 8 }, { hours: 4 }]);
+        callback(null, [
+          { hours: 8 },
+          { hours: 4 }
+        ]);
       });
 
       const response = await request(app).get('/api/reports/client/1');
@@ -297,7 +304,9 @@ describe('Report Routes', () => {
   describe('CSV Export Success Path', () => {
     test('should handle CSV write error', async () => {
       const mockClient = { id: 1, name: 'Test Client' };
-      const mockWorkEntries = [{ date: '2024-01-01', hours: 5, description: 'Work 1', created_at: '2024-01-01' }];
+      const mockWorkEntries = [
+        { date: '2024-01-01', hours: 5, description: 'Work 1', created_at: '2024-01-01' }
+      ];
 
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(null, mockClient);
@@ -345,7 +354,9 @@ describe('Report Routes', () => {
 
     test('should create temp directory if it does not exist', async () => {
       const mockClient = { id: 1, name: 'Test Client' };
-      const mockWorkEntries = [{ date: '2024-01-01', hours: 5, description: 'Work 1', created_at: '2024-01-01' }];
+      const mockWorkEntries = [
+        { date: '2024-01-01', hours: 5, description: 'Work 1', created_at: '2024-01-01' }
+      ];
 
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(null, mockClient);
@@ -391,6 +402,7 @@ describe('Report Routes', () => {
       expect(fs.mkdirSync).not.toHaveBeenCalled();
     });
   });
+
 
   describe('PDF Export Success Path', () => {
     test('should handle database error when fetching work entries for PDF', async () => {

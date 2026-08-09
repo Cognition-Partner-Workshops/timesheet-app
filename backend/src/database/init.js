@@ -24,7 +24,7 @@ function getDatabase() {
 
 async function initializeDatabase() {
   const database = getDatabase();
-
+  
   return new Promise((resolve, reject) => {
     database.serialize(() => {
       // Create users table
@@ -85,7 +85,7 @@ function closeDatabase() {
       resolve();
       return;
     }
-
+    
     if (isClosing) {
       // Currently closing, wait for it to complete
       const checkClosed = setInterval(() => {
@@ -96,13 +96,13 @@ function closeDatabase() {
       }, 10);
       return;
     }
-
+    
     if (!db) {
       // No database connection, resolve immediately
       resolve();
       return;
     }
-
+    
     isClosing = true;
     db.close((err) => {
       isClosed = true;

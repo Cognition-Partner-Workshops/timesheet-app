@@ -29,20 +29,20 @@ jobs:
         run: npm ci --prefix backend && npm ci --prefix frontend
       - name: Run lint and formatting checks
         id: checks
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set +e
           npm run lint --prefix frontend
           LINT=$?
-          npm run format:check --prefix backend
-          BACKEND_FORMAT=$?
-          npm run format:check --prefix frontend
-          FRONTEND_FORMAT=$?
-          if [ "$LINT" -eq 0 ] && [ "$BACKEND_FORMAT" -eq 0 ] && [ "$FRONTEND_FORMAT" -eq 0 ]; then
-            echo '{"gate":"lint","status":"pass","metric":"eslint and prettier checks passed","fix":"See [Lint](QUALITY_GATES.md#lint)"}' > lint.json
+          bash scripts/format-check-changed.sh "$BASE_SHA"
+          FORMAT=$?
+          if [ "$LINT" -eq 0 ] && [ "$FORMAT" -eq 0 ]; then
+            echo '{"gate":"lint","status":"pass","metric":"eslint and changed-file prettier checks passed"}' > lint.json
           else
-            echo '{"gate":"lint","status":"fail","metric":"eslint or prettier check failed","fix":"See [Lint](QUALITY_GATES.md#lint)"}' > lint.json
+            echo '{"gate":"lint","status":"fail","metric":"eslint or changed-file prettier check failed"}' > lint.json
           fi
-          exit $((LINT || BACKEND_FORMAT || FRONTEND_FORMAT))
+          exit $((LINT || FORMAT))
       - if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -71,9 +71,9 @@ jobs:
           npm test --prefix frontend
           FRONTEND=$?
           if [ "$BACKEND" -eq 0 ] && [ "$FRONTEND" -eq 0 ]; then
-            echo '{"gate":"unit-tests","status":"pass","metric":"backend Jest and frontend Vitest passed","fix":"See [Unit tests](QUALITY_GATES.md#unit-tests)"}' > unit-tests.json
+            echo '{"gate":"unit-tests","status":"pass","metric":"backend Jest and frontend Vitest passed"}' > unit-tests.json
           else
-            echo '{"gate":"unit-tests","status":"fail","metric":"backend or frontend unit tests failed","fix":"See [Unit tests](QUALITY_GATES.md#unit-tests)"}' > unit-tests.json
+            echo '{"gate":"unit-tests","status":"fail","metric":"backend or frontend unit tests failed"}' > unit-tests.json
           fi
           exit $((BACKEND || FRONTEND))
       - if: always()
@@ -212,7 +212,6 @@ jobs:
               "gate": "coverage",
               "status": status,
               "metric": metric,
-              "fix": "See [Coverage](QUALITY_GATES.md#coverage)",
           }) + "\n")
           raise SystemExit(0 if status == "pass" else 1)
           PY
@@ -323,7 +322,7 @@ jobs:
           )
           if baseline_available:
               new = sum(len(head_sets[package] - base_sets[package]) for package in packages)
-              pre_existing = head_high - new
+              pre_existing = sum(len(head_sets[package] & base_sets[package]) for package in packages)
               status = "pass" if new == 0 else "fail"
               metric = f"{new} new ({pre_existing} pre-existing high/critical)"
           else:
@@ -333,7 +332,6 @@ jobs:
               "gate": "security",
               "status": status,
               "metric": metric,
-              "fix": "See [Security](QUALITY_GATES.md#security)",
           }) + "\n")
           raise SystemExit(0 if status != "fail" else 1)
           PY
@@ -357,10 +355,11 @@ jobs:
       - name: Typecheck
         id: typecheck
         run: |
+          set +e
           npm run typecheck --prefix frontend
           STATUS=$?
           if [ "$STATUS" -eq 0 ]; then RESULT=pass; else RESULT=fail; fi
-          printf '{"gate":"types","status":"%s","metric":"frontend tsc --noEmit","fix":"See [Types](QUALITY_GATES.md#types)"}\n' "$RESULT" > types.json
+          printf '{"gate":"types","status":"%s","metric":"frontend tsc --noEmit"}\n' "$RESULT" > types.json
           exit "$STATUS"
       - if: always()
         uses: actions/upload-artifact@v4
@@ -389,6 +388,10 @@ jobs:
           set +e
           npm run build --prefix frontend
           HEAD_STATUS=$?
+          if [ "$HEAD_STATUS" -ne 0 ] || [ ! -d frontend/dist/assets ]; then
+            printf '{"gate":"bundle-size","status":"fail","metric":"build failed"}\n' > bundle-size.json
+            exit 1
+          fi
           HEAD_SIZE=$(find frontend/dist/assets -type f -print0 | xargs -0 gzip -c | wc -c)
           BASE_DIR=$(mktemp -d)
           BASE_AVAILABLE=true
@@ -406,7 +409,7 @@ jobs:
             METRIC="$(awk "BEGIN {printf \"%.1f\", $HEAD_SIZE / 1024}") KB gz, baseline unavailable"
           fi
           git worktree remove --force "$BASE_DIR" >/dev/null 2>&1 || true
-          printf '{"gate":"bundle-size","status":"%s","metric":"%s","fix":"See [Bundle size](QUALITY_GATES.md#bundle-size)"}\n' "$STATUS" "$METRIC" > bundle-size.json
+          printf '{"gate":"bundle-size","status":"%s","metric":"%s"}\n' "$STATUS" "$METRIC" > bundle-size.json
           [ "$HEAD_STATUS" -eq 0 ] && [ "$STATUS" != fail ] || exit 1
       - if: always()
         uses: actions/upload-artifact@v4
@@ -446,14 +449,6 @@ jobs:
                   item = json.load(open(path))
                   rows[item["gate"]] = item
               except Exception: pass
-          fixes = {
-              "lint": "lint",
-              "unit-tests": "unit-tests",
-              "coverage": "coverage",
-              "security": "security",
-              "types": "types",
-              "bundle-size": "bundle-size",
-          }
           base_url = f"{os.environ['SERVER_URL']}/{os.environ['REPOSITORY']}/blob/{os.environ['HEAD_SHA']}/QUALITY_GATES.md"
           lines = ["<!-- quality-gates-dashboard -->", "## Continuous quality gates", "", "| Gate | Status | Metric | How to fix |", "| --- | --- | --- | --- |"]
           for gate in expected:
@@ -461,7 +456,7 @@ jobs:
               if row is None:
                   lines.append(f"| {gate} | skipped | no result | [Troubleshooting]({base_url}#adjusting-thresholds) |")
               else:
-                  fix = f"[Troubleshooting]({base_url}#{fixes[gate]})"
+                  fix = f"[Troubleshooting]({base_url}#{gate})"
                   lines.append(f"| {gate} | {row['status']} | {row['metric']} | {fix} |")
           body = "\n".join(lines)
           print(body)

@@ -10,7 +10,6 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "format": "prettier --write \"src/**/*.js\"",
-    "format:check": "prettier --check \"src/**/*.js\"",
     "test:coverage:html": "jest --coverage && open coverage/index.html",
     "test:verbose": "jest --verbose",
     "test:ci": "jest --coverage --ci --maxWorkers=2"

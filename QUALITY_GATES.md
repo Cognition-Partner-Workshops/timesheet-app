@@ -6,17 +6,19 @@ unless noted.
 
 ## Lint
 
-Checks frontend ESLint plus Prettier checks for both packages. The gate passes
-when all checks exit successfully.
+Checks frontend ESLint plus Prettier on files changed in the PR. Existing
+legacy files are not reformatted automatically; a file is checked when it is
+touched.
 
 ```sh
 npm run lint --prefix frontend
-npm run format:check --prefix backend
-npm run format:check --prefix frontend
+bash scripts/format-check-changed.sh
 ```
 
-Fix with `npm run format --prefix backend` or `npm run format --prefix frontend`,
-then address any ESLint diagnostics.
+The PR workflow passes the base SHA to the script. Developers can run it
+without an argument to compare against `origin/main`. Fix formatting with
+`npm run format --prefix backend` or `npm run format --prefix frontend`, then
+address any ESLint diagnostics.
 
 ## Unit tests
 

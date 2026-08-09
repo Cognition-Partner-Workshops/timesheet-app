@@ -10,7 +10,7 @@ describe('Error Handler Middleware', () => {
       json: jest.fn()
     };
     next = jest.fn();
-
+    
     // Mock console.error to avoid cluttering test output
     jest.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -23,7 +23,10 @@ describe('Error Handler Middleware', () => {
     test('should handle Joi validation error', () => {
       const joiError = {
         isJoi: true,
-        details: [{ message: 'Field is required' }, { message: 'Invalid format' }]
+        details: [
+          { message: 'Field is required' },
+          { message: 'Invalid format' }
+        ]
       };
 
       errorHandler(joiError, req, res, next);
@@ -126,7 +129,7 @@ describe('Error Handler Middleware', () => {
   describe('Console Logging', () => {
     test('should log error to console', () => {
       const error = new Error('Test error');
-
+      
       errorHandler(error, req, res, next);
 
       expect(console.error).toHaveBeenCalledWith('Error:', error);
