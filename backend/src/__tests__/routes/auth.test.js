@@ -42,9 +42,7 @@ describe('Auth Routes', () => {
         callback(null, existingUser);
       });
 
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send({ email: 'existing@example.com' });
+      const response = await request(app).post('/api/auth/login').send({ email: 'existing@example.com' });
 
       expect(response.status).toBe(200);
       expect(response.body.message).toBe('Login successful');
@@ -56,13 +54,11 @@ describe('Auth Routes', () => {
         callback(null, null); // User doesn't exist
       });
 
-      mockDb.run.mockImplementation(function(query, params, callback) {
+      mockDb.run.mockImplementation(function (query, params, callback) {
         callback.call(this, null);
       });
 
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send({ email: 'newuser@example.com' });
+      const response = await request(app).post('/api/auth/login').send({ email: 'newuser@example.com' });
 
       expect(response.status).toBe(201);
       expect(response.body.message).toBe('User created and logged in successfully');
@@ -75,18 +71,14 @@ describe('Auth Routes', () => {
     });
 
     test('should return 400 for invalid email', async () => {
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send({ email: 'invalid-email' });
+      const response = await request(app).post('/api/auth/login').send({ email: 'invalid-email' });
 
       expect(response.status).toBe(400);
       expect(response.body.error).toBe('Validation error');
     });
 
     test('should return 400 for missing email', async () => {
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send({});
+      const response = await request(app).post('/api/auth/login').send({});
 
       expect(response.status).toBe(400);
       expect(response.body.error).toBe('Validation error');
@@ -97,9 +89,7 @@ describe('Auth Routes', () => {
         callback(new Error('Database error'), null);
       });
 
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send({ email: 'test@example.com' });
+      const response = await request(app).post('/api/auth/login').send({ email: 'test@example.com' });
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ error: 'Internal server error' });
@@ -114,9 +104,7 @@ describe('Auth Routes', () => {
         callback(new Error('Insert failed'));
       });
 
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send({ email: 'newuser@example.com' });
+      const response = await request(app).post('/api/auth/login').send({ email: 'newuser@example.com' });
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ error: 'Failed to create user' });
@@ -127,9 +115,7 @@ describe('Auth Routes', () => {
         throw new Error('Unexpected error');
       });
 
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send({ email: 'test@example.com' });
+      const response = await request(app).post('/api/auth/login').send({ email: 'test@example.com' });
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ error: 'Internal server error' });
@@ -147,9 +133,7 @@ describe('Auth Routes', () => {
         callback(null, user);
       });
 
-      const response = await request(app)
-        .get('/api/auth/me')
-        .set('x-user-email', 'test@example.com');
+      const response = await request(app).get('/api/auth/me').set('x-user-email', 'test@example.com');
 
       expect(response.status).toBe(200);
       expect(response.body.user.email).toBe('test@example.com');
@@ -174,9 +158,7 @@ describe('Auth Routes', () => {
         }
       });
 
-      const response = await request(app)
-        .get('/api/auth/me')
-        .set('x-user-email', 'test@example.com');
+      const response = await request(app).get('/api/auth/me').set('x-user-email', 'test@example.com');
 
       expect(response.status).toBe(404);
       expect(response.body).toEqual({ error: 'User not found' });
@@ -191,9 +173,7 @@ describe('Auth Routes', () => {
         }
       });
 
-      const response = await request(app)
-        .get('/api/auth/me')
-        .set('x-user-email', 'test@example.com');
+      const response = await request(app).get('/api/auth/me').set('x-user-email', 'test@example.com');
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ error: 'Internal server error' });

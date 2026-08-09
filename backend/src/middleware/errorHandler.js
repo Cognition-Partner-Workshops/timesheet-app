@@ -5,7 +5,7 @@ function errorHandler(err, req, res, next) {
   if (err.isJoi) {
     return res.status(400).json({
       error: 'Validation error',
-      details: err.details.map(detail => detail.message)
+      details: err.details.map((detail) => detail.message)
     });
   }
 

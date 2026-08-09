@@ -1,0 +1,320 @@
+name: Continuous Quality Gates
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci --prefix backend && npm ci --prefix frontend
+      - name: Run lint and formatting checks
+        id: checks
+        continue-on-error: true
+        run: |
+          set +e
+          npm run lint --prefix frontend
+          LINT=$?
+          npm run format:check --prefix backend
+          BACKEND_FORMAT=$?
+          npm run format:check --prefix frontend
+          FRONTEND_FORMAT=$?
+          if [ "$LINT" -eq 0 ] && [ "$BACKEND_FORMAT" -eq 0 ] && [ "$FRONTEND_FORMAT" -eq 0 ]; then
+            echo '{"gate":"lint","status":"pass","metric":"eslint and prettier checks passed","fix":"See [Lint](QUALITY_GATES.md#lint)"}' > lint.json
+          else
+            echo '{"gate":"lint","status":"fail","metric":"eslint or prettier check failed","fix":"See [Lint](QUALITY_GATES.md#lint)"}' > lint.json
+          fi
+          exit $((LINT || BACKEND_FORMAT || FRONTEND_FORMAT))
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-lint
+          path: lint.json
+
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - run: npm ci --prefix backend && npm ci --prefix frontend
+      - name: Run unit tests
+        id: tests
+        continue-on-error: true
+        run: |
+          set +e
+          npm test --prefix backend
+          BACKEND=$?
+          npm test --prefix frontend
+          FRONTEND=$?
+          if [ "$BACKEND" -eq 0 ] && [ "$FRONTEND" -eq 0 ]; then
+            echo '{"gate":"unit-tests","status":"pass","metric":"backend Jest and frontend Vitest passed","fix":"See [Unit tests](QUALITY_GATES.md#unit-tests)"}' > unit-tests.json
+          else
+            echo '{"gate":"unit-tests","status":"fail","metric":"backend or frontend unit tests failed","fix":"See [Unit tests](QUALITY_GATES.md#unit-tests)"}' > unit-tests.json
+          fi
+          exit $((BACKEND || FRONTEND))
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-unit-tests
+          path: unit-tests.json
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - run: npm ci --prefix backend && npm ci --prefix frontend
+      - name: Compare total and changed-line coverage
+        id: coverage
+        continue-on-error: true
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set +e
+          npm run test:coverage --prefix backend
+          BACKEND_TEST=$?
+          npm run test:coverage --prefix frontend
+          FRONTEND_TEST=$?
+          HEAD_LINES=$(node -e "const fs=require('./frontend/coverage/coverage-summary.json'); console.log(fs.total.lines.pct)")
+          BASE_DIR=$(mktemp -d)
+          BASE_AVAILABLE=true
+          git worktree add --detach "$BASE_DIR" "$BASE_SHA" >/dev/null 2>&1 || BASE_AVAILABLE=false
+          if [ "$BASE_AVAILABLE" = true ]; then
+            npm ci --prefix "$BASE_DIR/frontend" >/dev/null 2>&1 && npm run test:coverage --prefix "$BASE_DIR/frontend" >/dev/null 2>&1 || BASE_AVAILABLE=false
+          fi
+          BASE_LINES=""
+          if [ "$BASE_AVAILABLE" = true ] && [ -f "$BASE_DIR/frontend/coverage/coverage-summary.json" ]; then
+            BASE_LINES=$(node -e "const fs=require('$BASE_DIR/frontend/coverage/coverage-summary.json'); console.log(fs.total.lines.pct)")
+          else
+            BASE_AVAILABLE=false
+          fi
+          git worktree remove --force "$BASE_DIR" >/dev/null 2>&1 || true
+          PATCH=$(python3 - "$BASE_SHA" <<'PY'
+          import subprocess, re, json
+          base = subprocess.check_output(["git", "diff", "--unified=0", f"{__import__('os').environ['BASE_SHA']}...HEAD", "--", "frontend/src"], text=True)
+          changed = {}
+          file = None
+          for line in base.splitlines():
+              if line.startswith("+++ b/"):
+                  file = line[6:]
+              elif line.startswith("@@") and file:
+                  m = re.search(r"\+(\d+)(?:,(\d+))?", line)
+                  if m:
+                      start, count = int(m.group(1)), int(m.group(2) or 1)
+                      changed[file] = list(range(start, start + count))
+          lcov = open("frontend/coverage/lcov.info", encoding="utf-8").read()
+          covered = total = 0
+          current = None
+          requested = set()
+          for line in lcov.splitlines():
+              if line.startswith("SF:"):
+                  current = line[3:]
+              elif line.startswith("DA:") and current:
+                  n, hits = line[3:].split(",")[:2]
+                  lookup = "frontend/" + current.removeprefix("file://").split("/frontend/")[-1]
+                  if n.isdigit() and int(n) in changed.get(lookup, []):
+                      total += 1
+                      covered += int(hits.split(",")[0]) > 0
+          print("N/A" if not total else f"{covered / total * 100:.1f}")
+          PY
+          )
+          STATUS=pass
+          [ "$BACKEND_TEST" -eq 0 ] && [ "$FRONTEND_TEST" -eq 0 ] || STATUS=fail
+          if [ "$PATCH" != "N/A" ] && awk "BEGIN {exit !($PATCH >= 80)}"; then :; else [ "$PATCH" = "N/A" ] || STATUS=fail; fi
+          if [ "$BASE_AVAILABLE" = false ]; then
+            METRIC="lines ${HEAD_LINES}% vs baseline unavailable; patch ${PATCH}%"
+          else
+            awk "BEGIN {exit !($HEAD_LINES + 0 >= $BASE_LINES + 0)}" || STATUS=fail
+            METRIC="lines ${HEAD_LINES}% vs base ${BASE_LINES}%; patch ${PATCH}%"
+          fi
+          printf '{"gate":"coverage","status":"%s","metric":"%s","fix":"See [Coverage](QUALITY_GATES.md#coverage)"}\n' "$STATUS" "$METRIC" > coverage.json
+          [ "$STATUS" = pass ] || exit 1
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-coverage
+          path: coverage.json
+
+  security:
+    name: Security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - run: npm ci --prefix backend && npm ci --prefix frontend
+      - name: Audit dependencies
+        id: audit
+        continue-on-error: true
+        run: |
+          set +e
+          npm audit --json --prefix backend > backend-audit.json 2>/dev/null
+          npm audit --json --prefix frontend > frontend-audit.json 2>/dev/null
+          HIGH=$(jq -r '(.metadata.vulnerabilities.high // 0)' backend-audit.json) 
+          HIGH=$((HIGH + $(jq -r '(.metadata.vulnerabilities.high // 0)' frontend-audit.json)))
+          CRITICAL=$(jq -r '(.metadata.vulnerabilities.critical // 0)' backend-audit.json)
+          CRITICAL=$((CRITICAL + $(jq -r '(.metadata.vulnerabilities.critical // 0)' frontend-audit.json)))
+          if [ "$HIGH" -eq 0 ] && [ "$CRITICAL" -eq 0 ]; then STATUS=pass; else STATUS=fail; fi
+          printf '{"gate":"security","status":"%s","metric":"%s high / %s critical","fix":"See [Security](QUALITY_GATES.md#security)"}\n' "$STATUS" "$HIGH" "$CRITICAL" > security.json
+          [ "$STATUS" = pass ] || exit 1
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-security
+          path: security.json
+
+  types:
+    name: Types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --prefix frontend
+      - name: Typecheck
+        id: typecheck
+        continue-on-error: true
+        run: |
+          npm run typecheck --prefix frontend
+          STATUS=$?
+          if [ "$STATUS" -eq 0 ]; then RESULT=pass; else RESULT=fail; fi
+          printf '{"gate":"types","status":"%s","metric":"frontend tsc --noEmit","fix":"See [Types](QUALITY_GATES.md#types)"}\n' "$RESULT" > types.json
+          exit "$STATUS"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-types
+          path: types.json
+
+  bundle-size:
+    name: Bundle size
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --prefix frontend
+      - name: Compare gzipped bundles
+        id: bundle
+        continue-on-error: true
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set +e
+          npm run build --prefix frontend
+          HEAD_STATUS=$?
+          HEAD_SIZE=$(find frontend/dist/assets -type f -print0 | xargs -0 gzip -c | wc -c)
+          BASE_DIR=$(mktemp -d)
+          BASE_AVAILABLE=true
+          git worktree add --detach "$BASE_DIR" "$BASE_SHA" >/dev/null 2>&1 || BASE_AVAILABLE=false
+          if [ "$BASE_AVAILABLE" = true ]; then
+            npm ci --prefix "$BASE_DIR/frontend" >/dev/null 2>&1 && npm run build --prefix "$BASE_DIR/frontend" >/dev/null 2>&1 || BASE_AVAILABLE=false
+          fi
+          if [ "$BASE_AVAILABLE" = true ] && [ -d "$BASE_DIR/frontend/dist/assets" ]; then
+            BASE_SIZE=$(find "$BASE_DIR/frontend/dist/assets" -type f -print0 | xargs -0 gzip -c | wc -c)
+            CHANGE=$(awk "BEGIN {printf \"%.1f\", (($HEAD_SIZE - $BASE_SIZE) / $BASE_SIZE) * 100}")
+            awk "BEGIN {exit !($HEAD_SIZE <= $BASE_SIZE * 1.10)}" && STATUS=pass || STATUS=fail
+            METRIC="$(awk "BEGIN {printf \"%.1f\", $HEAD_SIZE / 1024}") KB gz, ${CHANGE}%"
+          else
+            STATUS=skipped
+            METRIC="$(awk "BEGIN {printf \"%.1f\", $HEAD_SIZE / 1024}") KB gz, baseline unavailable"
+          fi
+          git worktree remove --force "$BASE_DIR" >/dev/null 2>&1 || true
+          printf '{"gate":"bundle-size","status":"%s","metric":"%s","fix":"See [Bundle size](QUALITY_GATES.md#bundle-size)"}\n' "$STATUS" "$METRIC" > bundle-size.json
+          [ "$HEAD_STATUS" -eq 0 ] && [ "$STATUS" != fail ] || exit 1
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-bundle-size
+          path: bundle-size.json
+
+  quality-dashboard:
+    name: Quality dashboard
+    if: always()
+    needs: [lint, unit-tests, coverage, security, types, bundle-size]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: quality-*
+          path: quality-results
+          merge-multiple: true
+      - name: Render dashboard
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set +e
+          python3 - <<'PY'
+          import glob, json
+          rows = []
+          for path in glob.glob("quality-results/*.json"):
+              try: rows.append(json.load(open(path)))
+              except Exception: pass
+          order = ["lint", "unit-tests", "coverage", "security", "types", "bundle-size"]
+          rows.sort(key=lambda r: order.index(r["gate"]) if r["gate"] in order else 99)
+          lines = ["<!-- quality-gates-dashboard -->", "## Continuous quality gates", "", "| Gate | Status | Metric | How to fix |", "| --- | --- | --- | --- |"]
+          for row in rows:
+              lines.append(f"| {row['gate']} | {row['status']} | {row['metric']} | {row['fix']} |")
+          body = "\n".join(lines)
+          print(body)
+          open("dashboard.md", "w").write(body + "\n")
+          PY
+          cat dashboard.md >> "$GITHUB_STEP_SUMMARY"
+          COMMENT_ID=$(gh api "repos/$REPOSITORY/issues/$PR_NUMBER/comments" --paginate --jq '.[] | select(.body | contains("<!-- quality-gates-dashboard -->")) | .id' | head -1)
+          if [ -n "$COMMENT_ID" ]; then
+            gh api --method PATCH "repos/$REPOSITORY/issues/comments/$COMMENT_ID" -f body="$(cat dashboard.md)" >/dev/null
+          else
+            gh api --method POST "repos/$REPOSITORY/issues/$PR_NUMBER/comments" -f body="$(cat dashboard.md)" >/dev/null
+          fi
+          exit 0
