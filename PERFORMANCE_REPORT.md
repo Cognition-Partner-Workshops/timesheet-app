@@ -48,7 +48,15 @@ shows a stable gain.
 - Thresholds were p95 HTTP duration under 500 ms and HTTP failure rate under
   1%.
 - Raw logs, CPU samples, and `.cpuprofile` files are ignored. Small JSON/TXT
+  summaries were generated during the runs; only selected human-readable TXT
   summaries are committed.
+
+After these measurements, the harness received a static-analysis-driven
+refactor: client selection changed from random selection to deterministic
+round-robin selection using `(__VU + __ITER) % n`, and the shared iteration
+body was extracted into `runIteration`. The call mix and seed volumes stayed
+the same, but the results were not regenerated against the refactored
+scripts, so the reported numbers came from the pre-refactor harness.
 
 ## Corrected repeated measurements
 

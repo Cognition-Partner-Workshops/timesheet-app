@@ -20,7 +20,8 @@ backend dependencies must already be installed.
 
 Override `SEED_CLIENTS`, `SEED_ENTRIES_PER_CLIENT`, `USER_EMAIL`, `PORT`, or
 `RUN_ID` as needed. Each run writes JSON and text summaries plus a backend log
-to `load-tests/results/`.
+to `load-tests/results/`; raw logs and JSON outputs are ignored, while only
+selected human-readable TXT summaries are retained in version control.
 
 The SLO thresholds are p95 HTTP latency under 500 ms and HTTP failure rate
 under 1%. The breaking-point run aborts when either threshold fails for the
