@@ -1,0 +1,19 @@
+Scenario: workflow
+Run: phase2-index
+HTTP requests: 32702
+Throughput (requests/s): 1081.00
+HTTP p95 (ms): 15.64
+HTTP p99 (ms): 23.06
+HTTP failure rate: 0.00%
+
+Endpoint trends:
+endpoint_create_entry: count=6540 p95=20.85ms p99=28.51ms
+endpoint_create_entry_requests: count=0 p95=0.00ms p99=0.00ms
+endpoint_list_clients: count=6541 p95=12.21ms p99=16.33ms
+endpoint_list_clients_requests: count=0 p95=0.00ms p99=0.00ms
+endpoint_list_entries: count=6540 p95=13.66ms p99=18.27ms
+endpoint_list_entries_requests: count=0 p95=0.00ms p99=0.00ms
+endpoint_login: count=6541 p95=8.45ms p99=12.86ms
+endpoint_login_requests: count=0 p95=0.00ms p99=0.00ms
+endpoint_report: count=6540 p95=17.12ms p99=23.52ms
+endpoint_report_requests: count=0 p95=0.00ms p99=0.00ms

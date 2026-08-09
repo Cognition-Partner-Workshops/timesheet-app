@@ -1,0 +1,14 @@
+Scenario: workflow
+Run: profile-workflow
+HTTP requests: 31327
+Throughput (requests/s): 1035.63
+HTTP p95 (ms): 20.34
+HTTP p99 (ms): 28.76
+HTTP failure rate: 0.00%
+
+Endpoint trends:
+endpoint_create_entry: count=0 p95=26.18ms p99=35.96ms
+endpoint_list_clients: count=0 p95=15.54ms p99=21.30ms
+endpoint_list_entries: count=0 p95=16.85ms p99=23.33ms
+endpoint_login: count=0 p95=10.79ms p99=16.60ms
+endpoint_report: count=0 p95=21.50ms p99=28.82ms
