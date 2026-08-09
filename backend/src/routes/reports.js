@@ -7,6 +7,14 @@ const path = require('path');
 const fs = require('fs');
 
 const router = express.Router();
+const clientReportQuery = `SELECT id, hours, description, date, created_at, updated_at
+  FROM work_entries
+  WHERE client_id = ? AND user_email = ?
+  ORDER BY date DESC`;
+const clientExportQuery = `SELECT hours, description, date, created_at
+  FROM work_entries
+  WHERE client_id = ? AND user_email = ?
+  ORDER BY date DESC`;
 
 // All routes require authentication
 router.use(authenticateUser);
@@ -57,139 +65,109 @@ const withClientReport = (req, res, workEntriesQuery, handler) => {
 
 // Get hourly report for specific client
 router.get('/client/:clientId', (req, res) => {
-  withClientReport(
-    req,
-    res,
-    `SELECT id, hours, description, date, created_at, updated_at
-     FROM work_entries
-     WHERE client_id = ? AND user_email = ?
-     ORDER BY date DESC`,
-    (client, workEntries) => {
-      const totalHours = workEntries.reduce(
-        (sum, entry) => sum + Number.parseFloat(entry.hours),
-        0,
-      );
+  withClientReport(req, res, clientReportQuery, (client, workEntries) => {
+    const totalHours = workEntries.reduce((sum, entry) => sum + Number.parseFloat(entry.hours), 0);
 
-      res.json({
-        client,
-        workEntries,
-        totalHours,
-        entryCount: workEntries.length,
-      });
-    },
-  );
+    res.json({
+      client,
+      workEntries,
+      totalHours,
+      entryCount: workEntries.length,
+    });
+  });
 });
 
 // Export client report as CSV
 router.get('/export/csv/:clientId', (req, res) => {
-  withClientReport(
-    req,
-    res,
-    `SELECT hours, description, date, created_at
-     FROM work_entries
-     WHERE client_id = ? AND user_email = ?
-     ORDER BY date DESC`,
-    (client, workEntries) => {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const filename = `${client.name.replace(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.csv`;
-      const tempPath = path.join(__dirname, '../../temp', filename);
-      const tempDir = path.dirname(tempPath);
+  withClientReport(req, res, clientExportQuery, (client, workEntries) => {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `${client.name.replace(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.csv`;
+    const tempPath = path.join(__dirname, '../../temp', filename);
+    const tempDir = path.dirname(tempPath);
 
-      if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir, { recursive: true });
-      }
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
 
-      const csvWriter = createCsvWriter({
-        path: tempPath,
-        header: [
-          { id: 'date', title: 'Date' },
-          { id: 'hours', title: 'Hours' },
-          { id: 'description', title: 'Description' },
-          { id: 'created_at', title: 'Created At' },
-        ],
-      });
+    const csvWriter = createCsvWriter({
+      path: tempPath,
+      header: [
+        { id: 'date', title: 'Date' },
+        { id: 'hours', title: 'Hours' },
+        { id: 'description', title: 'Description' },
+        { id: 'created_at', title: 'Created At' },
+      ],
+    });
 
-      csvWriter
-        .writeRecords(workEntries)
-        .then(() => {
-          res.download(tempPath, filename, (downloadError) => {
-            if (downloadError) {
-              console.error('Error sending file:', downloadError);
+    csvWriter
+      .writeRecords(workEntries)
+      .then(() => {
+        res.download(tempPath, filename, (downloadError) => {
+          if (downloadError) {
+            console.error('Error sending file:', downloadError);
+          }
+          fs.unlink(tempPath, (unlinkError) => {
+            if (unlinkError) {
+              console.error('Error deleting temp file:', unlinkError);
             }
-            fs.unlink(tempPath, (unlinkError) => {
-              if (unlinkError) {
-                console.error('Error deleting temp file:', unlinkError);
-              }
-            });
           });
-        })
-        .catch((error) => {
-          console.error('Error creating CSV:', error);
-          res.status(500).json({ error: 'Failed to generate CSV report' });
         });
-    },
-  );
+      })
+      .catch((error) => {
+        console.error('Error creating CSV:', error);
+        res.status(500).json({ error: 'Failed to generate CSV report' });
+      });
+  });
 });
 
 // Export client report as PDF
 router.get('/export/pdf/:clientId', (req, res) => {
-  withClientReport(
-    req,
-    res,
-    `SELECT hours, description, date, created_at
-     FROM work_entries
-     WHERE client_id = ? AND user_email = ?
-     ORDER BY date DESC`,
-    (client, workEntries) => {
-      const doc = new PDFDocument();
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const filename = `${client.name.replace(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.pdf`;
+  withClientReport(req, res, clientExportQuery, (client, workEntries) => {
+    const doc = new PDFDocument();
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `${client.name.replace(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.pdf`;
 
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      doc.pipe(res);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    doc.pipe(res);
 
-      doc.fontSize(20).text(`Time Report for ${client.name}`, { align: 'center' });
+    doc.fontSize(20).text(`Time Report for ${client.name}`, { align: 'center' });
+    doc.moveDown();
+
+    const totalHours = workEntries.reduce((sum, entry) => sum + Number.parseFloat(entry.hours), 0);
+    doc.fontSize(14).text(`Total Hours: ${totalHours.toFixed(2)}`);
+    doc.text(`Total Entries: ${workEntries.length}`);
+    doc.text(`Generated: ${new Date().toLocaleString()}`);
+    doc.moveDown();
+
+    doc.fontSize(12).text('Date', 50, doc.y, { width: 100 });
+    doc.text('Hours', 150, doc.y - 15, { width: 80 });
+    doc.text('Description', 230, doc.y - 15, { width: 300 });
+    doc.moveDown();
+
+    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+    doc.moveDown(0.5);
+
+    workEntries.forEach((entry, index) => {
+      const y = doc.y;
+
+      if (y > 700) {
+        doc.addPage();
+      }
+
+      doc.text(entry.date, 50, doc.y, { width: 100 });
+      doc.text(entry.hours.toString(), 150, y, { width: 80 });
+      doc.text(entry.description || 'No description', 230, y, { width: 300 });
       doc.moveDown();
 
-      const totalHours = workEntries.reduce(
-        (sum, entry) => sum + Number.parseFloat(entry.hours),
-        0,
-      );
-      doc.fontSize(14).text(`Total Hours: ${totalHours.toFixed(2)}`);
-      doc.text(`Total Entries: ${workEntries.length}`);
-      doc.text(`Generated: ${new Date().toLocaleString()}`);
-      doc.moveDown();
+      if ((index + 1) % 5 === 0) {
+        doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+        doc.moveDown(0.5);
+      }
+    });
 
-      doc.fontSize(12).text('Date', 50, doc.y, { width: 100 });
-      doc.text('Hours', 150, doc.y - 15, { width: 80 });
-      doc.text('Description', 230, doc.y - 15, { width: 300 });
-      doc.moveDown();
-
-      doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-      doc.moveDown(0.5);
-
-      workEntries.forEach((entry, index) => {
-        const y = doc.y;
-
-        if (y > 700) {
-          doc.addPage();
-        }
-
-        doc.text(entry.date, 50, doc.y, { width: 100 });
-        doc.text(entry.hours.toString(), 150, y, { width: 80 });
-        doc.text(entry.description || 'No description', 230, y, { width: 300 });
-        doc.moveDown();
-
-        if ((index + 1) % 5 === 0) {
-          doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-          doc.moveDown(0.5);
-        }
-      });
-
-      doc.end();
-    },
-  );
+    doc.end();
+  });
 });
 
 module.exports = router;
