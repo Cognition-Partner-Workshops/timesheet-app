@@ -12,8 +12,8 @@ class ApiClient {
       baseURL: API_BASE_URL,
       timeout: 10000,
       headers: {
-        'Content-Type': 'application/json'
-      }
+        'Content-Type': 'application/json',
+      },
     });
 
     // Request interceptor to add email header
@@ -71,10 +71,7 @@ class ApiClient {
     return response.data;
   }
 
-  async updateClient(
-    id: number,
-    clientData: { name?: string; description?: string; department?: string; email?: string }
-  ) {
+  async updateClient(id: number, clientData: { name?: string; description?: string; department?: string; email?: string }) {
     const response = await this.client.put(`/api/clients/${id}`, clientData);
     return response.data;
   }
@@ -106,10 +103,7 @@ class ApiClient {
     return response.data;
   }
 
-  async updateWorkEntry(
-    id: number,
-    entryData: { clientId?: number; hours?: number; description?: string; date?: string }
-  ) {
+  async updateWorkEntry(id: number, entryData: { clientId?: number; hours?: number; description?: string; date?: string }) {
     const response = await this.client.put(`/api/work-entries/${id}`, entryData);
     return response.data;
   }
@@ -127,14 +121,14 @@ class ApiClient {
 
   async exportClientReportCsv(clientId: number) {
     const response = await this.client.get(`/api/reports/export/csv/${clientId}`, {
-      responseType: 'blob'
+      responseType: 'blob',
     });
     return response.data;
   }
 
   async exportClientReportPdf(clientId: number) {
     const response = await this.client.get(`/api/reports/export/pdf/${clientId}`, {
-      responseType: 'blob'
+      responseType: 'blob',
     });
     return response.data;
   }
