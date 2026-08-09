@@ -1,0 +1,21 @@
+{
+  "name": "timesheet-app",
+  "private": true,
+  "scripts": {
+    "prepare": "husky",
+    "lint": "npm --prefix frontend run lint && npm --prefix backend run lint",
+    "lint:fix": "npm --prefix frontend run lint:fix && npm --prefix backend run lint:fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "husky": "9.1.7",
+    "lint-staged": "15.5.2",
+    "prettier": "3.6.2"
+  },
+  "lint-staged": {
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  }
+}

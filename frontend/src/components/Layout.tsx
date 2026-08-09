@@ -61,7 +61,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <ListItem key={item.text} disablePadding>
             <ListItemButton
               selected={location.pathname === item.path}
-              onClick={() => navigate(item.path)}
+              onClick={() => {
+                void navigate(item.path);
+              }}
             >
               <ListItemIcon>{item.icon}</ListItemIcon>
               <ListItemText primary={item.text} />
@@ -93,17 +95,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            {menuItems.find(item => item.path === location.pathname)?.text || 'Time Tracker'}
+            {menuItems.find((item) => item.path === location.pathname)?.text || 'Time Tracker'}
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Typography variant="body2">{user?.email}</Typography>
-            <Avatar sx={{ width: 32, height: 32 }}>
-              {user?.email?.charAt(0).toUpperCase()}
-            </Avatar>
+            <Avatar sx={{ width: 32, height: 32 }}>{user?.email?.charAt(0).toUpperCase()}</Avatar>
             <Button
               color="inherit"
               startIcon={<LogoutIcon />}
-              onClick={logout}
+              onClick={() => {
+                logout();
+              }}
               size="small"
             >
               Logout

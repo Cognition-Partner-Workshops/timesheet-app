@@ -29,12 +29,12 @@ router.post('/login', async (req, res, next) => {
           message: 'Login successful',
           user: {
             email: row.email,
-            createdAt: row.created_at
-          }
+            createdAt: row.created_at,
+          },
         });
       } else {
         // Create new user
-        db.run('INSERT INTO users (email) VALUES (?)', [email], function(err) {
+        db.run('INSERT INTO users (email) VALUES (?)', [email], function (err) {
           if (err) {
             console.error('Error creating user:', err);
             return res.status(500).json({ error: 'Failed to create user' });
@@ -44,8 +44,8 @@ router.post('/login', async (req, res, next) => {
             message: 'User created and logged in successfully',
             user: {
               email: email,
-              createdAt: new Date().toISOString()
-            }
+              createdAt: new Date().toISOString(),
+            },
           });
         });
       }
@@ -58,7 +58,7 @@ router.post('/login', async (req, res, next) => {
 // Get current user info
 router.get('/me', authenticateUser, (req, res) => {
   const db = getDatabase();
-  
+
   db.get('SELECT email, created_at FROM users WHERE email = ?', [req.userEmail], (err, row) => {
     if (err) {
       console.error('Database error:', err);
@@ -72,8 +72,8 @@ router.get('/me', authenticateUser, (req, res) => {
     res.json({
       user: {
         email: row.email,
-        createdAt: row.created_at
-      }
+        createdAt: row.created_at,
+      },
     });
   });
 });

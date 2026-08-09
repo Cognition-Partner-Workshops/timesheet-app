@@ -8,7 +8,7 @@ jest.mock('../../middleware/auth', () => ({
   authenticateUser: (req, res, next) => {
     req.userEmail = 'test@example.com';
     next();
-  }
+  },
 }));
 
 const app = express();
@@ -29,7 +29,7 @@ describe('Client Routes', () => {
     mockDb = {
       all: jest.fn(),
       get: jest.fn(),
-      run: jest.fn()
+      run: jest.fn(),
     };
     getDatabase.mockReturnValue(mockDb);
   });
@@ -41,8 +41,20 @@ describe('Client Routes', () => {
   describe('GET /api/clients', () => {
     test('should return all clients for authenticated user', async () => {
       const mockClients = [
-        { id: 1, name: 'Client A', description: 'Desc A', created_at: '2024-01-01', updated_at: '2024-01-01' },
-        { id: 2, name: 'Client B', description: 'Desc B', created_at: '2024-01-02', updated_at: '2024-01-02' }
+        {
+          id: 1,
+          name: 'Client A',
+          description: 'Desc A',
+          created_at: '2024-01-01',
+          updated_at: '2024-01-01',
+        },
+        {
+          id: 2,
+          name: 'Client B',
+          description: 'Desc B',
+          created_at: '2024-01-02',
+          updated_at: '2024-01-02',
+        },
       ];
 
       mockDb.all.mockImplementation((query, params, callback) => {
@@ -56,7 +68,7 @@ describe('Client Routes', () => {
       expect(mockDb.all).toHaveBeenCalledWith(
         expect.stringContaining('SELECT id, name, description'),
         ['test@example.com'],
-        expect.any(Function)
+        expect.any(Function),
       );
     });
 
@@ -130,9 +142,14 @@ describe('Client Routes', () => {
   describe('POST /api/clients', () => {
     test('should create new client with valid data', async () => {
       const newClient = { name: 'New Client', description: 'New Description' };
-      const createdClient = { id: 1, ...newClient, created_at: '2024-01-01', updated_at: '2024-01-01' };
+      const createdClient = {
+        id: 1,
+        ...newClient,
+        created_at: '2024-01-01',
+        updated_at: '2024-01-01',
+      };
 
-      mockDb.run.mockImplementation(function(query, params, callback) {
+      mockDb.run.mockImplementation(function (query, params, callback) {
         this.lastID = 1;
         callback.call(this, null);
       });
@@ -141,9 +158,7 @@ describe('Client Routes', () => {
         callback(null, createdClient);
       });
 
-      const response = await request(app)
-        .post('/api/clients')
-        .send(newClient);
+      const response = await request(app).post('/api/clients').send(newClient);
 
       expect(response.status).toBe(201);
       expect(response.body.message).toBe('Client created successfully');
@@ -154,7 +169,7 @@ describe('Client Routes', () => {
       const newClient = { name: 'Client Without Desc' };
       const createdClient = { id: 1, name: 'Client Without Desc', description: null };
 
-      mockDb.run.mockImplementation(function(query, params, callback) {
+      mockDb.run.mockImplementation(function (query, params, callback) {
         this.lastID = 1;
         callback.call(this, null);
       });
@@ -163,9 +178,7 @@ describe('Client Routes', () => {
         callback(null, createdClient);
       });
 
-      const response = await request(app)
-        .post('/api/clients')
-        .send(newClient);
+      const response = await request(app).post('/api/clients').send(newClient);
 
       expect(response.status).toBe(201);
     });
@@ -179,9 +192,7 @@ describe('Client Routes', () => {
     });
 
     test('should return 400 for empty name', async () => {
-      const response = await request(app)
-        .post('/api/clients')
-        .send({ name: '' });
+      const response = await request(app).post('/api/clients').send({ name: '' });
 
       expect(response.status).toBe(400);
     });
@@ -191,9 +202,7 @@ describe('Client Routes', () => {
         callback(new Error('Insert failed'));
       });
 
-      const response = await request(app)
-        .post('/api/clients')
-        .send({ name: 'Test Client' });
+      const response = await request(app).post('/api/clients').send({ name: 'Test Client' });
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ error: 'Failed to create client' });
@@ -216,9 +225,7 @@ describe('Client Routes', () => {
         callback(null, updatedClient);
       });
 
-      const response = await request(app)
-        .put('/api/clients/1')
-        .send({ name: 'Updated Name' });
+      const response = await request(app).put('/api/clients/1').send({ name: 'Updated Name' });
 
       expect(response.status).toBe(200);
       expect(response.body.message).toBe('Client updated successfully');
@@ -250,27 +257,21 @@ describe('Client Routes', () => {
         callback(null, null);
       });
 
-      const response = await request(app)
-        .put('/api/clients/999')
-        .send({ name: 'Updated' });
+      const response = await request(app).put('/api/clients/999').send({ name: 'Updated' });
 
       expect(response.status).toBe(404);
       expect(response.body).toEqual({ error: 'Client not found' });
     });
 
     test('should return 400 for invalid client ID', async () => {
-      const response = await request(app)
-        .put('/api/clients/invalid')
-        .send({ name: 'Updated' });
+      const response = await request(app).put('/api/clients/invalid').send({ name: 'Updated' });
 
       expect(response.status).toBe(400);
       expect(response.body).toEqual({ error: 'Invalid client ID' });
     });
 
     test('should return 400 for empty update', async () => {
-      const response = await request(app)
-        .put('/api/clients/1')
-        .send({});
+      const response = await request(app).put('/api/clients/1').send({});
 
       expect(response.status).toBe(400);
     });
@@ -339,7 +340,7 @@ describe('Client Routes', () => {
 
   describe('POST /api/clients - Error Handling', () => {
     test('should handle error retrieving client after creation', async () => {
-      mockDb.run.mockImplementation(function(query, params, callback) {
+      mockDb.run.mockImplementation(function (query, params, callback) {
         this.lastID = 1;
         callback.call(this, null);
       });
@@ -348,9 +349,7 @@ describe('Client Routes', () => {
         callback(new Error('Retrieval failed'), null);
       });
 
-      const response = await request(app)
-        .post('/api/clients')
-        .send({ name: 'Test Client' });
+      const response = await request(app).post('/api/clients').send({ name: 'Test Client' });
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ error: 'Client created but failed to retrieve' });
@@ -363,9 +362,7 @@ describe('Client Routes', () => {
         callback(new Error('Database error'), null);
       });
 
-      const response = await request(app)
-        .put('/api/clients/1')
-        .send({ name: 'Updated Name' });
+      const response = await request(app).put('/api/clients/1').send({ name: 'Updated Name' });
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ error: 'Internal server error' });
@@ -380,9 +377,7 @@ describe('Client Routes', () => {
         callback(new Error('Update failed'));
       });
 
-      const response = await request(app)
-        .put('/api/clients/1')
-        .send({ name: 'Updated Name' });
+      const response = await request(app).put('/api/clients/1').send({ name: 'Updated Name' });
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ error: 'Failed to update client' });
@@ -401,9 +396,7 @@ describe('Client Routes', () => {
         callback(new Error('Retrieval failed'), null);
       });
 
-      const response = await request(app)
-        .put('/api/clients/1')
-        .send({ name: 'Updated Name' });
+      const response = await request(app).put('/api/clients/1').send({ name: 'Updated Name' });
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ error: 'Client updated but failed to retrieve' });
@@ -447,9 +440,7 @@ describe('Client Routes', () => {
         callback(null, updatedClient);
       });
 
-      const response = await request(app)
-        .put('/api/clients/1')
-        .send({ description: '' });
+      const response = await request(app).put('/api/clients/1').send({ description: '' });
 
       expect(response.status).toBe(200);
     });

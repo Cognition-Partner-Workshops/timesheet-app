@@ -72,6 +72,32 @@ export interface LoginResponse {
   user: User;
 }
 
+export interface UserResponse {
+  user: User;
+}
+
+export interface ClientsResponse {
+  clients: Client[];
+}
+
+export interface ClientResponse {
+  message?: string;
+  client: Client;
+}
+
+export interface WorkEntriesResponse {
+  workEntries: WorkEntryWithClient[];
+}
+
+export interface WorkEntryResponse {
+  message?: string;
+  workEntry: WorkEntryWithClient;
+}
+
+export interface MessageResponse {
+  message: string;
+}
+
 export interface ApiResponse<T> {
   data?: T;
   error?: string;

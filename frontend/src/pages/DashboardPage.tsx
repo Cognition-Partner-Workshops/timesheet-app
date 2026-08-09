@@ -1,13 +1,5 @@
 import React from 'react';
-import {
-  Grid,
-  Card,
-  CardContent,
-  Typography,
-  Box,
-  Button,
-  Paper,
-} from '@mui/material';
+import { Grid, Card, CardContent, Typography, Box, Button, Paper } from '@mui/material';
 import {
   Business as BusinessIcon,
   Assignment as AssignmentIcon,
@@ -34,7 +26,10 @@ const DashboardPage: React.FC = () => {
   const clients = clientsData?.clients || [];
   const workEntries = workEntriesData?.workEntries || [];
 
-  const totalHours = workEntries.reduce((sum: number, entry: { hours: number }) => sum + entry.hours, 0);
+  const totalHours = workEntries.reduce(
+    (sum: number, entry: { hours: number }) => sum + entry.hours,
+    0,
+  );
   const recentEntries = workEntries.slice(0, 5);
 
   const statsCards = [
@@ -79,7 +74,9 @@ const DashboardPage: React.FC = () => {
                   transform: 'translateY(-4px)',
                 },
               }}
-              onClick={stat.action}
+              onClick={() => {
+                void stat.action();
+              }}
             >
               <CardContent>
                 <Box display="flex" alignItems="center" justifyContent="space-between" gap={3}>
@@ -118,14 +115,16 @@ const DashboardPage: React.FC = () => {
               <Button
                 variant="outlined"
                 startIcon={<AddIcon />}
-                onClick={() => navigate('/work-entries')}
+                onClick={() => {
+                  void navigate('/work-entries');
+                }}
                 sx={{ flexShrink: 0 }}
               >
                 Add Entry
               </Button>
             </Box>
             {recentEntries.length > 0 ? (
-              recentEntries.map((entry: { id: number; client_name: string; hours: number; date: string; description?: string }) => (
+              recentEntries.map((entry) => (
                 <Box key={entry.id} sx={{ mb: 2, pb: 2, borderBottom: '1px solid #eee' }}>
                   <Typography variant="subtitle1">{entry.client_name}</Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -154,7 +153,9 @@ const DashboardPage: React.FC = () => {
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
-                onClick={() => navigate('/clients')}
+                onClick={() => {
+                  void navigate('/clients');
+                }}
                 fullWidth
               >
                 Add Client
@@ -162,7 +163,9 @@ const DashboardPage: React.FC = () => {
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
-                onClick={() => navigate('/work-entries')}
+                onClick={() => {
+                  void navigate('/work-entries');
+                }}
                 fullWidth
               >
                 Add Work Entry
@@ -170,7 +173,9 @@ const DashboardPage: React.FC = () => {
               <Button
                 variant="outlined"
                 startIcon={<AssessmentIcon />}
-                onClick={() => navigate('/reports')}
+                onClick={() => {
+                  void navigate('/reports');
+                }}
                 fullWidth
               >
                 View Reports

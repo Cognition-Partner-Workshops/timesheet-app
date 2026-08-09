@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+build/
+*.lock
+package-lock.json
+*.svg
+*.map
+.git/
+.husky/_/

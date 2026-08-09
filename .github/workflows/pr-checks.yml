@@ -11,6 +11,36 @@ permissions:
   pull-requests: write
 
 jobs:
+  lint:
+    name: Lint and Format
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install root tooling
+        run: npm ci
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Lint frontend and backend
+        run: npm run lint
+
+      - name: Check repository formatting
+        run: npm run format:check
+
   security-audit:
     name: Security Audit (CVE Check)
     if: "!contains(github.event.pull_request.user.login, 'devin')"
@@ -190,7 +220,6 @@ jobs:
 
           gh pr comment ${{ github.event.pull_request.number }} --body "$COMMENT"
 
-
   trigger-devin-cve-fix:
     name: Trigger Devin CVE Auto-Fix
     needs: [security-audit]
@@ -199,7 +228,6 @@ jobs:
       github.event.pull_request.user.login == 'bsmitches' &&
       needs.security-audit.result == 'failure'
     runs-on: ubuntu-latest
-
     steps:
       - name: Check for prior Devin CVE fix attempt
         id: guard
