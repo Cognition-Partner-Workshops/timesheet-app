@@ -266,6 +266,17 @@ jobs:
               except (OSError, ValueError, json.JSONDecodeError):
                   return {}
 
+          def metadata_count(path, severity):
+              try:
+                  value = subprocess.check_output(
+                      ["jq", "-r", f"(.metadata.vulnerabilities.{severity} // 0)", str(path)],
+                      stderr=subprocess.DEVNULL,
+                      text=True,
+                  ).strip()
+                  return int(value or 0)
+              except (OSError, subprocess.CalledProcessError, ValueError):
+                  return 0
+
           def findings(data):
               result = set()
               for module, item in (data.get("vulnerabilities") or {}).items():
@@ -305,7 +316,11 @@ jobs:
           subprocess.run(["git", "worktree", "remove", "--force", str(baseline_dir)], check=False)
           shutil.rmtree(baseline_dir, ignore_errors=True)
 
-          head_high = sum(len(values) for values in head_sets.values())
+          head_high = sum(
+              metadata_count(head_dir / f"{package}-head.json", severity)
+              for package in packages
+              for severity in ("high", "critical")
+          )
           if baseline_available:
               new = sum(len(head_sets[package] - base_sets[package]) for package in packages)
               pre_existing = head_high - new
@@ -407,6 +422,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           pattern: quality-*
           path: quality-results
