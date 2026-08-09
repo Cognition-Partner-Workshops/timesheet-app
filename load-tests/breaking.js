@@ -23,43 +23,19 @@ export function setup() {
 
 function getStages() {
   if (__ENV.BREAKING_PROFILE === 'short') {
-    return [
-      { duration: '10s', target: 25 },
-      { duration: '10s', target: 50 },
-      { duration: '10s', target: 75 },
-      { duration: '10s', target: 100 },
-      { duration: '10s', target: 125 },
-      { duration: '10s', target: 150 },
-      { duration: '10s', target: 175 },
-      { duration: '10s', target: 200 },
-    ];
+    return makeStages('10s', [25, 50, 75, 100, 125, 150, 175, 200]);
   }
   if (__ENV.BREAKING_PROFILE === 'extended') {
-    return [
-      { duration: '15s', target: 25 },
-      { duration: '15s', target: 50 },
-      { duration: '15s', target: 75 },
-      { duration: '15s', target: 100 },
-      { duration: '15s', target: 150 },
-      { duration: '15s', target: 200 },
-      { duration: '15s', target: 250 },
-      { duration: '15s', target: 300 },
-      { duration: '15s', target: 350 },
-      { duration: '15s', target: 400 },
-      { duration: '15s', target: 450 },
-      { duration: '15s', target: 500 },
-    ];
+    return makeStages('15s', [25, 50, 75, 100, 150, 200, 250, 300, 350, 400, 450, 500]);
   }
   return [
-    { duration: '30s', target: 25 },
-    { duration: '45s', target: 50 },
-    { duration: '45s', target: 75 },
-    { duration: '45s', target: 100 },
-    { duration: '45s', target: 125 },
-    { duration: '45s', target: 150 },
-    { duration: '45s', target: 175 },
-    { duration: '45s', target: 200 },
+    ...makeStages('30s', [25]),
+    ...makeStages('45s', [50, 75, 100, 125, 150, 175, 200]),
   ];
+}
+
+function makeStages(duration, targets) {
+  return targets.map((target) => ({ duration, target }));
 }
 
 export default function runBreaking(clientIds) {
