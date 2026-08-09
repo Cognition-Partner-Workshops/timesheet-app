@@ -20,11 +20,14 @@ test('work entry form validates client and hours', async ({ authedPage: page }) 
   await expect(page.getByRole('alert')).toContainText('Please select a client');
   await page.locator('[role="dialog"] [role="combobox"]').click();
   await page.getByRole('option', { name: client }).click();
-  for (const [value, message] of [['0', 'Hours must be between 0 and 24'], ['25', 'Hours must be between 0 and 24'], ['abc', 'Hours must be between 0 and 24']] as const) {
+  for (const value of ['0', '25'] as const) {
     await page.getByLabel('Hours').fill(value);
     await page.getByRole('button', { name: 'Create', exact: true }).click();
-    await expect(page.getByRole('alert')).toContainText(message);
+    await expect(page.getByRole('alert')).toContainText('Hours must be between 0 and 24');
   }
+  await page.getByLabel('Hours').fill('');
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Hours must be between 0 and 24');
 });
 
 test('special characters round-trip as text and length limits are enforced', async ({ authedPage: page }) => {
@@ -41,7 +44,7 @@ test('special characters round-trip as text and length limits are enforced', asy
   await page.getByRole('button', { name: 'Add Client' }).click();
   await page.getByLabel('Client Name').fill(`${maxName}x`);
   await page.getByRole('button', { name: 'Create', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('Validation error');
+  await expect(page.getByRole('alert')).toContainText('"name" length must be less than or equal to 255 characters long');
 
   const longDescription = 'D'.repeat(1000);
   await page.getByLabel('Client Name').fill('Description Client');
@@ -53,5 +56,5 @@ test('special characters round-trip as text and length limits are enforced', asy
   await page.getByLabel('Client Name').fill('Too Long Description');
   await page.getByRole('dialog').getByLabel('Description').fill(`${longDescription}x`);
   await page.getByRole('button', { name: 'Create', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('Validation error');
+  await expect(page.getByRole('alert')).toContainText('"description" length must be less than or equal to 1000 characters long');
 });

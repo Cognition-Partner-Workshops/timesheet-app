@@ -6,7 +6,7 @@ test('shows the empty state when no clients exist', async ({ authedPage: page })
   await expect(page.getByRole('link', { name: 'Create Client' })).toBeVisible();
 });
 
-test('creates, edits, and deletes a work entry', async ({ authedPage: page, userEmail }) => {
+test('creates, edits, and deletes a work entry', async ({ authedPage: page }) => {
   const client = `Work Client ${Date.now()}`;
   await createClient(page, client);
   await page.goto('/work-entries');
@@ -22,7 +22,6 @@ test('creates, edits, and deletes a work entry', async ({ authedPage: page, user
   );
   await page.getByRole('button', { name: 'Update', exact: true }).click();
   expect((await updateResponse).status()).toBe(200);
-  await page.evaluate((email) => localStorage.setItem('userEmail', email), userEmail);
   await page.goto('/work-entries');
   await expect(page.getByRole('row').filter({ hasText: client })).toContainText('6 hours');
 
@@ -30,4 +29,20 @@ test('creates, edits, and deletes a work entry', async ({ authedPage: page, user
   await page.getByRole('row').filter({ hasText: client })
     .getByRole('button', { name: `Delete work entry for ${client}` }).click();
   await expect(page.getByText('No work entries found. Add your first work entry to get started.')).toBeVisible();
+});
+
+test('deleting a client removes its work entries', async ({ authedPage: page }) => {
+  const client = `Cascade Client ${Date.now()}`;
+  const retainedClient = `Retained Client ${Date.now()}`;
+  await createClient(page, client);
+  await createClient(page, retainedClient);
+  await page.goto('/work-entries');
+  await addWorkEntry(page, client, '2', 'Cascade entry');
+  await page.goto('/clients');
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('row').filter({ hasText: client })
+    .getByRole('button', { name: `Delete client ${client}` }).click();
+  await page.goto('/work-entries');
+  await expect(page.getByText('No work entries found. Add your first work entry to get started.')).toBeVisible();
+  await expect(page.getByText('Cascade entry')).toHaveCount(0);
 });

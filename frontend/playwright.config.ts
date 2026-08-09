@@ -22,7 +22,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'npm --prefix ../backend run dev',
+      command: 'RATE_LIMIT_MAX=1000 npm --prefix ../backend run dev',
       url: 'http://localhost:3001/health',
       reuseExistingServer: true,
       timeout: 120_000,

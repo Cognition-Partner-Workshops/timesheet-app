@@ -12,9 +12,9 @@ test('reports totals update after edit and delete, and CSV exports entries', asy
   await expect(page.locator('[role="combobox"]')).toBeVisible();
   await page.locator('[role="combobox"]').click();
   await page.getByRole('option', { name: client }).click();
-  await expect(page.getByText('9.75', { exact: true })).toBeVisible();
-  await expect(page.getByText('3', { exact: true })).toBeVisible();
-  await expect(page.getByText('3.25', { exact: true })).toBeVisible();
+  await expect(page.getByText('Total Hours').locator('..')).toContainText('9.75');
+  await expect(page.getByText('Total Entries').locator('..')).toContainText('3');
+  await expect(page.getByText('Average Hours per Entry').locator('..')).toContainText('3.25');
   await expect(page.getByRole('row')).toHaveCount(4);
   await expect(page.getByRole('row').filter({ hasText: 'First' })).toBeVisible();
   await expect(page.getByRole('row').filter({ hasText: 'Second' })).toBeVisible();
@@ -30,8 +30,8 @@ test('reports totals update after edit and delete, and CSV exports entries', asy
   await expect(page.locator('[role="combobox"]')).toBeVisible();
   await page.locator('[role="combobox"]').click();
   await page.getByRole('option', { name: client }).click();
-  await expect(page.getByText('11.50', { exact: true })).toBeVisible();
-  await expect(page.getByText('3.83', { exact: true })).toBeVisible();
+  await expect(page.getByText('Total Hours').locator('..')).toContainText('11.50');
+  await expect(page.getByText('Average Hours per Entry').locator('..')).toContainText('3.83');
 
   await page.goto('/work-entries');
   page.once('dialog', (dialog) => dialog.accept());
@@ -42,9 +42,9 @@ test('reports totals update after edit and delete, and CSV exports entries', asy
   await expect(page.locator('[role="combobox"]')).toBeVisible();
   await page.locator('[role="combobox"]').click();
   await page.getByRole('option', { name: client }).click();
-  await expect(page.getByText('9.00', { exact: true })).toBeVisible();
-  await expect(page.getByText('2', { exact: true })).toBeVisible();
-  await expect(page.getByText('4.50', { exact: true })).toBeVisible();
+  await expect(page.getByText('Total Hours').locator('..')).toContainText('9.00');
+  await expect(page.getByText('Total Entries').locator('..')).toContainText('2');
+  await expect(page.getByText('Average Hours per Entry').locator('..')).toContainText('4.50');
 
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export as CSV' }).click();

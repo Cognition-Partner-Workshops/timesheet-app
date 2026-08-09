@@ -52,8 +52,8 @@ const ClientsPage: React.FC = () => {
       handleClose();
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to create client');
+      const error = err as { response?: { data?: { error?: string; details?: string[] } } };
+      setError(error.response?.data?.details?.[0] || error.response?.data?.error || 'Failed to create client');
     },
   });
 
@@ -66,8 +66,8 @@ const ClientsPage: React.FC = () => {
       handleClose();
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to update client');
+      const error = err as { response?: { data?: { error?: string; details?: string[] } } };
+      setError(error.response?.data?.details?.[0] || error.response?.data?.error || 'Failed to update client');
     },
   });
 
@@ -78,7 +78,7 @@ const ClientsPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['clientReport'] });
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
+      const error = err as { response?: { data?: { error?: string; details?: string[] } } };
       setError(error.response?.data?.error || 'Failed to delete client');
     },
   });
@@ -90,7 +90,7 @@ const ClientsPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['clientReport'] });
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
+      const error = err as { response?: { data?: { error?: string; details?: string[] } } };
       setError(error.response?.data?.error || 'Failed to delete all clients');
     },
   });
@@ -302,6 +302,7 @@ const ClientsPage: React.FC = () => {
               margin="dense"
               label="Client Name"
               fullWidth
+              required
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               disabled={createMutation.isPending || updateMutation.isPending}

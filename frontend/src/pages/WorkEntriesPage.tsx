@@ -301,7 +301,7 @@ const WorkEntriesPage: React.FC = () => {
                   {error}
                 </Alert>
               )}
-              <FormControl fullWidth margin="dense">
+              <FormControl fullWidth margin="dense" required>
                 <InputLabel>Client</InputLabel>
                 <Select
                   value={formData.clientId}
@@ -319,9 +319,10 @@ const WorkEntriesPage: React.FC = () => {
               <TextField
                 margin="dense"
                 label="Hours"
-                type="text"
+                type="number"
                 fullWidth
-                inputProps={{ inputMode: 'decimal' }}
+                inputProps={{ min: 0.01, max: 24, step: 0.01 }}
+                required
                 value={formData.hours}
                 onChange={(e) => setFormData({ ...formData, hours: e.target.value })}
                 disabled={createMutation.isPending || updateMutation.isPending}
@@ -335,6 +336,7 @@ const WorkEntriesPage: React.FC = () => {
                   textField: {
                     fullWidth: true,
                     margin: 'dense',
+                    required: true,
                     disabled: createMutation.isPending || updateMutation.isPending,
                   },
                 }}

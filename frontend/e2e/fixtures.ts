@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/rules-of-hooks */
 import { randomUUID } from 'node:crypto';
 import { expect, type Page, test as base } from '@playwright/test';
 

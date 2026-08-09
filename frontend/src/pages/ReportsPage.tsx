@@ -38,7 +38,6 @@ const ReportsPage: React.FC = () => {
   const { data: clientsData, isLoading: clientsLoading } = useQuery({
     queryKey: ['clients'],
     queryFn: () => apiClient.getClients(),
-    refetchOnMount: 'always',
   });
 
   const { data: reportData, isLoading: reportLoading } = useQuery({
