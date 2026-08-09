@@ -13,20 +13,20 @@ fi
 mapfile -t changed_files < <(
   git diff --name-only --diff-filter=ACMR "${base_ref}...HEAD" -- |
   while IFS= read -r file; do
-      [ -f "$file" ] || continue
+      [[ -f "$file" ]] || continue
       for pattern in "${patterns[@]}"; do
         [[ "$file" == $pattern ]] && printf '%s\n' "$file" && break
       done
     done
 )
 
-if [ "${#changed_files[@]}" -eq 0 ]; then
+if [[ "${#changed_files[@]}" -eq 0 ]]; then
   echo "No changed format-supported files."
   exit 0
 fi
 
 for candidate in frontend/node_modules/.bin/prettier backend/node_modules/.bin/prettier; do
-  if [ -x "$candidate" ]; then
+  if [[ -x "$candidate" ]]; then
     exec "$candidate" --check "${changed_files[@]}"
   fi
 done
