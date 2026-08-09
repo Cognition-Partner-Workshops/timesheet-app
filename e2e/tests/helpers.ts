@@ -1,7 +1,8 @@
+import { randomInt } from 'node:crypto';
 import { Page, expect } from '@playwright/test';
 
 export function uniqueEmail(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}@example.com`;
+  return `${prefix}-${Date.now()}-${randomInt(10000)}@example.com`;
 }
 
 export async function login(page: Page, email: string): Promise<void> {
