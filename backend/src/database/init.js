@@ -18,6 +18,7 @@ function getDatabase() {
       }
       console.log('Connected to SQLite in-memory database');
     });
+    db.run('PRAGMA foreign_keys = ON');
   }
   return db;
 }

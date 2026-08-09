@@ -64,6 +64,7 @@ const WorkEntriesPage: React.FC = () => {
       apiClient.createWorkEntry(entryData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workEntries'] });
+      queryClient.invalidateQueries({ queryKey: ['clientReport'] });
       handleClose();
     },
     onError: (err: unknown) => {
@@ -77,6 +78,7 @@ const WorkEntriesPage: React.FC = () => {
       apiClient.updateWorkEntry(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workEntries'] });
+      queryClient.invalidateQueries({ queryKey: ['clientReport'] });
       handleClose();
     },
     onError: (err: unknown) => {
@@ -89,6 +91,7 @@ const WorkEntriesPage: React.FC = () => {
     mutationFn: (id: number) => apiClient.deleteWorkEntry(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workEntries'] });
+      queryClient.invalidateQueries({ queryKey: ['clientReport'] });
     },
     onError: (err: unknown) => {
       const error = err as { response?: { data?: { error?: string } } };
@@ -194,7 +197,7 @@ const WorkEntriesPage: React.FC = () => {
           </Button>
         </Box>
 
-        {error && (
+        {error && !open && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
             {error}
           </Alert>
@@ -257,6 +260,7 @@ const WorkEntriesPage: React.FC = () => {
                             onClick={() => handleOpen(entry)}
                             color="primary"
                             size="small"
+                            aria-label={`Edit work entry for ${entry.client_name}`}
                           >
                             <EditIcon />
                           </IconButton>
@@ -264,6 +268,7 @@ const WorkEntriesPage: React.FC = () => {
                             onClick={() => handleDelete(entry)}
                             color="error"
                             size="small"
+                            aria-label={`Delete work entry for ${entry.client_name}`}
                           >
                             <DeleteIcon />
                           </IconButton>
@@ -289,9 +294,14 @@ const WorkEntriesPage: React.FC = () => {
           <DialogTitle>
             {editingEntry ? 'Edit Work Entry' : 'Add New Work Entry'}
           </DialogTitle>
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
             <DialogContent>
-              <FormControl fullWidth margin="dense" required>
+              {error && (
+                <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+                  {error}
+                </Alert>
+              )}
+              <FormControl fullWidth margin="dense">
                 <InputLabel>Client</InputLabel>
                 <Select
                   value={formData.clientId}
@@ -309,10 +319,9 @@ const WorkEntriesPage: React.FC = () => {
               <TextField
                 margin="dense"
                 label="Hours"
-                type="number"
+                type="text"
                 fullWidth
-                required
-                inputProps={{ min: 0.01, max: 24, step: 0.01 }}
+                inputProps={{ inputMode: 'decimal' }}
                 value={formData.hours}
                 onChange={(e) => setFormData({ ...formData, hours: e.target.value })}
                 disabled={createMutation.isPending || updateMutation.isPending}
@@ -326,7 +335,6 @@ const WorkEntriesPage: React.FC = () => {
                   textField: {
                     fullWidth: true,
                     margin: 'dense',
-                    required: true,
                     disabled: createMutation.isPending || updateMutation.isPending,
                   },
                 }}

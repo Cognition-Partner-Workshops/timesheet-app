@@ -27,6 +27,10 @@ function authenticateUser(req, res, next) {
       // Create new user
       db.run('INSERT INTO users (email) VALUES (?)', [userEmail], (err) => {
         if (err) {
+          if (err.code === 'SQLITE_CONSTRAINT') {
+            req.userEmail = userEmail;
+            return next();
+          }
           console.error('Error creating user:', err);
           return res.status(500).json({ error: 'Failed to create user' });
         }

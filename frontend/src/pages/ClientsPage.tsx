@@ -48,6 +48,7 @@ const ClientsPage: React.FC = () => {
       apiClient.createClient(clientData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['clientReport'] });
       handleClose();
     },
     onError: (err: unknown) => {
@@ -61,6 +62,7 @@ const ClientsPage: React.FC = () => {
       apiClient.updateClient(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['clientReport'] });
       handleClose();
     },
     onError: (err: unknown) => {
@@ -73,6 +75,7 @@ const ClientsPage: React.FC = () => {
     mutationFn: (id: number) => apiClient.deleteClient(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['clientReport'] });
     },
     onError: (err: unknown) => {
       const error = err as { response?: { data?: { error?: string } } };
@@ -84,6 +87,7 @@ const ClientsPage: React.FC = () => {
     mutationFn: () => apiClient.deleteAllClients(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['clientReport'] });
     },
     onError: (err: unknown) => {
       const error = err as { response?: { data?: { error?: string } } };
@@ -188,7 +192,7 @@ const ClientsPage: React.FC = () => {
         </Box>
       </Box>
 
-      {error && (
+      {error && !open && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
           {error}
         </Alert>
@@ -253,6 +257,7 @@ const ClientsPage: React.FC = () => {
                         onClick={() => handleOpen(client)}
                         color="primary"
                         size="small"
+                        aria-label={`Edit client ${client.name}`}
                       >
                         <EditIcon />
                       </IconButton>
@@ -260,6 +265,7 @@ const ClientsPage: React.FC = () => {
                         onClick={() => handleDelete(client)}
                         color="error"
                         size="small"
+                        aria-label={`Delete client ${client.name}`}
                       >
                         <DeleteIcon />
                       </IconButton>
@@ -284,14 +290,18 @@ const ClientsPage: React.FC = () => {
         <DialogTitle>
           {editingClient ? 'Edit Client' : 'Add New Client'}
         </DialogTitle>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           <DialogContent>
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+                {error}
+              </Alert>
+            )}
             <TextField
               autoFocus
               margin="dense"
               label="Client Name"
               fullWidth
-              required
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               disabled={createMutation.isPending || updateMutation.isPending}

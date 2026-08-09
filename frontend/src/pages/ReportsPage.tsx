@@ -38,6 +38,7 @@ const ReportsPage: React.FC = () => {
   const { data: clientsData, isLoading: clientsLoading } = useQuery({
     queryKey: ['clients'],
     queryFn: () => apiClient.getClients(),
+    refetchOnMount: 'always',
   });
 
   const { data: reportData, isLoading: reportLoading } = useQuery({
@@ -149,6 +150,7 @@ const ReportsPage: React.FC = () => {
                       disabled={!selectedClientId || reportLoading}
                       color="primary"
                       size="large"
+                      aria-label="Export as CSV"
                     >
                       <CsvIcon />
                     </IconButton>
@@ -159,6 +161,7 @@ const ReportsPage: React.FC = () => {
                       disabled={!selectedClientId || reportLoading}
                       color="error"
                       size="large"
+                      aria-label="Export as PDF"
                     >
                       <PdfIcon />
                     </IconButton>
