@@ -21,12 +21,9 @@ import {
   CircularProgress,
   Chip,
   IconButton,
-  Tooltip,
+  Tooltip
 } from '@mui/material';
-import {
-  PictureAsPdf as PdfIcon,
-  Description as CsvIcon,
-} from '@mui/icons-material';
+import { PictureAsPdf as PdfIcon, Description as CsvIcon } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
 import { type ClientReport } from '../types/api';
@@ -37,13 +34,13 @@ const ReportsPage: React.FC = () => {
 
   const { data: clientsData, isLoading: clientsLoading } = useQuery({
     queryKey: ['clients'],
-    queryFn: () => apiClient.getClients(),
+    queryFn: () => apiClient.getClients()
   });
 
   const { data: reportData, isLoading: reportLoading } = useQuery({
     queryKey: ['clientReport', selectedClientId],
     queryFn: () => apiClient.getClientReport(selectedClientId),
-    enabled: selectedClientId > 0,
+    enabled: selectedClientId > 0
   });
 
   const clients = clientsData?.clients || [];
@@ -51,7 +48,7 @@ const ReportsPage: React.FC = () => {
 
   const handleExportCsv = async () => {
     if (!selectedClientId) return;
-    
+
     try {
       const blob = await apiClient.exportClientReportCsv(selectedClientId);
       const url = window.URL.createObjectURL(blob);
@@ -176,9 +173,9 @@ const ReportsPage: React.FC = () => {
 
           {selectedClient && report && (
             <>
-                <Grid container spacing={3} sx={{ mb: 3 }}>
-                  <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                    <Card>
+              <Grid container spacing={3} sx={{ mb: 3 }}>
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                  <Card>
                     <CardContent>
                       <Typography color="textSecondary" gutterBottom>
                         Total Hours
@@ -231,16 +228,10 @@ const ReportsPage: React.FC = () => {
                         report.workEntries.map((entry) => (
                           <TableRow key={entry.id}>
                             <TableCell>
-                              <Typography variant="body2">
-                                {new Date(entry.date).toLocaleDateString()}
-                              </Typography>
+                              <Typography variant="body2">{new Date(entry.date).toLocaleDateString()}</Typography>
                             </TableCell>
                             <TableCell>
-                              <Chip 
-                                label={`${entry.hours} hours`} 
-                                color="primary" 
-                                variant="outlined" 
-                              />
+                              <Chip label={`${entry.hours} hours`} color="primary" variant="outlined" />
                             </TableCell>
                             <TableCell>
                               {entry.description ? (
@@ -276,9 +267,7 @@ const ReportsPage: React.FC = () => {
 
           {!selectedClient && (
             <Paper sx={{ p: 3, textAlign: 'center' }}>
-              <Typography color="text.secondary">
-                Select a client to view their time report.
-              </Typography>
+              <Typography color="text.secondary">Select a client to view their time report.</Typography>
             </Paper>
           )}
         </>

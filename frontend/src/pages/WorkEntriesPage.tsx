@@ -22,13 +22,9 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Chip,
+  Chip
 } from '@mui/material';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-} from '@mui/icons-material';
+import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -43,7 +39,7 @@ const WorkEntriesPage: React.FC = () => {
     clientId: 0,
     hours: '',
     description: '',
-    date: new Date(),
+    date: new Date()
   });
   const [error, setError] = useState('');
 
@@ -51,12 +47,12 @@ const WorkEntriesPage: React.FC = () => {
 
   const { data: workEntriesData, isLoading: entriesLoading } = useQuery({
     queryKey: ['workEntries'],
-    queryFn: () => apiClient.getWorkEntries(),
+    queryFn: () => apiClient.getWorkEntries()
   });
 
   const { data: clientsData, isLoading: clientsLoading } = useQuery({
     queryKey: ['clients'],
-    queryFn: () => apiClient.getClients(),
+    queryFn: () => apiClient.getClients()
   });
 
   const createMutation = useMutation({
@@ -69,12 +65,17 @@ const WorkEntriesPage: React.FC = () => {
     onError: (err: unknown) => {
       const error = err as { response?: { data?: { error?: string } } };
       setError(error.response?.data?.error || 'Failed to create work entry');
-    },
+    }
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { clientId?: number; hours?: number; description?: string; date?: string } }) =>
-      apiClient.updateWorkEntry(id, data),
+    mutationFn: ({
+      id,
+      data
+    }: {
+      id: number;
+      data: { clientId?: number; hours?: number; description?: string; date?: string };
+    }) => apiClient.updateWorkEntry(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workEntries'] });
       handleClose();
@@ -82,7 +83,7 @@ const WorkEntriesPage: React.FC = () => {
     onError: (err: unknown) => {
       const error = err as { response?: { data?: { error?: string } } };
       setError(error.response?.data?.error || 'Failed to update work entry');
-    },
+    }
   });
 
   const deleteMutation = useMutation({
@@ -93,7 +94,7 @@ const WorkEntriesPage: React.FC = () => {
     onError: (err: unknown) => {
       const error = err as { response?: { data?: { error?: string } } };
       setError(error.response?.data?.error || 'Failed to delete work entry');
-    },
+    }
   });
 
   const workEntries = workEntriesData?.workEntries || [];
@@ -106,7 +107,7 @@ const WorkEntriesPage: React.FC = () => {
         clientId: entry.client_id,
         hours: entry.hours.toString(),
         description: entry.description || '',
-        date: new Date(entry.date),
+        date: new Date(entry.date)
       });
     } else {
       setEditingEntry(null);
@@ -114,7 +115,7 @@ const WorkEntriesPage: React.FC = () => {
         clientId: 0,
         hours: '',
         description: '',
-        date: new Date(),
+        date: new Date()
       });
     }
     setError('');
@@ -128,7 +129,7 @@ const WorkEntriesPage: React.FC = () => {
       clientId: 0,
       hours: '',
       description: '',
-      date: new Date(),
+      date: new Date()
     });
     setError('');
   };
@@ -157,13 +158,13 @@ const WorkEntriesPage: React.FC = () => {
       clientId: formData.clientId,
       hours,
       description: formData.description || undefined,
-      date: formData.date.toISOString().split('T')[0],
+      date: formData.date.toISOString().split('T')[0]
     };
 
     if (editingEntry) {
       updateMutation.mutate({
         id: editingEntry.id,
-        data: entryData,
+        data: entryData
       });
     } else {
       createMutation.mutate(entryData);
@@ -232,16 +233,10 @@ const WorkEntriesPage: React.FC = () => {
                           </Typography>
                         </TableCell>
                         <TableCell>
-                          <Typography variant="body2">
-                            {new Date(entry.date).toLocaleDateString()}
-                          </Typography>
+                          <Typography variant="body2">{new Date(entry.date).toLocaleDateString()}</Typography>
                         </TableCell>
                         <TableCell>
-                          <Chip 
-                            label={`${entry.hours} hours`} 
-                            color="primary" 
-                            variant="outlined" 
-                          />
+                          <Chip label={`${entry.hours} hours`} color="primary" variant="outlined" />
                         </TableCell>
                         <TableCell>
                           {entry.description ? (
@@ -253,18 +248,10 @@ const WorkEntriesPage: React.FC = () => {
                           )}
                         </TableCell>
                         <TableCell align="right">
-                          <IconButton
-                            onClick={() => handleOpen(entry)}
-                            color="primary"
-                            size="small"
-                          >
+                          <IconButton onClick={() => handleOpen(entry)} color="primary" size="small">
                             <EditIcon />
                           </IconButton>
-                          <IconButton
-                            onClick={() => handleDelete(entry)}
-                            color="error"
-                            size="small"
-                          >
+                          <IconButton onClick={() => handleDelete(entry)} color="error" size="small">
                             <DeleteIcon />
                           </IconButton>
                         </TableCell>
@@ -286,9 +273,7 @@ const WorkEntriesPage: React.FC = () => {
         )}
 
         <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-          <DialogTitle>
-            {editingEntry ? 'Edit Work Entry' : 'Add New Work Entry'}
-          </DialogTitle>
+          <DialogTitle>{editingEntry ? 'Edit Work Entry' : 'Add New Work Entry'}</DialogTitle>
           <form onSubmit={handleSubmit}>
             <DialogContent>
               <FormControl fullWidth margin="dense" required>
@@ -327,8 +312,8 @@ const WorkEntriesPage: React.FC = () => {
                     fullWidth: true,
                     margin: 'dense',
                     required: true,
-                    disabled: createMutation.isPending || updateMutation.isPending,
-                  },
+                    disabled: createMutation.isPending || updateMutation.isPending
+                  }
                 }}
               />
 
@@ -347,15 +332,13 @@ const WorkEntriesPage: React.FC = () => {
               <Button onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                variant="contained"
-                disabled={createMutation.isPending || updateMutation.isPending}
-              >
+              <Button type="submit" variant="contained" disabled={createMutation.isPending || updateMutation.isPending}>
                 {createMutation.isPending || updateMutation.isPending ? (
                   <CircularProgress size={24} />
+                ) : editingEntry ? (
+                  'Update'
                 ) : (
-                  editingEntry ? 'Update' : 'Create'
+                  'Create'
                 )}
               </Button>
             </DialogActions>
