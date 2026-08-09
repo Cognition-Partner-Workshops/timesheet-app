@@ -318,7 +318,7 @@ jobs:
           subprocess.run(["git", "worktree", "remove", "--force", str(baseline_dir)], check=False)
           shutil.rmtree(baseline_dir, ignore_errors=True)
 
-          head_high = sum(
+          head_package_count = sum(
               metadata_count(head_dir / f"{package}-head.json", severity)
               for package in packages
               for severity in ("high", "critical")
@@ -327,10 +327,13 @@ jobs:
               new = sum(len(head_sets[package] - base_sets[package]) for package in packages)
               pre_existing = sum(len(head_sets[package] & base_sets[package]) for package in packages)
               status = "pass" if new == 0 else "fail"
-              metric = f"{new} new ({pre_existing} pre-existing high/critical)"
+              metric = (
+                  f"{new} new advisories ({pre_existing} pre-existing advisories; "
+                  f"{head_package_count} vulnerable packages)"
+              )
           else:
               status = "skipped"
-              metric = f"baseline unavailable; {head_high} head high/critical"
+              metric = f"baseline unavailable; {head_package_count} vulnerable packages (high/critical)"
           Path("security.json").write_text(json.dumps({
               "gate": "security",
               "status": status,

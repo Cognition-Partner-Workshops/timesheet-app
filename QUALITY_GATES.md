@@ -56,7 +56,9 @@ the base branch. The exact threshold is **0 new high or critical**
 vulnerabilities. The repository has a pre-existing high/critical dependency
 backlog, so those findings are reported but do not fail a PR unless the PR
 introduces a new finding. If the base audit cannot be produced, the gate is
-skipped and reports the head counts.
+skipped and reports the head vulnerable-package count. Dashboard metrics label
+advisory counts explicitly and also show the number of vulnerable packages,
+which matches the high/critical package counts in `npm audit` metadata.
 
 ```sh
 (cd backend && npm audit --json)
