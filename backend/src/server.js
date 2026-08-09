@@ -11,9 +11,11 @@ const reportRoutes = require('./routes/reports');
 
 const { initializeDatabase } = require('./database/init');
 const { errorHandler } = require('./middleware/errorHandler');
+const noStoreApiResponses = require('./middleware/noStoreApi');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+app.disable('etag');
 
 // Security middleware
 app.use(helmet());
@@ -35,6 +37,7 @@ app.use(morgan('combined'));
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use('/api', noStoreApiResponses);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -69,6 +72,8 @@ async function startServer() {
   }
 }
 
-startServer();
+if (require.main === module) {
+  startServer();
+}
 
 module.exports = app;

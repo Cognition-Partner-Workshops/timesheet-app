@@ -26,3 +26,10 @@ test('protected route redirects unauthenticated users', async ({ page }) => {
   await page.goto('/clients');
   await expect(page).toHaveURL(/\/login$/);
 });
+
+test('repeat visits keep the user authenticated', async ({ authedPage: page }) => {
+  await page.goto('/reports');
+  await page.reload();
+  await expect(page).not.toHaveURL(/\/login$/);
+  await expect(page.getByRole('button', { name: 'Logout' })).toBeVisible();
+});
