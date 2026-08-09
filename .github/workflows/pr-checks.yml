@@ -25,15 +25,15 @@ jobs:
           node-version: '20'
 
       - name: Install root tooling
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Install backend dependencies
         working-directory: backend
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Lint frontend and backend
         run: npm run lint
@@ -63,7 +63,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: frontend
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Run npm audit
         id: audit
@@ -153,7 +153,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: frontend
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Run tests with coverage
         id: coverage
