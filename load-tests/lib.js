@@ -4,6 +4,12 @@ import { Counter, Trend } from 'k6/metrics';
 
 const BASE_URL = __ENV.BASE_URL || 'http://127.0.0.1:3001';
 const USER_EMAIL = __ENV.USER_EMAIL || 'load-heavy@example.com';
+let uniqueCounter = 0;
+
+function uniqueId() {
+  uniqueCounter += 1;
+  return `${Date.now()}-${uniqueCounter}`;
+}
 
 export const endpointLatency = {
   login: new Trend('endpoint_login', true),
@@ -43,12 +49,12 @@ export function login() {
   return response;
 }
 
-export function createClient(name = `VU client ${Date.now()}-${Math.random()}`) {
+export function createClient(name = `VU client ${uniqueId()}`) {
   const response = request('POST', '/api/clients', {
     name,
     description: 'Load-test client',
     department: 'Engineering',
-    email: `load-${Date.now()}-${Math.floor(Math.random() * 1000000)}@example.com`,
+    email: `load-${uniqueId()}@example.com`,
   }, 'createClient');
   check(response, { 'client created': (r) => r.status === 201 });
   return response;
@@ -64,7 +70,7 @@ export function createWorkEntry(clientId, date = new Date().toISOString().slice(
   const response = request('POST', '/api/work-entries', {
     clientId,
     hours: 2.5,
-    description: `Load-test work ${Date.now()}-${Math.random()}`,
+    description: `Load-test work ${uniqueId()}`,
     date,
   }, 'createEntry');
   check(response, { 'work entry created': (r) => r.status === 201 });
@@ -85,7 +91,7 @@ export function viewReport(clientId) {
 }
 
 export function randomClient(clientIds) {
-  return clientIds[Math.floor(Math.random() * clientIds.length)];
+  return clientIds[(__VU + __ITER) % clientIds.length];
 }
 
 export function pause(seconds = 0.2) {

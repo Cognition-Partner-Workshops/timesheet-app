@@ -2,9 +2,9 @@ export function handleSummary(data) {
   const runId = __ENV.RUN_ID || 'run';
   const scenario = __ENV.SCENARIO || 'scenario';
   const metrics = data.metrics || {};
-  const http = metrics.http_req_duration && metrics.http_req_duration.values;
-  const failed = metrics.http_req_failed && metrics.http_req_failed.values;
-  const requests = metrics.http_reqs && metrics.http_reqs.values;
+  const http = metrics.http_req_duration?.values;
+  const failed = metrics.http_req_failed?.values;
+  const requests = metrics.http_reqs?.values;
   const lines = [
     `Scenario: ${scenario}`,
     `Run: ${runId}`,
@@ -16,7 +16,7 @@ export function handleSummary(data) {
     '',
     'Endpoint trends:',
   ];
-  Object.keys(metrics).filter((name) => name.startsWith('endpoint_') && !name.endsWith('_requests')).sort().forEach((name) => {
+  Object.keys(metrics).filter((name) => name.startsWith('endpoint_') && !name.endsWith('_requests')).sort((a, b) => a.localeCompare(b)).forEach((name) => {
     const values = metrics[name].values;
     const countMetric = metrics[`${name}_requests`];
     const count = countMetric ? countMetric.values.count : 0;

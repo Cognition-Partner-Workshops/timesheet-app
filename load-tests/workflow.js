@@ -24,7 +24,7 @@ export function setup() {
   return clients.map((client) => client.id);
 }
 
-export default function (clientIds) {
+export default function runWorkflow(clientIds) {
   login();
   const clientId = randomClient(clientIds);
   createWorkEntry(clientId);

@@ -1,6 +1,6 @@
-const fs = require('fs');
-const inspector = require('inspector');
-const path = require('path');
+const fs = require('node:fs');
+const inspector = require('node:inspector');
+const path = require('node:path');
 
 const session = new inspector.Session();
 const profilePath = path.resolve(

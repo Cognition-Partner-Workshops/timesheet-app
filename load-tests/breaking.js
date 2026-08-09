@@ -5,38 +5,7 @@ export const options = {
     breaking_point: {
       executor: 'ramping-vus',
       startVUs: 1,
-      stages: __ENV.BREAKING_PROFILE === 'short' ? [
-        { duration: '10s', target: 25 },
-        { duration: '10s', target: 50 },
-        { duration: '10s', target: 75 },
-        { duration: '10s', target: 100 },
-        { duration: '10s', target: 125 },
-        { duration: '10s', target: 150 },
-        { duration: '10s', target: 175 },
-        { duration: '10s', target: 200 },
-      ] : __ENV.BREAKING_PROFILE === 'extended' ? [
-        { duration: '15s', target: 25 },
-        { duration: '15s', target: 50 },
-        { duration: '15s', target: 75 },
-        { duration: '15s', target: 100 },
-        { duration: '15s', target: 150 },
-        { duration: '15s', target: 200 },
-        { duration: '15s', target: 250 },
-        { duration: '15s', target: 300 },
-        { duration: '15s', target: 350 },
-        { duration: '15s', target: 400 },
-        { duration: '15s', target: 450 },
-        { duration: '15s', target: 500 },
-      ] : [
-        { duration: '30s', target: 25 },
-        { duration: '45s', target: 50 },
-        { duration: '45s', target: 75 },
-        { duration: '45s', target: 100 },
-        { duration: '45s', target: 125 },
-        { duration: '45s', target: 150 },
-        { duration: '45s', target: 175 },
-        { duration: '45s', target: 200 },
-      ],
+      stages: getStages(),
       gracefulRampDown: '5s',
     },
   },
@@ -52,7 +21,48 @@ export function setup() {
   return (listClients().json('clients') || []).map((client) => client.id);
 }
 
-export default function (clientIds) {
+function getStages() {
+  if (__ENV.BREAKING_PROFILE === 'short') {
+    return [
+      { duration: '10s', target: 25 },
+      { duration: '10s', target: 50 },
+      { duration: '10s', target: 75 },
+      { duration: '10s', target: 100 },
+      { duration: '10s', target: 125 },
+      { duration: '10s', target: 150 },
+      { duration: '10s', target: 175 },
+      { duration: '10s', target: 200 },
+    ];
+  }
+  if (__ENV.BREAKING_PROFILE === 'extended') {
+    return [
+      { duration: '15s', target: 25 },
+      { duration: '15s', target: 50 },
+      { duration: '15s', target: 75 },
+      { duration: '15s', target: 100 },
+      { duration: '15s', target: 150 },
+      { duration: '15s', target: 200 },
+      { duration: '15s', target: 250 },
+      { duration: '15s', target: 300 },
+      { duration: '15s', target: 350 },
+      { duration: '15s', target: 400 },
+      { duration: '15s', target: 450 },
+      { duration: '15s', target: 500 },
+    ];
+  }
+  return [
+    { duration: '30s', target: 25 },
+    { duration: '45s', target: 50 },
+    { duration: '45s', target: 75 },
+    { duration: '45s', target: 100 },
+    { duration: '45s', target: 125 },
+    { duration: '45s', target: 150 },
+    { duration: '45s', target: 175 },
+    { duration: '45s', target: 200 },
+  ];
+}
+
+export default function runBreaking(clientIds) {
   login();
   const clientId = randomClient(clientIds);
   createWorkEntry(clientId);

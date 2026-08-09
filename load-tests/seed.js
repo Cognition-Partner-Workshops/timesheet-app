@@ -14,7 +14,7 @@ export function setup() {
   for (let i = 0; i < Number(__ENV.SEED_CLIENTS || 20); i += 1) {
     const response = createClient(`Heavy client ${i + 1}`);
     const client = response.json('client');
-    if (client && client.id) clientIds.push(client.id);
+    if (client?.id) clientIds.push(client.id);
   }
   const entriesPerClient = Number(__ENV.SEED_ENTRIES_PER_CLIENT || 150);
   for (const clientId of clientIds) {
@@ -25,7 +25,7 @@ export function setup() {
   return { clientIds, userEmail: USER_EMAIL };
 }
 
-export default function (data) {
+export default function verifySeed(data) {
   const response = http.get(`${__ENV.BASE_URL || 'http://127.0.0.1:3001'}/api/clients`, {
     headers: { 'x-user-email': data.userEmail },
     tags: { endpoint: 'seed_verify' },

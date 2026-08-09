@@ -33,7 +33,7 @@ export function setup() {
   return (listClients().json('clients') || []).map((client) => client.id);
 }
 
-export default function (clientIds) {
+export default function runRamp(clientIds) {
   login();
   const clientId = randomClient(clientIds);
   createWorkEntry(clientId);
