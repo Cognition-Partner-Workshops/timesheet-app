@@ -1,7 +1,7 @@
 # k6 load tests
 
-This directory contains the phase-1 load harness and baseline artifacts for the
-Express/SQLite backend. The runner starts a fresh in-memory database, disables
+This directory contains the k6 load harness and the measurement artifacts behind
+`PERFORMANCE_REPORT.md` for the Express/SQLite backend. The runner starts a fresh in-memory database, disables
 the application rate limiter for the duration of the run, seeds 20 clients with
 150 entries each, runs one scenario, and shuts the backend down.
 
@@ -41,5 +41,6 @@ PROFILE_WRAPPER=1 PROFILE_DURATION_MS=120000 DURATION=60s \
 ```
 
 Set `BREAKING_PROFILE=extended` for the staged 25-to-500-VU breaking run.
-API ETags are disabled by default by the runner; set `ETAG_ENABLED=1` for the
-comparison/control behavior.
+The backend disables API ETags by default; set `ETAG_ENABLED=1` to restore
+Express ETag generation, which is the control behavior used for that
+comparison.
