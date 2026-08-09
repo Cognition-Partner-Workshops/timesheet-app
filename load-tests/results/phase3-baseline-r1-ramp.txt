@@ -1,0 +1,14 @@
+Scenario: ramp
+Run: phase3-baseline-r1
+HTTP requests: 56877
+Throughput (requests/s): 752.87
+HTTP p95 (ms): 133.24
+HTTP p99 (ms): 177.43
+HTTP failure rate: 0.00%
+
+Endpoint trends:
+endpoint_create_entry: count=11375 p95=169.99ms p99=210.72ms
+endpoint_list_clients: count=11376 p95=107.81ms p99=140.44ms
+endpoint_list_entries: count=11375 p95=118.66ms p99=150.08ms
+endpoint_login: count=11376 p95=76.12ms p99=105.59ms
+endpoint_report: count=11375 p95=138.99ms p99=172.94ms

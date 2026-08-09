@@ -1,0 +1,14 @@
+Scenario: workflow
+Run: phase3-control-a1
+HTTP requests: 22877
+Throughput (requests/s): 752.54
+HTTP p95 (ms): 63.24
+HTTP p99 (ms): 90.11
+HTTP failure rate: 0.00%
+
+Endpoint trends:
+endpoint_create_entry: count=4575 p95=80.05ms p99=102.86ms
+endpoint_list_clients: count=4576 p95=51.05ms p99=71.44ms
+endpoint_list_entries: count=4575 p95=55.17ms p99=73.83ms
+endpoint_login: count=4576 p95=37.90ms p99=61.12ms
+endpoint_report: count=4575 p95=69.88ms p99=95.50ms

@@ -1,0 +1,14 @@
+Scenario: workflow
+Run: phase5-fixed-w1-workflow
+HTTP requests: 123987
+Throughput (requests/s): 687.26
+HTTP p95 (ms): 77.70
+HTTP p99 (ms): 98.90
+HTTP failure rate: 0.00%
+
+Endpoint trends:
+endpoint_create_entry: count=24797 p95=96.07ms p99=117.05ms
+endpoint_list_clients: count=24798 p95=56.72ms p99=71.01ms
+endpoint_list_entries: count=24797 p95=58.00ms p99=72.60ms
+endpoint_login: count=24798 p95=54.54ms p99=68.08ms
+endpoint_report: count=24797 p95=80.44ms p99=96.38ms

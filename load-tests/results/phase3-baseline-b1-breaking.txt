@@ -1,0 +1,14 @@
+Scenario: breaking
+Run: phase3-baseline-b1
+HTTP requests: 65407
+Throughput (requests/s): 804.77
+HTTP p95 (ms): 283.08
+HTTP p99 (ms): 397.25
+HTTP failure rate: 0.00%
+
+Endpoint trends:
+endpoint_create_entry: count=13081 p95=248.38ms p99=334.37ms
+endpoint_list_clients: count=13082 p95=247.37ms p99=312.86ms
+endpoint_list_entries: count=13081 p95=388.93ms p99=483.48ms
+endpoint_login: count=13082 p95=235.77ms p99=293.81ms
+endpoint_report: count=13081 p95=256.38ms p99=314.28ms

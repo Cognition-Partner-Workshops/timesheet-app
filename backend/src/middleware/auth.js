@@ -1,5 +1,32 @@
 const { getDatabase } = require('../database/init');
 
+const MAX_KNOWN_USERS = 1000;
+const knownUsersByDatabase = new WeakMap();
+
+function getKnownUsers(db) {
+  let knownUsers = knownUsersByDatabase.get(db);
+  if (!knownUsers) {
+    knownUsers = new Map();
+    knownUsersByDatabase.set(db, knownUsers);
+  }
+  return knownUsers;
+}
+
+function rememberUser(db, email) {
+  const knownUsers = getKnownUsers(db);
+  if (knownUsers.has(email)) {
+    knownUsers.delete(email);
+  }
+  knownUsers.set(email, true);
+  if (knownUsers.size > MAX_KNOWN_USERS) {
+    knownUsers.delete(knownUsers.keys().next().value);
+  }
+}
+
+function isAuthCacheEnabled() {
+  return process.env.AUTH_CACHE_ENABLED !== '0';
+}
+
 // Simple email-based authentication middleware
 function authenticateUser(req, res, next) {
   const userEmail = req.headers['x-user-email'];
@@ -15,6 +42,11 @@ function authenticateUser(req, res, next) {
   }
 
   const db = getDatabase();
+  const knownUsers = getKnownUsers(db);
+  if (isAuthCacheEnabled() && knownUsers.has(userEmail)) {
+    req.userEmail = userEmail;
+    return next();
+  }
   
   // Check if user exists, create if not
   db.get('SELECT email FROM users WHERE email = ?', [userEmail], (err, row) => {
@@ -31,10 +63,16 @@ function authenticateUser(req, res, next) {
           return res.status(500).json({ error: 'Failed to create user' });
         }
         
+        if (isAuthCacheEnabled()) {
+          rememberUser(db, userEmail);
+        }
         req.userEmail = userEmail;
         next();
       });
     } else {
+      if (isAuthCacheEnabled()) {
+        rememberUser(db, userEmail);
+      }
       req.userEmail = userEmail;
       next();
     }

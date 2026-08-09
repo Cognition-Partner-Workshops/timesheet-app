@@ -1,0 +1,14 @@
+Scenario: workflow
+Run: phase3-baseline-w2
+HTTP requests: 121137
+Throughput (requests/s): 671.43
+HTTP p95 (ms): 81.35
+HTTP p99 (ms): 107.73
+HTTP failure rate: 0.00%
+
+Endpoint trends:
+endpoint_create_entry: count=24227 p95=96.33ms p99=128.48ms
+endpoint_list_clients: count=24228 p95=64.20ms p99=89.50ms
+endpoint_list_entries: count=24227 p95=71.60ms p99=105.09ms
+endpoint_login: count=24228 p95=45.30ms p99=69.37ms
+endpoint_report: count=24227 p95=82.74ms p99=110.50ms

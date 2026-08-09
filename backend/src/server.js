@@ -14,6 +14,9 @@ const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+if (process.env.ETAG_ENABLED !== '1') {
+  app.disable('etag');
+}
 
 // Security middleware
 app.use(helmet());
@@ -23,14 +26,20 @@ app.use(cors({
 }));
 
 // Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
-});
-app.use(limiter);
+const rateLimitWindowMs = Number.parseInt(process.env.RATE_LIMIT_WINDOW_MS || '', 10) || 15 * 60 * 1000;
+const rateLimitMax = Number.parseInt(process.env.RATE_LIMIT_MAX || '', 10);
+if (rateLimitMax !== 0) {
+  app.use(rateLimit({
+    windowMs: rateLimitWindowMs,
+    max: Number.isNaN(rateLimitMax) ? 100 : rateLimitMax
+  }));
+}
 
 // Logging
-app.use(morgan('combined'));
+const morganFormat = process.env.MORGAN_FORMAT || 'combined';
+if (morganFormat !== 'off') {
+  app.use(morgan(morganFormat));
+}
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));

@@ -1,0 +1,14 @@
+Scenario: breaking
+Run: phase5-fixed-b4-breaking
+HTTP requests: 103511
+Throughput (requests/s): 784.18
+HTTP p95 (ms): 511.69
+HTTP p99 (ms): 696.02
+HTTP failure rate: 0.00%
+
+Endpoint trends:
+endpoint_create_entry: count=20781 p95=491.08ms p99=689.34ms
+endpoint_list_clients: count=20652 p95=382.27ms p99=568.13ms
+endpoint_list_entries: count=20652 p95=611.08ms p99=737.66ms
+endpoint_login: count=20807 p95=571.69ms p99=728.31ms
+endpoint_report: count=20619 p95=444.14ms p99=578.77ms
