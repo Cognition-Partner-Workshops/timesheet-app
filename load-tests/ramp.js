@@ -1,4 +1,4 @@
-import { createWorkEntry, listClients, listWorkEntries, login, pause, randomClient, viewReport } from './lib.js';
+import { listClients, login, runIteration } from './lib.js';
 
 export const options = {
   scenarios: {
@@ -34,13 +34,7 @@ export function setup() {
 }
 
 export default function runRamp(clientIds) {
-  login();
-  const clientId = randomClient(clientIds);
-  createWorkEntry(clientId);
-  listWorkEntries(clientId);
-  listClients();
-  viewReport(clientId);
-  pause(0.2);
+  runIteration(clientIds);
 }
 
 export { handleSummary } from './summary.js';

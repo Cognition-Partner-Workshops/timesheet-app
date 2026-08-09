@@ -90,6 +90,16 @@ export function viewReport(clientId) {
   return response;
 }
 
+export function runIteration(clientIds) {
+  login();
+  const clientId = randomClient(clientIds);
+  createWorkEntry(clientId);
+  listWorkEntries(clientId);
+  listClients();
+  viewReport(clientId);
+  pause(0.2);
+}
+
 export function randomClient(clientIds) {
   return clientIds[(__VU + __ITER) % clientIds.length];
 }
