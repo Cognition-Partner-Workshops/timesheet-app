@@ -28,8 +28,7 @@ const getClientAndWorkEntries = (db, clientId, userEmail, workEntriesQuery, call
   );
 };
 
-// Get hourly report for specific client
-router.get('/client/:clientId', (req, res) => {
+const withClientReport = (req, res, workEntriesQuery, handler) => {
   const clientId = Number.parseInt(req.params.clientId, 10);
 
   if (Number.isNaN(clientId)) {
@@ -40,10 +39,7 @@ router.get('/client/:clientId', (req, res) => {
     getDatabase(),
     clientId,
     req.userEmail,
-    `SELECT id, hours, description, date, created_at, updated_at
-     FROM work_entries
-     WHERE client_id = ? AND user_email = ?
-     ORDER BY date DESC`,
+    workEntriesQuery,
     (err, client, workEntries) => {
       if (err) {
         console.error('Database error:', err);
@@ -54,6 +50,21 @@ router.get('/client/:clientId', (req, res) => {
         return res.status(404).json({ error: 'Client not found' });
       }
 
+      handler(client, workEntries);
+    },
+  );
+};
+
+// Get hourly report for specific client
+router.get('/client/:clientId', (req, res) => {
+  withClientReport(
+    req,
+    res,
+    `SELECT id, hours, description, date, created_at, updated_at
+     FROM work_entries
+     WHERE client_id = ? AND user_email = ?
+     ORDER BY date DESC`,
+    (client, workEntries) => {
       const totalHours = workEntries.reduce(
         (sum, entry) => sum + Number.parseFloat(entry.hours),
         0,
@@ -71,30 +82,14 @@ router.get('/client/:clientId', (req, res) => {
 
 // Export client report as CSV
 router.get('/export/csv/:clientId', (req, res) => {
-  const clientId = Number.parseInt(req.params.clientId, 10);
-
-  if (Number.isNaN(clientId)) {
-    return res.status(400).json({ error: 'Invalid client ID' });
-  }
-
-  getClientAndWorkEntries(
-    getDatabase(),
-    clientId,
-    req.userEmail,
+  withClientReport(
+    req,
+    res,
     `SELECT hours, description, date, created_at
      FROM work_entries
      WHERE client_id = ? AND user_email = ?
      ORDER BY date DESC`,
-    (err, client, workEntries) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ error: 'Internal server error' });
-      }
-
-      if (!client) {
-        return res.status(404).json({ error: 'Client not found' });
-      }
-
+    (client, workEntries) => {
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const filename = `${client.name.replace(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.csv`;
       const tempPath = path.join(__dirname, '../../temp', filename);
@@ -138,30 +133,14 @@ router.get('/export/csv/:clientId', (req, res) => {
 
 // Export client report as PDF
 router.get('/export/pdf/:clientId', (req, res) => {
-  const clientId = Number.parseInt(req.params.clientId, 10);
-
-  if (Number.isNaN(clientId)) {
-    return res.status(400).json({ error: 'Invalid client ID' });
-  }
-
-  getClientAndWorkEntries(
-    getDatabase(),
-    clientId,
-    req.userEmail,
+  withClientReport(
+    req,
+    res,
     `SELECT hours, description, date, created_at
      FROM work_entries
      WHERE client_id = ? AND user_email = ?
      ORDER BY date DESC`,
-    (err, client, workEntries) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ error: 'Internal server error' });
-      }
-
-      if (!client) {
-        return res.status(404).json({ error: 'Client not found' });
-      }
-
+    (client, workEntries) => {
       const doc = new PDFDocument();
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const filename = `${client.name.replace(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.pdf`;
