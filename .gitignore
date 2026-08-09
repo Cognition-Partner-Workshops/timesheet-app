@@ -2,3 +2,4 @@
 /load-tests/results/*.log
 /load-tests/results/*.cpuprofile
 /load-tests/results/cpu-monitor*
+/load-tests/results/*cpu*.txt

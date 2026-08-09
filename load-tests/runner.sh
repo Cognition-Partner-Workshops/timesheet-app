@@ -24,13 +24,19 @@ fi
 
 cd "${ROOT}/backend"
 NODE_ARGS=()
-if [[ "${CPU_PROFILE:-0}" == "1" ]]; then
-  NODE_ARGS+=(--cpu-prof --cpu-prof-dir="${RESULTS_DIR}")
+if [[ "${PROFILE_WRAPPER:-0}" == "1" ]]; then
+  NODE_ARGS+=("${ROOT}/load-tests/profile-server.js")
+elif [[ "${CPU_PROFILE:-0}" == "1" ]]; then
+  NODE_ARGS+=(--cpu-prof --cpu-prof-dir="${RESULTS_DIR}" "${ROOT}/backend/src/server.js")
+else
+  NODE_ARGS+=("${ROOT}/backend/src/server.js")
 fi
 PORT="${PORT}" RATE_LIMIT_MAX=0 RATE_LIMIT_WINDOW_MS=900000 \
 AUTH_CACHE_ENABLED="${AUTH_CACHE_ENABLED:-1}" \
 MORGAN_FORMAT="${MORGAN_FORMAT:-combined}" \
-node "${NODE_ARGS[@]}" src/server.js >"${RESULTS_DIR}/${RUN_ID}-backend.log" 2>&1 &
+PROFILE_OUTPUT="${PROFILE_OUTPUT:-${RESULTS_DIR}/${RUN_ID}.cpuprofile}" \
+PROFILE_DURATION_MS="${PROFILE_DURATION_MS:-180000}" \
+node "${NODE_ARGS[@]}" >"${RESULTS_DIR}/${RUN_ID}-backend.log" 2>&1 &
 SERVER_PID=$!
 cleanup() {
   if [[ "${CPU_PROFILE:-0}" == "1" ]]; then

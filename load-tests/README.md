@@ -31,3 +31,13 @@ configured evaluation delay. Endpoint-specific trends (`endpoint_login`,
 The backend retains the default 15-minute/100-request-per-IP limiter unless
 `RATE_LIMIT_WINDOW_MS` or `RATE_LIMIT_MAX` are set. `RATE_LIMIT_MAX=0` disables
 it, which is necessary because all k6 VUs share one source IP.
+
+Set `PROFILE_WRAPPER=1` to collect an in-process V8 profile. The wrapper writes
+the ignored `.cpuprofile` when the runner stops the server:
+
+```bash
+PROFILE_WRAPPER=1 PROFILE_DURATION_MS=120000 DURATION=60s \
+  RUN_ID=profile-w50 ./load-tests/runner.sh workflow
+```
+
+Set `BREAKING_PROFILE=extended` for the staged 25-to-500-VU breaking run.

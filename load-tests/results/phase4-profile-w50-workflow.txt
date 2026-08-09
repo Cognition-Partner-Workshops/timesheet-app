@@ -1,0 +1,14 @@
+Scenario: workflow
+Run: phase4-profile-w50
+HTTP requests: 33967
+Throughput (requests/s): 1123.71
+HTTP p95 (ms): 11.24
+HTTP p99 (ms): 18.41
+HTTP failure rate: 0.00%
+
+Endpoint trends:
+endpoint_create_entry: count=6793 p95=15.48ms p99=25.86ms
+endpoint_list_clients: count=6794 p95=7.38ms p99=12.09ms
+endpoint_list_entries: count=6793 p95=8.54ms p99=12.78ms
+endpoint_login: count=6794 p95=7.96ms p99=15.29ms
+endpoint_report: count=6793 p95=12.08ms p99=19.61ms
