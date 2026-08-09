@@ -31,11 +31,12 @@ Fix the failing test or implementation and rerun the relevant suite.
 
 ## Coverage
 
-Head total line coverage must not be lower than the base branch's total line
-coverage. The base is computed by checking out the PR base ref and running the
-same commands; if that ref predates the coverage tooling, the comparison is
-reported as baseline unavailable and skipped. Lines changed in `frontend/src`
-must have at least **80%** coverage; a patch with no coverable changed lines is
+Backend and frontend head total line coverage must each be at least as high as
+the corresponding base branch total. The base is computed by checking out the
+PR base ref and running the same commands; if that ref predates the coverage
+tooling, the comparison is reported as baseline unavailable and skipped.
+Coverable lines changed in either `backend/src` or `frontend/src` must have at
+least **80%** coverage per package; a package with no coverable changed lines is
 N/A and passes.
 
 ```sh
@@ -48,12 +49,16 @@ pass.
 
 ## Security
 
-Runs `npm audit --json` in both packages. The exact threshold is **0 high and 0
-critical** vulnerabilities.
+Runs `npm audit --json` in both packages and compares advisory identities with
+the base branch. The exact threshold is **0 new high or critical**
+vulnerabilities. The repository has a pre-existing high/critical dependency
+backlog, so those findings are reported but do not fail a PR unless the PR
+introduces a new finding. If the base audit cannot be produced, the gate is
+skipped and reports the head counts.
 
 ```sh
-npm audit --prefix backend
-npm audit --prefix frontend
+(cd backend && npm audit --json)
+(cd frontend && npm audit --json)
 ```
 
 Upgrade affected dependencies, regenerate lockfiles, and rerun the audits.

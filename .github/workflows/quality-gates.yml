@@ -29,7 +29,6 @@ jobs:
         run: npm ci --prefix backend && npm ci --prefix frontend
       - name: Run lint and formatting checks
         id: checks
-        continue-on-error: true
         run: |
           set +e
           npm run lint --prefix frontend
@@ -65,7 +64,6 @@ jobs:
       - run: npm ci --prefix backend && npm ci --prefix frontend
       - name: Run unit tests
         id: tests
-        continue-on-error: true
         run: |
           set +e
           npm test --prefix backend
@@ -101,69 +99,123 @@ jobs:
       - run: npm ci --prefix backend && npm ci --prefix frontend
       - name: Compare total and changed-line coverage
         id: coverage
-        continue-on-error: true
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          set +e
-          npm run test:coverage --prefix backend
-          BACKEND_TEST=$?
-          npm run test:coverage --prefix frontend
-          FRONTEND_TEST=$?
-          HEAD_LINES=$(node -e "const fs=require('./frontend/coverage/coverage-summary.json'); console.log(fs.total.lines.pct)")
-          BASE_DIR=$(mktemp -d)
-          BASE_AVAILABLE=true
-          git worktree add --detach "$BASE_DIR" "$BASE_SHA" >/dev/null 2>&1 || BASE_AVAILABLE=false
-          if [ "$BASE_AVAILABLE" = true ]; then
-            npm ci --prefix "$BASE_DIR/frontend" >/dev/null 2>&1 && npm run test:coverage --prefix "$BASE_DIR/frontend" >/dev/null 2>&1 || BASE_AVAILABLE=false
-          fi
-          BASE_LINES=""
-          if [ "$BASE_AVAILABLE" = true ] && [ -f "$BASE_DIR/frontend/coverage/coverage-summary.json" ]; then
-            BASE_LINES=$(node -e "const fs=require('$BASE_DIR/frontend/coverage/coverage-summary.json'); console.log(fs.total.lines.pct)")
-          else
-            BASE_AVAILABLE=false
-          fi
-          git worktree remove --force "$BASE_DIR" >/dev/null 2>&1 || true
-          PATCH=$(python3 - "$BASE_SHA" <<'PY'
-          import subprocess, re, json
-          base = subprocess.check_output(["git", "diff", "--unified=0", f"{__import__('os').environ['BASE_SHA']}...HEAD", "--", "frontend/src"], text=True)
-          changed = {}
-          file = None
-          for line in base.splitlines():
-              if line.startswith("+++ b/"):
-                  file = line[6:]
-              elif line.startswith("@@") and file:
-                  m = re.search(r"\+(\d+)(?:,(\d+))?", line)
-                  if m:
-                      start, count = int(m.group(1)), int(m.group(2) or 1)
-                      changed[file] = list(range(start, start + count))
-          lcov = open("frontend/coverage/lcov.info", encoding="utf-8").read()
-          covered = total = 0
-          current = None
-          requested = set()
-          for line in lcov.splitlines():
-              if line.startswith("SF:"):
-                  current = line[3:]
-              elif line.startswith("DA:") and current:
-                  n, hits = line[3:].split(",")[:2]
-                  lookup = "frontend/" + current.removeprefix("file://").split("/frontend/")[-1]
-                  if n.isdigit() and int(n) in changed.get(lookup, []):
-                      total += 1
-                      covered += int(hits.split(",")[0]) > 0
-          print("N/A" if not total else f"{covered / total * 100:.1f}")
-          PY
+          python3 <<'PY'
+          import json
+          import os
+          import re
+          import shutil
+          import subprocess
+          import tempfile
+          from pathlib import Path
+
+          base_sha = os.environ["BASE_SHA"]
+          packages = ("backend", "frontend")
+
+          def run(command, cwd=None):
+              return subprocess.run(command, cwd=cwd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode
+
+          def summary(path):
+              try:
+                  data = json.loads(Path(path).read_text())
+                  return float(data["total"]["lines"]["pct"])
+              except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+                  return None
+
+          def changed_lines(diff):
+              changed = {}
+              current = None
+              for line in diff.splitlines():
+                  if line.startswith("+++ b/"):
+                      current = line[6:]
+                  elif line.startswith("@@") and current:
+                      match = re.search(r"\+(\d+)(?:,(\d+))?", line)
+                      if match:
+                          start = int(match.group(1))
+                          count = int(match.group(2) or 1)
+                          changed.setdefault(current, set()).update(range(start, start + count))
+              return changed
+
+          def patch_percentage(package, changed, lcov_path):
+              covered = total = 0
+              current = None
+              try:
+                  lines = Path(lcov_path).read_text().splitlines()
+              except OSError:
+                  return None
+              for line in lines:
+                  if line.startswith("SF:"):
+                      current = line[3:]
+                  elif line.startswith("DA:") and current:
+                      number, hits = line[3:].split(",", 2)[:2]
+                      normalized = current.removeprefix("file://")
+                      suffix = normalized.split(f"/{package}/", 1)[-1]
+                      filename = f"{package}/{suffix}"
+                      if number.isdigit() and int(number) in changed.get(filename, set()):
+                          total += 1
+                          covered += int(hits.split(",", 1)[0]) > 0
+              return None if total == 0 else covered * 100 / total
+
+          head_status = [run(["npm", "run", "test:coverage"], package) for package in packages]
+          diff = subprocess.check_output(
+              ["git", "diff", "--unified=0", f"{base_sha}...HEAD", "--", "backend/src", "frontend/src"],
+              text=True,
           )
-          STATUS=pass
-          [ "$BACKEND_TEST" -eq 0 ] && [ "$FRONTEND_TEST" -eq 0 ] || STATUS=fail
-          if [ "$PATCH" != "N/A" ] && awk "BEGIN {exit !($PATCH >= 80)}"; then :; else [ "$PATCH" = "N/A" ] || STATUS=fail; fi
-          if [ "$BASE_AVAILABLE" = false ]; then
-            METRIC="lines ${HEAD_LINES}% vs baseline unavailable; patch ${PATCH}%"
-          else
-            awk "BEGIN {exit !($HEAD_LINES + 0 >= $BASE_LINES + 0)}" || STATUS=fail
-            METRIC="lines ${HEAD_LINES}% vs base ${BASE_LINES}%; patch ${PATCH}%"
-          fi
-          printf '{"gate":"coverage","status":"%s","metric":"%s","fix":"See [Coverage](QUALITY_GATES.md#coverage)"}\n' "$STATUS" "$METRIC" > coverage.json
-          [ "$STATUS" = pass ] || exit 1
+          changed = changed_lines(diff)
+          head = {package: summary(f"{package}/coverage/coverage-summary.json") for package in packages}
+          patch = {
+              package: patch_percentage(package, changed, f"{package}/coverage/lcov.info")
+              for package in packages
+          }
+
+          baseline = {}
+          worktree = tempfile.mkdtemp()
+          baseline_available = run(["git", "worktree", "add", "--detach", worktree, base_sha]) == 0
+          if baseline_available:
+              for package in packages:
+                  if run(["npm", "ci"], Path(worktree, package)) != 0 or run(
+                      ["npm", "run", "test:coverage"], Path(worktree, package)
+                  ) != 0:
+                      baseline_available = False
+                      break
+              if baseline_available:
+                  baseline = {
+                      package: summary(Path(worktree, package, "coverage", "coverage-summary.json"))
+                      for package in packages
+                  }
+                  baseline_available = all(value is not None for value in baseline.values())
+          subprocess.run(["git", "worktree", "remove", "--force", worktree], check=False)
+          shutil.rmtree(worktree, ignore_errors=True)
+
+          status = "pass"
+          if any(code != 0 for code in head_status) or any(value is None for value in head.values()):
+              status = "fail"
+          for value in patch.values():
+              if value is not None and value < 80:
+                  status = "fail"
+          if baseline_available:
+              for package in packages:
+                  if head[package] < baseline[package]:
+                      status = "fail"
+              baseline_text = "; ".join(
+                  f"{package} {head[package]:.1f}% vs base {baseline[package]:.1f}%" for package in packages
+              )
+          else:
+              baseline_text = "; ".join(f"{package} {head[package] or 0:.1f}% vs baseline unavailable" for package in packages)
+          patch_text = "; ".join(
+              f"{package} patch {'N/A' if patch[package] is None else f'{patch[package]:.1f}%'}" for package in packages
+          )
+          metric = f"{baseline_text}; {patch_text}"
+          Path("coverage.json").write_text(json.dumps({
+              "gate": "coverage",
+              "status": status,
+              "metric": metric,
+              "fix": "See [Coverage](QUALITY_GATES.md#coverage)",
+          }) + "\n")
+          raise SystemExit(0 if status == "pass" else 1)
+          PY
       - if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -185,18 +237,91 @@ jobs:
       - run: npm ci --prefix backend && npm ci --prefix frontend
       - name: Audit dependencies
         id: audit
-        continue-on-error: true
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          set +e
-          npm audit --json --prefix backend > backend-audit.json 2>/dev/null
-          npm audit --json --prefix frontend > frontend-audit.json 2>/dev/null
-          HIGH=$(jq -r '(.metadata.vulnerabilities.high // 0)' backend-audit.json) 
-          HIGH=$((HIGH + $(jq -r '(.metadata.vulnerabilities.high // 0)' frontend-audit.json)))
-          CRITICAL=$(jq -r '(.metadata.vulnerabilities.critical // 0)' backend-audit.json)
-          CRITICAL=$((CRITICAL + $(jq -r '(.metadata.vulnerabilities.critical // 0)' frontend-audit.json)))
-          if [ "$HIGH" -eq 0 ] && [ "$CRITICAL" -eq 0 ]; then STATUS=pass; else STATUS=fail; fi
-          printf '{"gate":"security","status":"%s","metric":"%s high / %s critical","fix":"See [Security](QUALITY_GATES.md#security)"}\n' "$STATUS" "$HIGH" "$CRITICAL" > security.json
-          [ "$STATUS" = pass ] || exit 1
+          python3 <<'PY'
+          import json
+          import os
+          import shutil
+          import subprocess
+          import tempfile
+          from pathlib import Path
+
+          packages = ("backend", "frontend")
+          base_sha = os.environ["BASE_SHA"]
+
+          def audit(directory, output):
+              with open(output, "w") as stream:
+                  return subprocess.run(
+                      ["npm", "audit", "--json"],
+                      cwd=directory,
+                      stdout=stream,
+                      stderr=subprocess.DEVNULL,
+                  ).returncode
+
+          def read_json(path):
+              try:
+                  return json.loads(Path(path).read_text())
+              except (OSError, ValueError, json.JSONDecodeError):
+                  return {}
+
+          def findings(data):
+              result = set()
+              for module, item in (data.get("vulnerabilities") or {}).items():
+                  if item.get("severity") not in {"high", "critical"}:
+                      continue
+                  via = item.get("via") or []
+                  advisories = [entry for entry in via if isinstance(entry, dict)]
+                  if advisories:
+                      for advisory in advisories:
+                          identity = advisory.get("source") or advisory.get("url") or advisory.get("title")
+                          result.add(str(identity or f"{module}|{item.get('severity')}|{item.get('range')}"))
+                  else:
+                      result.add(f"{module}|{item.get('severity')}|{item.get('range')}")
+              return result
+
+          head_dir = Path(tempfile.mkdtemp())
+          head_sets = {}
+          for package in packages:
+              audit(package, head_dir / f"{package}-head.json")
+              head_sets[package] = findings(read_json(head_dir / f"{package}-head.json"))
+
+          baseline_dir = Path(tempfile.mkdtemp())
+          baseline_available = subprocess.run(
+              ["git", "worktree", "add", "--detach", str(baseline_dir), base_sha],
+              stdout=subprocess.DEVNULL,
+              stderr=subprocess.DEVNULL,
+          ).returncode == 0
+          base_sets = {}
+          if baseline_available:
+              for package in packages:
+                  audit(baseline_dir / package, baseline_dir / f"{package}-base.json")
+                  data = read_json(baseline_dir / f"{package}-base.json")
+                  if not data:
+                      baseline_available = False
+                      break
+                  base_sets[package] = findings(data)
+          subprocess.run(["git", "worktree", "remove", "--force", str(baseline_dir)], check=False)
+          shutil.rmtree(baseline_dir, ignore_errors=True)
+
+          head_high = sum(len(values) for values in head_sets.values())
+          if baseline_available:
+              new = sum(len(head_sets[package] - base_sets[package]) for package in packages)
+              pre_existing = head_high - new
+              status = "pass" if new == 0 else "fail"
+              metric = f"{new} new ({pre_existing} pre-existing high/critical)"
+          else:
+              status = "skipped"
+              metric = f"baseline unavailable; {head_high} head high/critical"
+          Path("security.json").write_text(json.dumps({
+              "gate": "security",
+              "status": status,
+              "metric": metric,
+              "fix": "See [Security](QUALITY_GATES.md#security)",
+          }) + "\n")
+          raise SystemExit(0 if status != "fail" else 1)
+          PY
       - if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -216,7 +341,6 @@ jobs:
       - run: npm ci --prefix frontend
       - name: Typecheck
         id: typecheck
-        continue-on-error: true
         run: |
           npm run typecheck --prefix frontend
           STATUS=$?
@@ -244,7 +368,6 @@ jobs:
       - run: npm ci --prefix frontend
       - name: Compare gzipped bundles
         id: bundle
-        continue-on-error: true
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
@@ -293,19 +416,37 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPOSITORY: ${{ github.repository }}
+          SERVER_URL: ${{ github.server_url }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set +e
           python3 - <<'PY'
           import glob, json
-          rows = []
+          import os
+          expected = ["lint", "unit-tests", "coverage", "security", "types", "bundle-size"]
+          rows = {}
           for path in glob.glob("quality-results/*.json"):
-              try: rows.append(json.load(open(path)))
+              try:
+                  item = json.load(open(path))
+                  rows[item["gate"]] = item
               except Exception: pass
-          order = ["lint", "unit-tests", "coverage", "security", "types", "bundle-size"]
-          rows.sort(key=lambda r: order.index(r["gate"]) if r["gate"] in order else 99)
+          fixes = {
+              "lint": "lint",
+              "unit-tests": "unit-tests",
+              "coverage": "coverage",
+              "security": "security",
+              "types": "types",
+              "bundle-size": "bundle-size",
+          }
+          base_url = f"{os.environ['SERVER_URL']}/{os.environ['REPOSITORY']}/blob/{os.environ['HEAD_SHA']}/QUALITY_GATES.md"
           lines = ["<!-- quality-gates-dashboard -->", "## Continuous quality gates", "", "| Gate | Status | Metric | How to fix |", "| --- | --- | --- | --- |"]
-          for row in rows:
-              lines.append(f"| {row['gate']} | {row['status']} | {row['metric']} | {row['fix']} |")
+          for gate in expected:
+              row = rows.get(gate)
+              if row is None:
+                  lines.append(f"| {gate} | skipped | no result | [Troubleshooting]({base_url}#adjusting-thresholds) |")
+              else:
+                  fix = f"[Troubleshooting]({base_url}#{fixes[gate]})"
+                  lines.append(f"| {gate} | {row['status']} | {row['metric']} | {fix} |")
           body = "\n".join(lines)
           print(body)
           open("dashboard.md", "w").write(body + "\n")
