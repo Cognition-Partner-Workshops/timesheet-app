@@ -105,15 +105,15 @@ async function initializeDatabase() {
  * @returns {Promise<void>}
  */
 function closeDatabase() {
-  return new Promise((resolve, reject) => {
-    if (isClosed) {
-      // Already closed, resolve immediately
+  return new Promise((resolve) => {
+    // Nothing to do if already closed or never opened
+    if (isClosed || !db) {
       resolve();
       return;
     }
-    
+
+    // Another caller is closing; resolve once it finishes
     if (isClosing) {
-      // Currently closing, wait for it to complete
       const checkClosed = setInterval(() => {
         if (isClosed) {
           clearInterval(checkClosed);
@@ -122,13 +122,7 @@ function closeDatabase() {
       }, 10);
       return;
     }
-    
-    if (!db) {
-      // No database connection, resolve immediately
-      resolve();
-      return;
-    }
-    
+
     isClosing = true;
     db.close((err) => {
       isClosed = true;
