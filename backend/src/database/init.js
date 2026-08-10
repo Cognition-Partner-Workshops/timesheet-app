@@ -26,6 +26,11 @@ function getDatabase() {
   return db;
 }
 
+// Shared column/constraint fragments used by multiple tables
+const AUDIT_TIMESTAMP_COLUMNS = `created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP`;
+const USER_EMAIL_FK = `FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE`;
+
 const SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS users (
     email TEXT PRIMARY KEY,
@@ -38,9 +43,8 @@ const SCHEMA_STATEMENTS = [
     department TEXT,
     email TEXT,
     user_email TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
+    ${AUDIT_TIMESTAMP_COLUMNS},
+    ${USER_EMAIL_FK}
   )`,
   `CREATE TABLE IF NOT EXISTS work_entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,10 +53,9 @@ const SCHEMA_STATEMENTS = [
     hours DECIMAL(5,2) NOT NULL,
     description TEXT,
     date DATE NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ${AUDIT_TIMESTAMP_COLUMNS},
     FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE,
-    FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
+    ${USER_EMAIL_FK}
   )`,
   // Indexes for common lookup patterns (per-user filtering and date ranges)
   `CREATE INDEX IF NOT EXISTS idx_clients_user_email ON clients (user_email)`,
