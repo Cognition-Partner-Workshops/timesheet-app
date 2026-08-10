@@ -1,3 +1,10 @@
+/**
+ * Central Express error handler. Maps known error types to consistent
+ * JSON responses: Joi validation errors become 400s with per-field
+ * details, SQLite errors become generic 500s (internal details are not
+ * leaked to clients), and anything else uses `err.status`/`err.message`
+ * with a 500 fallback.
+ */
 function errorHandler(err, req, res, next) {
   console.error('Error:', err);
 

@@ -15,6 +15,10 @@ const { errorHandler } = require('./middleware/errorHandler');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const RATE_LIMIT_MAX_REQUESTS = 100; // per IP per window
+const JSON_BODY_LIMIT = '10mb';
+
 // Security middleware
 app.use(helmet());
 app.use(cors({
@@ -24,8 +28,8 @@ app.use(cors({
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  max: RATE_LIMIT_MAX_REQUESTS
 });
 app.use(limiter);
 
@@ -33,7 +37,7 @@ app.use(limiter);
 app.use(morgan('combined'));
 
 // Body parsing
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: JSON_BODY_LIMIT }));
 app.use(express.urlencoded({ extended: true }));
 
 // Health check
@@ -47,13 +51,13 @@ app.use('/api/clients', clientRoutes);
 app.use('/api/work-entries', workEntryRoutes);
 app.use('/api/reports', reportRoutes);
 
-// Error handling
-app.use(errorHandler);
-
-// 404 handler
+// 404 handler for unmatched routes
 app.use('*', (req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
+
+// Error handling (must be registered last)
+app.use(errorHandler);
 
 // Initialize database and start server
 async function startServer() {
