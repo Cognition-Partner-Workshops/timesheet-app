@@ -113,6 +113,46 @@ describe('Report Export Routes (real file generation)', () => {
       expect(response.status).toBe(200);
       expect(response.text.trim()).toBe('Date,Hours,Description,Created At');
     });
+
+    test('should quote a description containing a comma', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, [
+          { date: '2024-01-01', hours: 2, description: 'Design, build and ship', created_at: '2024-01-01' }
+        ]);
+      });
+
+      const response = await request(app).get('/api/reports/export/csv/1');
+
+      expect(response.status).toBe(200);
+      expect(response.text).toContain('"Design, build and ship"');
+    });
+
+    test('should escape double quotes inside a description', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, [
+          { date: '2024-01-01', hours: 2, description: 'Fix the "urgent" bug', created_at: '2024-01-01' }
+        ]);
+      });
+
+      const response = await request(app).get('/api/reports/export/csv/1');
+
+      expect(response.status).toBe(200);
+      // RFC 4180: embedded quotes are doubled and the whole field is quoted
+      expect(response.text).toContain('"Fix the ""urgent"" bug"');
+    });
+
+    test('should quote a description containing a newline', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, [
+          { date: '2024-01-01', hours: 2, description: 'Line one\nLine two', created_at: '2024-01-01' }
+        ]);
+      });
+
+      const response = await request(app).get('/api/reports/export/csv/1');
+
+      expect(response.status).toBe(200);
+      expect(response.text).toContain('"Line one\nLine two"');
+    });
   });
 
   describe('GET /api/reports/export/pdf/:clientId', () => {
