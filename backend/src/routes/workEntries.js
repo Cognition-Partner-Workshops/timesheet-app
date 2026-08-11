@@ -2,6 +2,7 @@ const express = require('express');
 const { getDatabase } = require('../database/init');
 const { authenticateUser } = require('../middleware/auth');
 const { workEntrySchema, updateWorkEntrySchema } = require('../validation/schemas');
+const { toDateOnly } = require('../utils/date');
 
 const router = express.Router();
 
@@ -104,7 +105,7 @@ router.post('/', (req, res, next) => {
         // Create work entry
         db.run(
           'INSERT INTO work_entries (client_id, user_email, hours, description, date) VALUES (?, ?, ?, ?, ?)',
-          [clientId, req.userEmail, hours, description || null, date],
+          [clientId, req.userEmail, hours, description || null, toDateOnly(date)],
           function(err) {
             if (err) {
               console.error('Database error:', err);
@@ -214,7 +215,7 @@ router.put('/:id', (req, res, next) => {
 
           if (value.date !== undefined) {
             updates.push('date = ?');
-            values.push(value.date);
+            values.push(toDateOnly(value.date));
           }
 
           updates.push('updated_at = CURRENT_TIMESTAMP');
