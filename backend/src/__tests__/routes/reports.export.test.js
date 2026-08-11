@@ -161,8 +161,15 @@ describe('Report Export Routes (real file generation)', () => {
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.length).toBeGreaterThan(0);
       expect(response.body.slice(0, 4).toString()).toBe('%PDF');
+
+      // 60 entries force at least one doc.addPage() (the y > 700 branch),
+      // so the rendered document must span multiple pages. PDFKit records the
+      // total page count as "/Count N" in the page-tree object.
+      const pdfText = response.body.toString('latin1');
+      const countMatch = pdfText.match(/\/Count (\d+)/);
+      expect(countMatch).not.toBeNull();
+      expect(Number(countMatch[1])).toBeGreaterThan(1);
     });
 
     test('should generate a PDF for a client with no entries', async () => {
