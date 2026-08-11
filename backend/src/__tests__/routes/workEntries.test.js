@@ -585,4 +585,154 @@ describe('Work Entry Routes', () => {
       expect(response.body.message).toBe('Work entry updated successfully');
     });
   });
+
+  describe('Unexpected failures', () => {
+    test('should forward synchronous errors from POST to the error handler', async () => {
+      getDatabase.mockImplementation(() => {
+        throw new Error('Connection pool exhausted');
+      });
+
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: 5, date: '2024-01-15' });
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Internal server error' });
+    });
+
+    test('should forward synchronous errors from PUT to the error handler', async () => {
+      getDatabase.mockImplementation(() => {
+        throw new Error('Connection pool exhausted');
+      });
+
+      const response = await request(app)
+        .put('/api/work-entries/1')
+        .send({ hours: 8 });
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Internal server error' });
+    });
+  });
+
+  describe('Hours boundary conditions', () => {
+    beforeEach(() => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        if (query.includes('work_entries we')) {
+          callback(null, { id: 1, hours: 24, client_name: 'Client A' });
+        } else {
+          callback(null, { id: 1 });
+        }
+      });
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.lastID = 1;
+        callback.call(this, null);
+      });
+    });
+
+    test('should accept exactly 24 hours', async () => {
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: 24, date: '2024-01-15' });
+
+      expect(response.status).toBe(201);
+    });
+
+    test('should reject more than 24 hours', async () => {
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: 24.01, date: '2024-01-15' });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Validation error' });
+    });
+
+    test('should reject zero hours', async () => {
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: 0, date: '2024-01-15' });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should reject negative hours', async () => {
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: -1, date: '2024-01-15' });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should accept the smallest positive fraction of an hour', async () => {
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: 0.01, date: '2024-01-15' });
+
+      expect(response.status).toBe(201);
+    });
+  });
+
+  describe('Input edge cases', () => {
+    test('should reject an empty request body on create', async () => {
+      const response = await request(app).post('/api/work-entries').send({});
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Validation error' });
+    });
+
+    test('should reject an empty request body on update', async () => {
+      const response = await request(app).put('/api/work-entries/1').send({});
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Validation error' });
+    });
+
+    test('should reject a non-ISO date', async () => {
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: 5, date: '15-01-2024' });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should reject a description longer than 1000 characters', async () => {
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: 5, date: '2024-01-15', description: 'x'.repeat(1001) });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should accept a description of exactly 1000 characters', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        if (query.includes('work_entries we')) {
+          callback(null, { id: 1, client_name: 'Client A' });
+        } else {
+          callback(null, { id: 1 });
+        }
+      });
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.lastID = 1;
+        callback.call(this, null);
+      });
+
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: 5, date: '2024-01-15', description: 'x'.repeat(1000) });
+
+      expect(response.status).toBe(201);
+    });
+
+    test('should return an empty list when the user has no entries', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, []);
+      });
+
+      const response = await request(app).get('/api/work-entries');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ workEntries: [] });
+    });
+  });
 });
