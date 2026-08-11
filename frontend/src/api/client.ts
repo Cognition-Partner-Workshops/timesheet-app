@@ -45,7 +45,7 @@ interface HealthResponse {
 }
 
 class ApiClient {
-  private client: AxiosInstance;
+  private readonly client: AxiosInstance;
 
   constructor() {
     this.client = axios.create({
