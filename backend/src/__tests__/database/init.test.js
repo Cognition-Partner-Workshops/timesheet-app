@@ -184,4 +184,52 @@ describe('Database Initialization', () => {
       expect(workEntriesQuery[0]).toContain('FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE');
     });
   });
+
+  describe('closeDatabase - Connection States', () => {
+    // Loads a module instance with its own connection state, so the singleton
+    // already closed by the tests above does not short-circuit closeDatabase.
+    const loadFreshModule = (close) => {
+      jest.resetModules();
+      jest.doMock('sqlite3', () => ({
+        verbose: jest.fn(() => ({
+          Database: jest.fn((path, callback) => {
+            callback(null);
+            return {
+              serialize: jest.fn((cb) => cb()),
+              run: jest.fn(),
+              close
+            };
+          })
+        }))
+      }));
+
+      return require('../../database/init');
+    };
+
+    test('should resolve when no connection was ever opened', async () => {
+      const freshModule = loadFreshModule(jest.fn((callback) => callback(null)));
+
+      await expect(freshModule.closeDatabase()).resolves.toBeUndefined();
+      expect(consoleLogSpy).not.toHaveBeenCalledWith('Database connection closed');
+    });
+
+    test('should wait for an in-progress close instead of closing twice', async () => {
+      let pendingCloseCallback;
+      const close = jest.fn((callback) => {
+        pendingCloseCallback = callback;
+      });
+
+      const freshModule = loadFreshModule(close);
+      freshModule.getDatabase();
+
+      const firstClose = freshModule.closeDatabase();
+      const secondClose = freshModule.closeDatabase();
+
+      pendingCloseCallback(null);
+      await Promise.all([firstClose, secondClose]);
+
+      expect(close).toHaveBeenCalledTimes(1);
+      expect(consoleLogSpy).toHaveBeenCalledWith('Database connection closed');
+    });
+  });
 });
