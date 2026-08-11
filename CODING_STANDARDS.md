@@ -124,8 +124,9 @@ checks anyway.
 ## CI
 
 `.github/workflows/pr-checks.yml` has a `Lint & Format` job that installs the root, backend, and
-frontend dependencies and then runs `npm run format:check`, backend `npm run lint`, and frontend
-`npm run lint`. Both lint scripts use `--max-warnings=0`, so warnings fail the build exactly like
+frontend dependencies (`npm ci --ignore-scripts`; no lifecycle script is needed to lint, and Sonar
+rule S6505 requires the flag) and then runs `npm run format:check`, backend `npm run lint`, and
+frontend `npm run lint`. Both lint scripts use `--max-warnings=0`, so warnings fail the build exactly like
 errors — the project has no lint debt to inherit, and this keeps it that way.
 
 ## Conventions when adding code
