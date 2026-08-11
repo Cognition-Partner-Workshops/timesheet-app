@@ -9,7 +9,7 @@ const app = express();
 app.use(express.json());
 app.use('/api/auth', authRoutes);
 // Add error handler for Joi validation
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   if (err.isJoi) {
     return res.status(400).json({ error: 'Validation error' });
   }
@@ -22,7 +22,7 @@ describe('Auth Routes', () => {
   beforeEach(() => {
     mockDb = {
       get: jest.fn(),
-      run: jest.fn()
+      run: jest.fn(),
     };
     getDatabase.mockReturnValue(mockDb);
   });
@@ -35,7 +35,7 @@ describe('Auth Routes', () => {
     test('should login existing user', async () => {
       const existingUser = {
         email: 'existing@example.com',
-        created_at: '2024-01-01T00:00:00.000Z'
+        created_at: '2024-01-01T00:00:00.000Z',
       };
 
       mockDb.get.mockImplementation((query, params, callback) => {
@@ -56,7 +56,7 @@ describe('Auth Routes', () => {
         callback(null, null); // User doesn't exist
       });
 
-      mockDb.run.mockImplementation(function(query, params, callback) {
+      mockDb.run.mockImplementation(function (query, params, callback) {
         callback.call(this, null);
       });
 
@@ -70,23 +70,19 @@ describe('Auth Routes', () => {
       expect(mockDb.run).toHaveBeenCalledWith(
         'INSERT INTO users (email) VALUES (?)',
         ['newuser@example.com'],
-        expect.any(Function)
+        expect.any(Function),
       );
     });
 
     test('should return 400 for invalid email', async () => {
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send({ email: 'invalid-email' });
+      const response = await request(app).post('/api/auth/login').send({ email: 'invalid-email' });
 
       expect(response.status).toBe(400);
       expect(response.body.error).toBe('Validation error');
     });
 
     test('should return 400 for missing email', async () => {
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send({});
+      const response = await request(app).post('/api/auth/login').send({});
 
       expect(response.status).toBe(400);
       expect(response.body.error).toBe('Validation error');
@@ -140,7 +136,7 @@ describe('Auth Routes', () => {
     test('should return current user info', async () => {
       const user = {
         email: 'test@example.com',
-        created_at: '2024-01-01T00:00:00.000Z'
+        created_at: '2024-01-01T00:00:00.000Z',
       };
 
       mockDb.get.mockImplementation((query, params, callback) => {

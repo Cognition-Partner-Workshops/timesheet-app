@@ -34,11 +34,11 @@ const queryClient = new QueryClient({
 
 const AppContent: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
-  
+
   if (isLoading) {
     return <div>Loading...</div>;
   }
-  
+
   return (
     <Router>
       <Routes>

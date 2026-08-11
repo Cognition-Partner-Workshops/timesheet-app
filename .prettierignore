@@ -1,0 +1,9 @@
+node_modules
+dist
+build
+coverage
+package-lock.json
+*.min.js
+*.log
+backend/test-results.txt
+frontend/src/assets
