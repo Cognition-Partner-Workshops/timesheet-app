@@ -21,6 +21,7 @@ All original requirements have been fully implemented:
 ## 🏗️ Architecture Overview
 
 ### Frontend (React + TypeScript + Material UI)
+
 - **Framework**: React 18 with TypeScript
 - **Build Tool**: Vite for fast development and optimized builds
 - **UI Library**: Material UI for professional, responsive design
@@ -29,6 +30,7 @@ All original requirements have been fully implemented:
 - **HTTP Client**: Axios with JWT interceptors
 
 **Key Pages:**
+
 - Login Page - Email-based authentication
 - Dashboard - Overview with statistics and recent entries
 - Clients Page - Manage client list with add/edit/delete
@@ -36,6 +38,7 @@ All original requirements have been fully implemented:
 - Reports Page - View and export client reports
 
 ### Backend (Node.js + Express)
+
 - **Runtime**: Node.js with Express framework
 - **Database**: SQLite in-memory (as specified)
 - **Authentication**: JWT tokens with 24-hour expiration
@@ -44,6 +47,7 @@ All original requirements have been fully implemented:
 - **Export**: PDFKit for PDF, csv-writer for CSV
 
 **API Structure:**
+
 - `/api/auth/*` - Authentication endpoints
 - `/api/clients/*` - Client CRUD operations
 - `/api/work-entries/*` - Work entry management
@@ -117,6 +121,7 @@ general/
 ### Quick Start (Development)
 
 **Terminal 1 - Backend:**
+
 ```bash
 cd backend
 npm install
@@ -125,6 +130,7 @@ npm run dev
 ```
 
 **Terminal 2 - Frontend:**
+
 ```bash
 cd frontend
 npm install
@@ -140,16 +146,19 @@ Open http://localhost:5173 and log in with any email address.
 ## ⚠️ Important Considerations
 
 ### Data Persistence
+
 - **In-memory database** means all data is lost on server restart
 - Suitable for development and testing
 - For production, modify `backend/src/database/init.js` to use file-based SQLite
 
 ### Authentication
+
 - Email-only authentication (no password)
 - Assumes trusted internal network
 - Consider SSO integration for production
 
 ### Environment Variables
+
 - Set strong `JWT_SECRET` in production
 - Configure `FRONTEND_URL` for CORS
 - See `.env.example` files for all options
@@ -172,6 +181,7 @@ Open http://localhost:5173 and log in with any email address.
 ## 📊 Technical Highlights
 
 ### Frontend
+
 - TypeScript strict mode for type safety
 - React Query for efficient data fetching and caching
 - Axios interceptors for automatic JWT token injection
@@ -179,6 +189,7 @@ Open http://localhost:5173 and log in with any email address.
 - Blob handling for file downloads (CSV/PDF)
 
 ### Backend
+
 - Modular route structure for maintainability
 - Middleware chain for authentication and validation
 - Async/await error handling
@@ -233,6 +244,7 @@ Open http://localhost:5173 and log in with any email address.
 ## 🎓 Learning Outcomes
 
 This project demonstrates:
+
 - Full-stack TypeScript development
 - JWT authentication implementation
 - RESTful API design
@@ -247,6 +259,7 @@ This project demonstrates:
 ## 📞 Support
 
 For questions or issues:
+
 1. Check the README.md for setup instructions
 2. Review DEPLOYMENT.md for production guidance
 3. Examine code comments for implementation details
@@ -257,6 +270,7 @@ For questions or issues:
 ## ✨ Summary
 
 A production-ready time tracking application has been successfully built with:
+
 - Modern, responsive UI
 - Secure JWT authentication
 - Complete CRUD operations

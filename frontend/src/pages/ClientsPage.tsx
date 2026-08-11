@@ -33,7 +33,12 @@ import { type Client } from '../types/api';
 const ClientsPage: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
-  const [formData, setFormData] = useState({ name: '', description: '', department: '', email: '' });
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    department: '',
+    email: '',
+  });
   const [error, setError] = useState('');
 
   const queryClient = useQueryClient();
@@ -44,10 +49,14 @@ const ClientsPage: React.FC = () => {
   });
 
   const createMutation = useMutation({
-    mutationFn: (clientData: { name: string; description?: string; department?: string; email?: string }) =>
-      apiClient.createClient(clientData),
+    mutationFn: (clientData: {
+      name: string;
+      description?: string;
+      department?: string;
+      email?: string;
+    }) => apiClient.createClient(clientData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      void queryClient.invalidateQueries({ queryKey: ['clients'] });
       handleClose();
     },
     onError: (err: unknown) => {
@@ -57,10 +66,15 @@ const ClientsPage: React.FC = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { name?: string; description?: string; department?: string; email?: string } }) =>
-      apiClient.updateClient(id, data),
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: number;
+      data: { name?: string; description?: string; department?: string; email?: string };
+    }) => apiClient.updateClient(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      void queryClient.invalidateQueries({ queryKey: ['clients'] });
       handleClose();
     },
     onError: (err: unknown) => {
@@ -72,7 +86,7 @@ const ClientsPage: React.FC = () => {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiClient.deleteClient(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      void queryClient.invalidateQueries({ queryKey: ['clients'] });
     },
     onError: (err: unknown) => {
       const error = err as { response?: { data?: { error?: string } } };
@@ -83,7 +97,7 @@ const ClientsPage: React.FC = () => {
   const deleteAllMutation = useMutation({
     mutationFn: () => apiClient.deleteAllClients(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      void queryClient.invalidateQueries({ queryKey: ['clients'] });
     },
     onError: (err: unknown) => {
       const error = err as { response?: { data?: { error?: string } } };
@@ -96,11 +110,11 @@ const ClientsPage: React.FC = () => {
   const handleOpen = (client?: Client) => {
     if (client) {
       setEditingClient(client);
-      setFormData({ 
-        name: client.name, 
+      setFormData({
+        name: client.name,
         description: client.description || '',
         department: client.department || '',
-        email: client.email || ''
+        email: client.email || '',
       });
     } else {
       setEditingClient(null);
@@ -153,7 +167,9 @@ const ClientsPage: React.FC = () => {
   };
 
   const handleDeleteAll = () => {
-    if (window.confirm('Are you sure you want to delete ALL clients? This action cannot be undone.')) {
+    if (
+      window.confirm('Are you sure you want to delete ALL clients? This action cannot be undone.')
+    ) {
       deleteAllMutation.mutate();
     }
   };
@@ -249,18 +265,10 @@ const ClientsPage: React.FC = () => {
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
-                      <IconButton
-                        onClick={() => handleOpen(client)}
-                        color="primary"
-                        size="small"
-                      >
+                      <IconButton onClick={() => handleOpen(client)} color="primary" size="small">
                         <EditIcon />
                       </IconButton>
-                      <IconButton
-                        onClick={() => handleDelete(client)}
-                        color="error"
-                        size="small"
-                      >
+                      <IconButton onClick={() => handleDelete(client)} color="error" size="small">
                         <DeleteIcon />
                       </IconButton>
                     </TableCell>
@@ -281,9 +289,7 @@ const ClientsPage: React.FC = () => {
       </Paper>
 
       <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {editingClient ? 'Edit Client' : 'Add New Client'}
-        </DialogTitle>
+        <DialogTitle>{editingClient ? 'Edit Client' : 'Add New Client'}</DialogTitle>
         <form onSubmit={handleSubmit}>
           <DialogContent>
             <TextField
@@ -325,7 +331,10 @@ const ClientsPage: React.FC = () => {
             />
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
+            <Button
+              onClick={handleClose}
+              disabled={createMutation.isPending || updateMutation.isPending}
+            >
               Cancel
             </Button>
             <Button
@@ -335,8 +344,10 @@ const ClientsPage: React.FC = () => {
             >
               {createMutation.isPending || updateMutation.isPending ? (
                 <CircularProgress size={24} />
+              ) : editingClient ? (
+                'Update'
               ) : (
-                editingClient ? 'Update' : 'Create'
+                'Create'
               )}
             </Button>
           </DialogActions>

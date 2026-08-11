@@ -1,0 +1,19 @@
+{
+  "name": "timesheet-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Repository-level tooling (linting, formatting, git hooks) for the timesheet app",
+  "license": "MIT",
+  "scripts": {
+    "lint": "npm --prefix backend run lint && npm --prefix frontend run lint",
+    "lint:fix": "npm --prefix backend run lint:fix && npm --prefix frontend run lint:fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.6.2"
+  }
+}

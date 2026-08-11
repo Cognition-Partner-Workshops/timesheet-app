@@ -23,13 +23,9 @@ import {
   IconButton,
   Tooltip,
 } from '@mui/material';
-import {
-  PictureAsPdf as PdfIcon,
-  Description as CsvIcon,
-} from '@mui/icons-material';
+import { PictureAsPdf as PdfIcon, Description as CsvIcon } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
-import { type ClientReport } from '../types/api';
 
 const ReportsPage: React.FC = () => {
   const [selectedClientId, setSelectedClientId] = useState<number>(0);
@@ -47,11 +43,11 @@ const ReportsPage: React.FC = () => {
   });
 
   const clients = clientsData?.clients || [];
-  const report = reportData as ClientReport | undefined;
+  const report = reportData;
 
   const handleExportCsv = async () => {
     if (!selectedClientId) return;
-    
+
     try {
       const blob = await apiClient.exportClientReportCsv(selectedClientId);
       const url = window.URL.createObjectURL(blob);
@@ -89,7 +85,9 @@ const ReportsPage: React.FC = () => {
     }
   };
 
-  const selectedClient = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
+  const selectedClient = clients.find(
+    (c: { id: number; name: string }) => c.id === selectedClientId,
+  );
 
   if (clientsLoading) {
     return (
@@ -176,9 +174,9 @@ const ReportsPage: React.FC = () => {
 
           {selectedClient && report && (
             <>
-                <Grid container spacing={3} sx={{ mb: 3 }}>
-                  <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                    <Card>
+              <Grid container spacing={3} sx={{ mb: 3 }}>
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                  <Card>
                     <CardContent>
                       <Typography color="textSecondary" gutterBottom>
                         Total Hours
@@ -208,7 +206,9 @@ const ReportsPage: React.FC = () => {
                         Average Hours per Entry
                       </Typography>
                       <Typography variant="h4" component="div">
-                        {report.entryCount > 0 ? (report.totalHours / report.entryCount).toFixed(2) : '0.00'}
+                        {report.entryCount > 0
+                          ? (report.totalHours / report.entryCount).toFixed(2)
+                          : '0.00'}
                       </Typography>
                     </CardContent>
                   </Card>
@@ -236,10 +236,10 @@ const ReportsPage: React.FC = () => {
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Chip 
-                                label={`${entry.hours} hours`} 
-                                color="primary" 
-                                variant="outlined" 
+                              <Chip
+                                label={`${entry.hours} hours`}
+                                color="primary"
+                                variant="outlined"
                               />
                             </TableCell>
                             <TableCell>

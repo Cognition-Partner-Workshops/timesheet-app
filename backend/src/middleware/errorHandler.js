@@ -1,11 +1,11 @@
-function errorHandler(err, req, res, next) {
+function errorHandler(err, req, res, _next) {
   console.error('Error:', err);
 
   // Joi validation errors
   if (err.isJoi) {
     return res.status(400).json({
       error: 'Validation error',
-      details: err.details.map(detail => detail.message)
+      details: err.details.map((detail) => detail.message),
     });
   }
 
@@ -13,16 +13,16 @@ function errorHandler(err, req, res, next) {
   if (err.code && err.code.startsWith('SQLITE_')) {
     return res.status(500).json({
       error: 'Database error',
-      message: 'An error occurred while processing your request'
+      message: 'An error occurred while processing your request',
     });
   }
 
   // Default error
   res.status(err.status || 500).json({
-    error: err.message || 'Internal server error'
+    error: err.message || 'Internal server error',
   });
 }
 
 module.exports = {
-  errorHandler
+  errorHandler,
 };
