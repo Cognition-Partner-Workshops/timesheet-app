@@ -1,0 +1,16 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      DATABASE_PATH: /app/data/timesheet.db
+    volumes:
+      - timesheet-data:/app/data
+
+volumes:
+  timesheet-data:
