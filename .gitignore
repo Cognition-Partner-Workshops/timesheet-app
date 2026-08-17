@@ -1,0 +1,6 @@
+# Environment variable files (never commit real values; templates are allowed)
+.env
+.env.*
+*.env
+!.env.example
+!*.env.example
