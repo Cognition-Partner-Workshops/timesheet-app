@@ -2,3 +2,10 @@
 AGENTS.local.md
 .devin/mcp_config.local.json
 .devin/config.local.json
+
+# Environment variable files (never commit real values; templates are allowed)
+.env
+.env.*
+*.env
+!.env.example
+!*.env.example
