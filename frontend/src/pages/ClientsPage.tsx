@@ -28,7 +28,8 @@ import {
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
-import { type Client } from '../types/api';
+import { type Client, type CreateClientRequest, type UpdateClientRequest } from '../types/api';
+import { getApiErrorMessage } from '../utils/apiError';
 
 const ClientsPage: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -44,28 +45,25 @@ const ClientsPage: React.FC = () => {
   });
 
   const createMutation = useMutation({
-    mutationFn: (clientData: { name: string; description?: string; department?: string; email?: string }) =>
-      apiClient.createClient(clientData),
+    mutationFn: (clientData: CreateClientRequest) => apiClient.createClient(clientData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       handleClose();
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to create client');
+      setError(getApiErrorMessage(err, 'Failed to create client'));
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { name?: string; description?: string; department?: string; email?: string } }) =>
+    mutationFn: ({ id, data }: { id: number; data: UpdateClientRequest }) =>
       apiClient.updateClient(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       handleClose();
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to update client');
+      setError(getApiErrorMessage(err, 'Failed to update client'));
     },
   });
 
@@ -75,8 +73,7 @@ const ClientsPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to delete client');
+      setError(getApiErrorMessage(err, 'Failed to delete client'));
     },
   });
 
@@ -86,8 +83,7 @@ const ClientsPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to delete all clients');
+      setError(getApiErrorMessage(err, 'Failed to delete all clients'));
     },
   });
 
