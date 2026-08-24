@@ -437,5 +437,126 @@ describe('Report Routes', () => {
         expect.any(Function)
       );
     });
+
+    test('should generate PDF with correct headers and content for entries', async () => {
+      const mockClient = { id: 1, name: 'Test Client' };
+      const mockWorkEntries = [
+        { date: '2024-01-01', hours: 5, description: 'Work 1', created_at: '2024-01-01' },
+        { date: '2024-01-02', hours: 3.5, description: null, created_at: '2024-01-02' }
+      ];
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, mockClient);
+      });
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, mockWorkEntries);
+      });
+
+      const PDFDocument = require('pdfkit');
+      let docInstance;
+      PDFDocument.mockImplementation(() => {
+        docInstance = {
+          fontSize: jest.fn().mockReturnThis(),
+          text: jest.fn().mockReturnThis(),
+          moveDown: jest.fn().mockReturnThis(),
+          moveTo: jest.fn().mockReturnThis(),
+          lineTo: jest.fn().mockReturnThis(),
+          stroke: jest.fn().mockReturnThis(),
+          addPage: jest.fn().mockReturnThis(),
+          pipe: jest.fn((stream) => stream.end()),
+          end: jest.fn(),
+          y: 100
+        };
+        return docInstance;
+      });
+
+      const response = await request(app).get('/api/reports/export/pdf/1');
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toContain('application/pdf');
+      expect(response.headers['content-disposition']).toMatch(/attachment; filename="Test_Client_report_.*\.pdf"/);
+      expect(docInstance.text).toHaveBeenCalledWith('Time Report for Test Client', { align: 'center' });
+      expect(docInstance.text).toHaveBeenCalledWith('Total Hours: 8.50');
+      expect(docInstance.text).toHaveBeenCalledWith('Total Entries: 2');
+      expect(docInstance.text).toHaveBeenCalledWith('No description', 230, 100, { width: 300 });
+      expect(docInstance.end).toHaveBeenCalled();
+    });
+
+    test('should add a new page when entries exceed page height', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { id: 1, name: 'Test Client' });
+      });
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, [
+          { date: '2024-01-01', hours: 5, description: 'Work 1', created_at: '2024-01-01' }
+        ]);
+      });
+
+      const PDFDocument = require('pdfkit');
+      let docInstance;
+      PDFDocument.mockImplementation(() => {
+        docInstance = {
+          fontSize: jest.fn().mockReturnThis(),
+          text: jest.fn().mockReturnThis(),
+          moveDown: jest.fn().mockReturnThis(),
+          moveTo: jest.fn().mockReturnThis(),
+          lineTo: jest.fn().mockReturnThis(),
+          stroke: jest.fn().mockReturnThis(),
+          addPage: jest.fn().mockReturnThis(),
+          pipe: jest.fn((stream) => stream.end()),
+          end: jest.fn(),
+          y: 750
+        };
+        return docInstance;
+      });
+
+      const response = await request(app).get('/api/reports/export/pdf/1');
+
+      expect(response.status).toBe(200);
+      expect(docInstance.addPage).toHaveBeenCalled();
+    });
+
+    test('should draw separator line after every 5th entry', async () => {
+      const entries = Array.from({ length: 5 }, (_, i) => ({
+        date: `2024-01-0${i + 1}`,
+        hours: 1,
+        description: `Work ${i + 1}`,
+        created_at: `2024-01-0${i + 1}`
+      }));
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { id: 1, name: 'Test Client' });
+      });
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, entries);
+      });
+
+      const PDFDocument = require('pdfkit');
+      let docInstance;
+      PDFDocument.mockImplementation(() => {
+        docInstance = {
+          fontSize: jest.fn().mockReturnThis(),
+          text: jest.fn().mockReturnThis(),
+          moveDown: jest.fn().mockReturnThis(),
+          moveTo: jest.fn().mockReturnThis(),
+          lineTo: jest.fn().mockReturnThis(),
+          stroke: jest.fn().mockReturnThis(),
+          addPage: jest.fn().mockReturnThis(),
+          pipe: jest.fn((stream) => stream.end()),
+          end: jest.fn(),
+          y: 100
+        };
+        return docInstance;
+      });
+
+      const response = await request(app).get('/api/reports/export/pdf/1');
+
+      expect(response.status).toBe(200);
+      // One line under the table header plus one separator after the 5th entry
+      expect(docInstance.stroke).toHaveBeenCalledTimes(2);
+    });
   });
 });
