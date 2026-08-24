@@ -36,6 +36,13 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import apiClient from '../api/client';
 import { type WorkEntry } from '../types/api';
 
+const statusColors: Record<WorkEntry['status'], 'default' | 'info' | 'success' | 'error'> = {
+  draft: 'default',
+  submitted: 'info',
+  approved: 'success',
+  rejected: 'error',
+};
+
 const WorkEntriesPage: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<WorkEntry | null>(null);
@@ -93,6 +100,17 @@ const WorkEntriesPage: React.FC = () => {
     onError: (err: unknown) => {
       const error = err as { response?: { data?: { error?: string } } };
       setError(error.response?.data?.error || 'Failed to delete work entry');
+    },
+  });
+
+  const submitMutation = useMutation({
+    mutationFn: (id: number) => apiClient.submitWorkEntry(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workEntries'] });
+    },
+    onError: (err: unknown) => {
+      const error = err as { response?: { data?: { error?: string } } };
+      setError(error.response?.data?.error || 'Failed to submit work entry');
     },
   });
 
@@ -219,6 +237,7 @@ const WorkEntriesPage: React.FC = () => {
                     <TableCell>Date</TableCell>
                     <TableCell>Hours</TableCell>
                     <TableCell>Description</TableCell>
+                    <TableCell>Status</TableCell>
                     <TableCell align="right">Actions</TableCell>
                   </TableRow>
                 </TableHead>
@@ -252,11 +271,28 @@ const WorkEntriesPage: React.FC = () => {
                             <Chip label="No description" size="small" variant="outlined" />
                           )}
                         </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={entry.status}
+                            color={statusColors[entry.status]}
+                            size="small"
+                          />
+                        </TableCell>
                         <TableCell align="right">
+                          {(entry.status === 'draft' || entry.status === 'rejected') && (
+                            <Button
+                              size="small"
+                              onClick={() => submitMutation.mutate(entry.id)}
+                              disabled={submitMutation.isPending}
+                            >
+                              Submit
+                            </Button>
+                          )}
                           <IconButton
                             onClick={() => handleOpen(entry)}
                             color="primary"
                             size="small"
+                            disabled={entry.status === 'approved'}
                           >
                             <EditIcon />
                           </IconButton>
@@ -264,6 +300,7 @@ const WorkEntriesPage: React.FC = () => {
                             onClick={() => handleDelete(entry)}
                             color="error"
                             size="small"
+                            disabled={entry.status === 'approved'}
                           >
                             <DeleteIcon />
                           </IconButton>
@@ -272,7 +309,7 @@ const WorkEntriesPage: React.FC = () => {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={5} align="center">
+                      <TableCell colSpan={6} align="center">
                         <Typography color="text.secondary" sx={{ py: 3 }}>
                           No work entries found. Add your first work entry to get started.
                         </Typography>
