@@ -18,6 +18,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 
 REPO = "Cognition-Partner-Workshops/timesheet-app"
@@ -30,6 +31,28 @@ HIGH_BLAST_RADIUS = {
     "react", "react-dom", "react-router-dom", "@mui/material", "vite", "typescript",
     "express", "sqlite3", "jsonwebtoken", "jest", "eslint",
 }
+
+
+def resolve_within(base, *parts):
+    """Path under base, or None when the joined path escapes it (--root is user input)."""
+    base = os.path.realpath(base)
+    candidate = os.path.realpath(os.path.join(base, *parts))
+    return candidate if candidate == base or candidate.startswith(base + os.sep) else None
+
+
+def output_bases():
+    """Directories --out may write into: the working tree and the temp directories."""
+    candidates = [os.getcwd(), tempfile.gettempdir(), "/tmp"]
+    return tuple(sorted({os.path.realpath(c) for c in candidates if os.path.isdir(c)}))
+
+
+def resolve_output(path):
+    """--out is user input, so it is validated against output_bases() before opening."""
+    candidate = os.path.realpath(path)
+    bases = output_bases()
+    if any(candidate.startswith(base + os.sep) for base in bases):
+        return candidate
+    raise SystemExit(f"--out must be inside one of {', '.join(bases)}: {path}")
 
 
 def run(cmd, cwd):
@@ -83,31 +106,37 @@ def size_estimate(item):
     return "S" if item["advisories"] else "XS"
 
 
+def advisory_entries(name, vuln):
+    """npm audit lists direct advisories as objects in `via`; transitive ones as names."""
+    entries = [
+        {
+            "id": str(via.get("source") or via.get("url") or "unknown"),
+            "severity": (via.get("severity") or vuln.get("severity") or "low").upper(),
+            "summary": via.get("title") or "",
+            "url": via.get("url") or "",
+        }
+        for via in vuln.get("via") or [] if isinstance(via, dict)
+    ]
+    if entries:
+        return entries
+    chain = ", ".join(str(via) for via in vuln.get("via") or [])
+    return [{
+        "id": f"npm-audit:{name}",
+        "severity": (vuln.get("severity") or "low").upper(),
+        "summary": f"transitive advisory via {chain}",
+        "url": "",
+    }]
+
+
 def collect_advisories(cwd, errors):
     """Map package name -> advisories, from `npm audit --json`."""
     report = run_json(["npm", "audit", "--json"], cwd, errors)
-    advisories = {}
     if not report:
-        return advisories
-    for name, vuln in (report.get("vulnerabilities") or {}).items():
-        entries = []
-        for via in vuln.get("via") or []:
-            if isinstance(via, dict):
-                entries.append({
-                    "id": str(via.get("source") or via.get("url") or "unknown"),
-                    "severity": (via.get("severity") or vuln.get("severity") or "low").upper(),
-                    "summary": via.get("title") or "",
-                    "url": via.get("url") or "",
-                })
-        if not entries:
-            entries.append({
-                "id": f"npm-audit:{name}",
-                "severity": (vuln.get("severity") or "low").upper(),
-                "summary": f"transitive advisory via {', '.join(str(v) for v in vuln.get('via') or [])}",
-                "url": "",
-            })
-        advisories[name] = entries
-    return advisories
+        return {}
+    return {
+        name: advisory_entries(name, vuln)
+        for name, vuln in (report.get("vulnerabilities") or {}).items()
+    }
 
 
 def declared_exposure(manifest, name):
@@ -119,9 +148,9 @@ def declared_exposure(manifest, name):
 
 
 def scan_workspace(workspace, root, errors):
-    cwd = os.path.join(root, workspace)
-    manifest_path = os.path.join(cwd, "package.json")
-    if not os.path.isfile(manifest_path):
+    cwd = resolve_within(root, workspace)
+    manifest_path = resolve_within(root, workspace, "package.json") if cwd else None
+    if not manifest_path or not os.path.isfile(manifest_path):
         errors.append(f"{workspace}: no package.json")
         return []
     with open(manifest_path) as handle:
@@ -193,7 +222,7 @@ def main():
     }
     payload = json.dumps(document, indent=2)
     if args.out:
-        with open(args.out, "w") as handle:
+        with open(resolve_output(args.out), "w") as handle:
             handle.write(payload + "\n")
     else:
         print(payload)
