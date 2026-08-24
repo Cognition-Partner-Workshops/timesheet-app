@@ -20,13 +20,13 @@ Repositories (clone each with the built-in git tools if it is not already on the
 Run each repository's own read-only scanner on a clean checkout of `main` and keep the
 JSON output:
 
-- `timesheet-app`: `python3 scripts/drift_scan.py --out /tmp/drift-timesheet-app.json`
+- `timesheet-app`: `python3 scripts/drift_scan.py --out drift-timesheet-app.json`
   (run `npm ci` in `backend/` and `frontend/` first so `npm outdated`/`npm audit` see an
   installed tree; if `npm ci` fails, record it as a scan error and continue)
-- `petclinic-microservices`: `python3 scripts/drift_scan.py --out /tmp/drift-petclinic.json`
+- `petclinic-microservices`: `python3 scripts/drift_scan.py --out drift-petclinic.json`
   (add `--skip-maven` if `./mvnw dependency:list` cannot resolve; that fallback parses the
   poms directly and is recorded in `errors`)
-- `timesheet-infra`: `python3 scripts/drift_scan.py --out /tmp/drift-infra.json`
+- `timesheet-infra`: `python3 scripts/drift_scan.py --out drift-infra.json`
 
 Do not modify anything: no installs that write to `package.json`, no lockfile updates, no
 `pom.xml` edits, no `terraform init`/`plan`/`apply`, no `.tf` or `.terraform.lock.hcl`
