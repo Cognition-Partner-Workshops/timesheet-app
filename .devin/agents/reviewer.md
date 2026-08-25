@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Read-only code review of diffs and files; reports findings with file:line citations
-model: swe-1-6-fast
+model: swe-1-7-lightning
 allowed-tools:
   - read
   - grep
