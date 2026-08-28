@@ -189,20 +189,38 @@ router.put('/:id', (req, res, next) => {
 // Delete all clients for authenticated user
 router.delete('/', (req, res) => {
   const db = getDatabase();
-  
-  db.run(
-    'DELETE FROM clients WHERE user_email = ?',
+
+  db.all(
+    "SELECT DISTINCT c.name FROM clients c INNER JOIN projects p ON c.id = p.client_id WHERE c.user_email = ? AND p.status = 'active'",
     [req.userEmail],
-    function(err) {
+    (err, rows) => {
       if (err) {
         console.error('Database error:', err);
-        return res.status(500).json({ error: 'Failed to delete clients' });
+        return res.status(500).json({ error: 'Internal server error' });
       }
-      
-      res.json({ 
-        message: 'All clients deleted successfully',
-        deletedCount: this.changes
-      });
+
+      if (rows && rows.length > 0) {
+        const clientNames = rows.map(r => r.name).join(', ');
+        return res.status(409).json({
+          error: `Cannot delete all clients. The following clients have active projects: ${clientNames}. Please complete or reassign their projects first.`
+        });
+      }
+
+      db.run(
+        'DELETE FROM clients WHERE user_email = ?',
+        [req.userEmail],
+        function(err) {
+          if (err) {
+            console.error('Database error:', err);
+            return res.status(500).json({ error: 'Failed to delete clients' });
+          }
+
+          res.json({
+            message: 'All clients deleted successfully',
+            deletedCount: this.changes
+          });
+        }
+      );
     }
   );
 });
@@ -230,18 +248,36 @@ router.delete('/:id', (req, res) => {
       if (!row) {
         return res.status(404).json({ error: 'Client not found' });
       }
-      
-      // Delete client (work entries will be deleted due to CASCADE)
-      db.run(
-        'DELETE FROM clients WHERE id = ? AND user_email = ?',
-        [clientId, req.userEmail],
-        function(err) {
+
+      // Check for active projects assigned to this client
+      db.get(
+        "SELECT COUNT(*) as count FROM projects WHERE client_id = ? AND status = 'active'",
+        [clientId],
+        (err, result) => {
           if (err) {
             console.error('Database error:', err);
-            return res.status(500).json({ error: 'Failed to delete client' });
+            return res.status(500).json({ error: 'Internal server error' });
           }
-          
-          res.json({ message: 'Client deleted successfully' });
+
+          if (result && result.count > 0) {
+            return res.status(409).json({
+              error: `Cannot delete client. It has ${result.count} active project(s). Please complete or reassign them first.`
+            });
+          }
+
+          // Delete client (work entries will be deleted due to CASCADE)
+          db.run(
+            'DELETE FROM clients WHERE id = ? AND user_email = ?',
+            [clientId, req.userEmail],
+            function(err) {
+              if (err) {
+                console.error('Database error:', err);
+                return res.status(500).json({ error: 'Failed to delete client' });
+              }
+
+              res.json({ message: 'Client deleted successfully' });
+            }
+          );
         }
       );
     }

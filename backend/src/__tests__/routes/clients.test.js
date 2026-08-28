@@ -277,9 +277,13 @@ describe('Client Routes', () => {
   });
 
   describe('DELETE /api/clients/:id', () => {
-    test('should delete existing client', async () => {
-      mockDb.get.mockImplementation((query, params, callback) => {
+    test('should delete existing client with no active projects', async () => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
         callback(null, { id: 1 });
+      });
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { count: 0 });
       });
 
       mockDb.run.mockImplementation((query, params, callback) => {
@@ -290,6 +294,37 @@ describe('Client Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({ message: 'Client deleted successfully' });
+    });
+
+    test('should return 409 if client has active projects', async () => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { count: 3 });
+      });
+
+      const response = await request(app).delete('/api/clients/1');
+
+      expect(response.status).toBe(409);
+      expect(response.body.error).toContain('Cannot delete client');
+      expect(response.body.error).toContain('3 active project(s)');
+    });
+
+    test('should handle database error when checking active projects', async () => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(new Error('Database error'), null);
+      });
+
+      const response = await request(app).delete('/api/clients/1');
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Internal server error' });
     });
 
     test('should return 404 if client not found', async () => {
@@ -311,8 +346,12 @@ describe('Client Routes', () => {
     });
 
     test('should handle database delete error', async () => {
-      mockDb.get.mockImplementation((query, params, callback) => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
         callback(null, { id: 1 });
+      });
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { count: 0 });
       });
 
       mockDb.run.mockImplementation((query, params, callback) => {
@@ -452,6 +491,49 @@ describe('Client Routes', () => {
         .send({ description: '' });
 
       expect(response.status).toBe(200);
+    });
+  });
+
+  describe('DELETE /api/clients (delete all)', () => {
+    test('should delete all clients when none have active projects', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, []);
+      });
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.changes = 3;
+        callback.call(this, null);
+      });
+
+      const response = await request(app).delete('/api/clients');
+
+      expect(response.status).toBe(200);
+      expect(response.body.message).toBe('All clients deleted successfully');
+      expect(response.body.deletedCount).toBe(3);
+    });
+
+    test('should return 409 when clients have active projects', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, [{ name: 'Client A' }, { name: 'Client B' }]);
+      });
+
+      const response = await request(app).delete('/api/clients');
+
+      expect(response.status).toBe(409);
+      expect(response.body.error).toContain('Cannot delete all clients');
+      expect(response.body.error).toContain('Client A');
+      expect(response.body.error).toContain('Client B');
+    });
+
+    test('should handle database error when checking active projects', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(new Error('Database error'), null);
+      });
+
+      const response = await request(app).delete('/api/clients');
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Internal server error' });
     });
   });
 });
