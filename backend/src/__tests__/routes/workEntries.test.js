@@ -55,6 +55,26 @@ describe('Work Entry Routes', () => {
       expect(response.body).toEqual({ workEntries: mockEntries });
     });
 
+    test('should return work entries without clientId filter', async () => {
+      const mockEntries = [
+        { id: 1, client_id: 1, hours: 5, description: 'Work 1', date: '2024-01-01', client_name: 'Client A' },
+        { id: 2, client_id: 2, hours: 3, description: 'Work 2', date: '2024-01-02', client_name: 'Client B' }
+      ];
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, mockEntries);
+      });
+
+      const response = await request(app).get('/api/work-entries');
+
+      expect(response.status).toBe(200);
+      expect(mockDb.all).toHaveBeenCalledWith(
+        expect.not.stringContaining('AND we.client_id'),
+        ['test@example.com'],
+        expect.any(Function)
+      );
+    });
+
     test('should filter by client ID when provided', async () => {
       mockDb.all.mockImplementation((query, params, callback) => {
         expect(params).toEqual(['test@example.com', 1]);
@@ -187,6 +207,48 @@ describe('Work Entry Routes', () => {
         });
 
       expect(response.status).toBe(400);
+    });
+
+    test('should create work entry without description (optional field)', async () => {
+      const newEntry = {
+        clientId: 1,
+        hours: 3,
+        date: '2024-01-15'
+      };
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        if (query.includes('clients')) {
+          callback(null, { id: 1 });
+        } else {
+          callback(null, { id: 1, ...newEntry, description: null, client_name: 'Client A' });
+        }
+      });
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.lastID = 1;
+        callback.call(this, null);
+      });
+
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send(newEntry);
+
+      expect(response.status).toBe(201);
+      expect(response.body.message).toBe('Work entry created successfully');
+    });
+
+    test('should return 500 when getDatabase throws in POST', async () => {
+      getDatabase.mockImplementation(() => { throw new Error('DB connection failed'); });
+
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({
+          clientId: 1,
+          hours: 5,
+          date: '2024-01-15'
+        });
+
+      expect(response.status).toBe(500);
     });
 
     test('should return 400 for hours exceeding 24', async () => {
@@ -501,6 +563,16 @@ describe('Work Entry Routes', () => {
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ error: 'Work entry updated but failed to retrieve' });
+    });
+
+    test('should return 500 when getDatabase throws in PUT after validation passes', async () => {
+      getDatabase.mockImplementation(() => { throw new Error('DB connection failed'); });
+
+      const response = await request(app)
+        .put('/api/work-entries/1')
+        .send({ hours: 8 });
+
+      expect(response.status).toBe(500);
     });
 
     test('should update work entry date', async () => {
