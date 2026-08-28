@@ -54,61 +54,19 @@ describe('Authentication Middleware', () => {
     test('should accept valid email format', () => {
       req.headers['x-user-email'] = 'test@example.com';
       
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, { email: 'test@example.com' });
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
       });
 
       authenticateUser(req, res, next);
 
-      expect(mockDb.get).toHaveBeenCalled();
+      expect(mockDb.run).toHaveBeenCalled();
     });
   });
 
-  describe('Existing User Authentication', () => {
-    test('should authenticate existing user and call next()', (done) => {
+  describe('User Authentication', () => {
+    test('should authenticate user and call next()', (done) => {
       req.headers['x-user-email'] = 'existing@example.com';
-      
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, { email: 'existing@example.com' });
-      });
-
-      authenticateUser(req, res, next);
-
-      setImmediate(() => {
-        expect(req.userEmail).toBe('existing@example.com');
-        expect(next).toHaveBeenCalled();
-        expect(res.status).not.toHaveBeenCalled();
-        done();
-      });
-    });
-
-    test('should handle database error when checking user', (done) => {
-      req.headers['x-user-email'] = 'test@example.com';
-      
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(new Error('Database error'), null);
-      });
-
-      authenticateUser(req, res, next);
-
-      setImmediate(() => {
-        expect(res.status).toHaveBeenCalledWith(500);
-        expect(res.json).toHaveBeenCalledWith({
-          error: 'Internal server error'
-        });
-        expect(next).not.toHaveBeenCalled();
-        done();
-      });
-    });
-  });
-
-  describe('New User Creation', () => {
-    test('should create new user if not exists and call next()', (done) => {
-      req.headers['x-user-email'] = 'newuser@example.com';
-      
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, null); // User doesn't exist
-      });
       
       mockDb.run.mockImplementation((query, params, callback) => {
         callback(null);
@@ -118,7 +76,50 @@ describe('Authentication Middleware', () => {
 
       setImmediate(() => {
         expect(mockDb.run).toHaveBeenCalledWith(
-          'INSERT INTO users (email) VALUES (?)',
+          'INSERT OR IGNORE INTO users (email) VALUES (?)',
+          ['existing@example.com'],
+          expect.any(Function)
+        );
+        expect(req.userEmail).toBe('existing@example.com');
+        expect(next).toHaveBeenCalled();
+        expect(res.status).not.toHaveBeenCalled();
+        done();
+      });
+    });
+
+    test('should handle database error', (done) => {
+      req.headers['x-user-email'] = 'test@example.com';
+      
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(new Error('Database error'));
+      });
+
+      authenticateUser(req, res, next);
+
+      setImmediate(() => {
+        expect(res.status).toHaveBeenCalledWith(500);
+        expect(res.json).toHaveBeenCalledWith({
+          error: 'Failed to authenticate user'
+        });
+        expect(next).not.toHaveBeenCalled();
+        done();
+      });
+    });
+  });
+
+  describe('New User Creation', () => {
+    test('should create new user via INSERT OR IGNORE and call next()', (done) => {
+      req.headers['x-user-email'] = 'newuser@example.com';
+      
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+
+      authenticateUser(req, res, next);
+
+      setImmediate(() => {
+        expect(mockDb.run).toHaveBeenCalledWith(
+          'INSERT OR IGNORE INTO users (email) VALUES (?)',
           ['newuser@example.com'],
           expect.any(Function)
         );
@@ -128,12 +129,8 @@ describe('Authentication Middleware', () => {
       });
     });
 
-    test('should handle error when creating new user', (done) => {
+    test('should handle error when ensuring user exists', (done) => {
       req.headers['x-user-email'] = 'newuser@example.com';
-      
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, null);
-      });
       
       mockDb.run.mockImplementation((query, params, callback) => {
         callback(new Error('Insert failed'));
@@ -144,7 +141,7 @@ describe('Authentication Middleware', () => {
       setImmediate(() => {
         expect(res.status).toHaveBeenCalledWith(500);
         expect(res.json).toHaveBeenCalledWith({
-          error: 'Failed to create user'
+          error: 'Failed to authenticate user'
         });
         expect(next).not.toHaveBeenCalled();
         done();
@@ -174,12 +171,12 @@ describe('Authentication Middleware', () => {
     test('should accept email with subdomain', () => {
       req.headers['x-user-email'] = 'test@mail.example.com';
       
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, { email: 'test@mail.example.com' });
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
       });
 
       authenticateUser(req, res, next);
-      expect(mockDb.get).toHaveBeenCalled();
+      expect(mockDb.run).toHaveBeenCalled();
     });
   });
 });
