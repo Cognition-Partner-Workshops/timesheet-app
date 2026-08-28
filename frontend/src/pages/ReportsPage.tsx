@@ -19,7 +19,6 @@ import {
   Grid,
   Alert,
   CircularProgress,
-  Chip,
   IconButton,
   Tooltip,
 } from '@mui/material';
@@ -30,6 +29,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
 import { type ClientReport } from '../types/api';
+import WorkEntryTableCells from '../components/WorkEntryTableCells';
 
 const ReportsPage: React.FC = () => {
   const [selectedClientId, setSelectedClientId] = useState<number>(0);
@@ -230,27 +230,11 @@ const ReportsPage: React.FC = () => {
                       {report.workEntries.length > 0 ? (
                         report.workEntries.map((entry) => (
                           <TableRow key={entry.id}>
-                            <TableCell>
-                              <Typography variant="body2">
-                                {new Date(entry.date).toLocaleDateString()}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Chip 
-                                label={`${entry.hours} hours`} 
-                                color="primary" 
-                                variant="outlined" 
-                              />
-                            </TableCell>
-                            <TableCell>
-                              {entry.description ? (
-                                <Typography variant="body2" color="text.secondary">
-                                  {entry.description}
-                                </Typography>
-                              ) : (
-                                <Chip label="No description" size="small" variant="outlined" />
-                              )}
-                            </TableCell>
+                            <WorkEntryTableCells
+                              date={entry.date}
+                              hours={entry.hours}
+                              description={entry.description}
+                            />
                             <TableCell>
                               <Typography variant="body2" color="text.secondary">
                                 {new Date(entry.created_at).toLocaleDateString()}
