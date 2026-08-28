@@ -4,6 +4,11 @@ import axios, { type AxiosInstance, type AxiosResponse } from 'axios';
 // Vite proxy will forward /api requests to the backend
 const API_BASE_URL = '';
 
+export interface DateRangeParams {
+  from?: string;
+  to?: string;
+}
+
 class ApiClient {
   private client: AxiosInstance;
 
@@ -114,21 +119,32 @@ class ApiClient {
   }
 
   // Report endpoints
-  async getClientReport(clientId: number) {
-    const response = await this.client.get(`/api/reports/client/${clientId}`);
+  async getClientReport(clientId: number, dateRange?: DateRangeParams) {
+    const params: Record<string, string> = {};
+    if (dateRange?.from) params.from = dateRange.from;
+    if (dateRange?.to) params.to = dateRange.to;
+    const response = await this.client.get(`/api/reports/client/${clientId}`, { params });
     return response.data;
   }
 
-  async exportClientReportCsv(clientId: number) {
+  async exportClientReportCsv(clientId: number, dateRange?: DateRangeParams) {
+    const params: Record<string, string> = {};
+    if (dateRange?.from) params.from = dateRange.from;
+    if (dateRange?.to) params.to = dateRange.to;
     const response = await this.client.get(`/api/reports/export/csv/${clientId}`, {
       responseType: 'blob',
+      params,
     });
     return response.data;
   }
 
-  async exportClientReportPdf(clientId: number) {
+  async exportClientReportPdf(clientId: number, dateRange?: DateRangeParams) {
+    const params: Record<string, string> = {};
+    if (dateRange?.from) params.from = dateRange.from;
+    if (dateRange?.to) params.to = dateRange.to;
     const response = await this.client.get(`/api/reports/export/pdf/${clientId}`, {
       responseType: 'blob',
+      params,
     });
     return response.data;
   }
