@@ -142,6 +142,63 @@ describe('Database Initialization', () => {
 
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
+
+    test('should resolve immediately when already closed (isClosed true)', async () => {
+      const db = getDatabase();
+      db.close.mockImplementation((callback) => callback(null));
+
+      // First close
+      await closeDatabase();
+      // Second close - isClosed is true, should resolve immediately
+      await closeDatabase();
+
+      // close should only have been called once
+      expect(db.close).toHaveBeenCalledTimes(1);
+    });
+
+    test('should resolve when no database connection exists', async () => {
+      // Don't call getDatabase(), so db is null
+      // Need fresh module to ensure db=null
+      jest.resetModules();
+      jest.doMock('sqlite3', () => {
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, callback) => {
+              callback(null);
+              return { close: jest.fn((cb) => cb(null)) };
+            })
+          }))
+        };
+      });
+
+      const { closeDatabase: closeFresh } = require('../../database/init');
+      // db is null since getDatabase was never called
+      await expect(closeFresh()).resolves.toBeUndefined();
+    });
+
+    test('should wait when close is already in progress (isClosing true)', async () => {
+      const db = getDatabase();
+      
+      // Make close take some time by delaying the callback
+      let closeCallback;
+      db.close.mockImplementation((callback) => {
+        closeCallback = callback;
+        // Don't call callback immediately - simulate async close
+      });
+
+      // Start first close (will set isClosing = true)
+      const firstClose = closeDatabase();
+
+      // Start second close while first is still in progress
+      const secondClose = closeDatabase();
+
+      // Now complete the first close
+      closeCallback(null);
+
+      // Both should resolve
+      await firstClose;
+      await secondClose;
+    });
   });
 
   describe('Database Schema', () => {
