@@ -1,0 +1,16 @@
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<suite name="Timesheet App Functional Tests" verbose="2">
+
+    <test name="Test Case 1: Login with Email and Log Entry">
+        <classes>
+            <class name="com.timesheet.tests.LoginAndLogEntryTest"/>
+        </classes>
+    </test>
+
+    <test name="Test Case 2: Report Validation">
+        <classes>
+            <class name="com.timesheet.tests.ReportValidationTest"/>
+        </classes>
+    </test>
+
+</suite>
