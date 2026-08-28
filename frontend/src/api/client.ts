@@ -133,6 +133,22 @@ class ApiClient {
     return response.data;
   }
 
+  // Analytics endpoints
+  async getWeeklyFeatureUsage() {
+    const response = await this.client.get('/api/analytics/feature-usage/weekly');
+    return response.data;
+  }
+
+  async getFeatureUsageTrends() {
+    const response = await this.client.get('/api/analytics/feature-usage/trends');
+    return response.data;
+  }
+
+  async getFeatureUsageBreakdown() {
+    const response = await this.client.get('/api/analytics/feature-usage/breakdown');
+    return response.data;
+  }
+
   // Health check
   async healthCheck() {
     const response = await this.client.get('/health');

@@ -66,11 +66,27 @@ async function initializeDatabase() {
         )
       `);
 
+      // Create feature_usage table for analytics
+      database.run(`
+        CREATE TABLE IF NOT EXISTS feature_usage (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_email TEXT NOT NULL,
+          feature_family TEXT NOT NULL,
+          action TEXT NOT NULL,
+          endpoint TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
+        )
+      `);
+
       // Create indexes for better performance
       database.run(`CREATE INDEX IF NOT EXISTS idx_clients_user_email ON clients (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_client_id ON work_entries (client_id)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_user_email ON work_entries (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_date ON work_entries (date)`);
+      database.run(`CREATE INDEX IF NOT EXISTS idx_feature_usage_user_email ON feature_usage (user_email)`);
+      database.run(`CREATE INDEX IF NOT EXISTS idx_feature_usage_created_at ON feature_usage (created_at)`);
+      database.run(`CREATE INDEX IF NOT EXISTS idx_feature_usage_family ON feature_usage (feature_family)`);
 
       console.log('Database tables created successfully');
       resolve();
