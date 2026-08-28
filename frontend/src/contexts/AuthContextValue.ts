@@ -3,7 +3,9 @@ import { type User } from '../types/api';
 
 export interface AuthContextType {
   user: User | null;
-  login: (email: string) => Promise<void>;
+  requestOtp: (email: string) => Promise<void>;
+  verifyOtp: (email: string, code: string) => Promise<void>;
+  resendOtp: (email: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
   isAuthenticated: boolean;

@@ -69,7 +69,19 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   message: string;
+  email: string;
+  expiresInMinutes: number;
+}
+
+export interface OtpVerifyRequest {
+  email: string;
+  code: string;
+}
+
+export interface OtpVerifyResponse {
+  message: string;
   user: User;
+  token: string;
 }
 
 export interface ApiResponse<T> {

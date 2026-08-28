@@ -16,12 +16,12 @@ class ApiClient {
       },
     });
 
-    // Request interceptor to add email header
+    // Request interceptor to add JWT Bearer token
     this.client.interceptors.request.use(
       (config) => {
-        const userEmail = localStorage.getItem('userEmail');
-        if (userEmail) {
-          config.headers['x-user-email'] = userEmail;
+        const token = localStorage.getItem('authToken');
+        if (token) {
+          config.headers['Authorization'] = `Bearer ${token}`;
         }
         return config;
       },
@@ -35,7 +35,8 @@ class ApiClient {
       (response: AxiosResponse) => response,
       (error) => {
         if (error.response?.status === 401) {
-          // Clear stored email on auth error
+          // Clear stored auth data on token expiry / invalid token
+          localStorage.removeItem('authToken');
           localStorage.removeItem('userEmail');
           window.location.href = '/login';
         }
@@ -45,8 +46,18 @@ class ApiClient {
   }
 
   // Auth endpoints
-  async login(email: string) {
+  async requestOtp(email: string) {
     const response = await this.client.post('/api/auth/login', { email });
+    return response.data;
+  }
+
+  async verifyOtp(email: string, code: string) {
+    const response = await this.client.post('/api/auth/verify-otp', { email, code });
+    return response.data;
+  }
+
+  async resendOtp(email: string) {
+    const response = await this.client.post('/api/auth/resend-otp', { email });
     return response.data;
   }
 
