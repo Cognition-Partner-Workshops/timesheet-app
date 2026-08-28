@@ -152,6 +152,32 @@ describe('Work Entry Routes', () => {
       expect(response.body.message).toBe('Work entry created successfully');
     });
 
+    test('should persist date as a YYYY-MM-DD string, not an epoch timestamp', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        if (query.includes('clients')) {
+          callback(null, { id: 1 });
+        } else {
+          callback(null, { id: 1, client_name: 'Client A' });
+        }
+      });
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.lastID = 1;
+        callback.call(this, null);
+      });
+
+      await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: 5.5, date: '2024-01-15' });
+
+      const insertCall = mockDb.run.mock.calls.find(([query]) =>
+        query.includes('INSERT INTO work_entries')
+      );
+      const insertedDate = insertCall[1][4];
+      expect(insertedDate).toBe('2024-01-15');
+      expect(typeof insertedDate).toBe('string');
+    });
+
     test('should return 400 if client not found', async () => {
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(null, null); // Client doesn't exist
@@ -522,6 +548,13 @@ describe('Work Entry Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.message).toBe('Work entry updated successfully');
+
+      const updateCall = mockDb.run.mock.calls.find(([query]) =>
+        query.includes('UPDATE work_entries')
+      );
+      const updatedDate = updateCall[1][0];
+      expect(updatedDate).toBe('2024-02-01');
+      expect(typeof updatedDate).toBe('string');
     });
 
     test('should update work entry description', async () => {
