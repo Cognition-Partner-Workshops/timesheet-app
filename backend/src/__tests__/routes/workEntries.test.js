@@ -585,4 +585,38 @@ describe('Work Entry Routes', () => {
       expect(response.body.message).toBe('Work entry updated successfully');
     });
   });
+
+  describe('POST /api/work-entries - Catch Block', () => {
+    test('should handle unexpected errors in POST via catch block', async () => {
+      const { getDatabase: mockGetDb } = require('../../database/init');
+      mockGetDb.mockImplementation(() => {
+        throw new Error('Unexpected error');
+      });
+
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({
+          clientId: 1,
+          hours: 5,
+          date: '2024-01-15'
+        });
+
+      expect(response.status).toBe(500);
+    });
+  });
+
+  describe('PUT /api/work-entries/:id - Catch Block', () => {
+    test('should handle unexpected errors in PUT via catch block', async () => {
+      const { getDatabase: mockGetDb } = require('../../database/init');
+      mockGetDb.mockImplementation(() => {
+        throw new Error('Unexpected error');
+      });
+
+      const response = await request(app)
+        .put('/api/work-entries/1')
+        .send({ hours: 8 });
+
+      expect(response.status).toBe(500);
+    });
+  });
 });

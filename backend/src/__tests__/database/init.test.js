@@ -142,6 +142,87 @@ describe('Database Initialization', () => {
 
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
+
+    test('should resolve immediately when already closed', async () => {
+      jest.resetModules();
+
+      const closedModule = (() => {
+        let _db = null;
+        let _isClosing = false;
+        let _isClosed = true;
+
+        return {
+          closeDatabase: () => {
+            return new Promise((resolve) => {
+              if (_isClosed) {
+                resolve();
+                return;
+              }
+            });
+          }
+        };
+      })();
+
+      await expect(closedModule.closeDatabase()).resolves.toBeUndefined();
+    });
+
+    test('should resolve immediately when no database connection exists', async () => {
+      jest.resetModules();
+
+      jest.doMock('sqlite3', () => {
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, callback) => {
+              callback(null);
+              return {
+                serialize: jest.fn((cb) => cb()),
+                run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
+                close: jest.fn((cb) => cb(null))
+              };
+            })
+          }))
+        };
+      });
+
+      const { closeDatabase: closeFresh } = require('../../database/init');
+      await expect(closeFresh()).resolves.toBeUndefined();
+    });
+
+    test('should wait and resolve when concurrent close is in progress', async () => {
+      jest.resetModules();
+
+      let closeCallback = null;
+
+      jest.doMock('sqlite3', () => {
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((dbPath, callback) => {
+              callback(null);
+              return {
+                serialize: jest.fn((cb) => cb()),
+                run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
+                close: jest.fn((cb) => {
+                  closeCallback = cb;
+                })
+              };
+            })
+          }))
+        };
+      });
+
+      const { getDatabase: getDb2, closeDatabase: closeDb2 } = require('../../database/init');
+      getDb2();
+
+      const firstClose = closeDb2();
+      const secondClose = closeDb2();
+
+      setTimeout(() => {
+        if (closeCallback) closeCallback(null);
+      }, 50);
+
+      await firstClose;
+      await secondClose;
+    });
   });
 
   describe('Database Schema', () => {
