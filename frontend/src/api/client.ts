@@ -113,6 +113,32 @@ class ApiClient {
     return response.data;
   }
 
+  // Project endpoints
+  async getProjects() {
+    const response = await this.client.get('/api/projects');
+    return response.data;
+  }
+
+  async getProject(id: number) {
+    const response = await this.client.get(`/api/projects/${id}`);
+    return response.data;
+  }
+
+  async createProject(data: { name: string; description?: string; clientId?: number | null; status?: string; startDate?: string | null }) {
+    const response = await this.client.post('/api/projects', data);
+    return response.data;
+  }
+
+  async updateProject(id: number, data: { name?: string; description?: string; clientId?: number | null; status?: string; startDate?: string | null }) {
+    const response = await this.client.put(`/api/projects/${id}`, data);
+    return response.data;
+  }
+
+  async deleteProject(id: number) {
+    const response = await this.client.delete(`/api/projects/${id}`);
+    return response.data;
+  }
+
   // Report endpoints
   async getClientReport(clientId: number) {
     const response = await this.client.get(`/api/reports/client/${clientId}`);
