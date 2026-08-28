@@ -1,7 +1,9 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
 const { getDatabase } = require('../database/init');
 const { emailSchema } = require('../validation/schemas');
 const { authenticateUser } = require('../middleware/auth');
+const { getJwtSecret, JWT_EXPIRY } = require('../config/jwt');
 
 const router = express.Router();
 
@@ -25,12 +27,14 @@ router.post('/login', async (req, res, next) => {
 
       if (row) {
         // User exists
+        const token = jwt.sign({ email }, getJwtSecret(), { expiresIn: JWT_EXPIRY });
         return res.json({
           message: 'Login successful',
           user: {
             email: row.email,
             createdAt: row.created_at
-          }
+          },
+          token
         });
       } else {
         // Create new user
@@ -40,12 +44,14 @@ router.post('/login', async (req, res, next) => {
             return res.status(500).json({ error: 'Failed to create user' });
           }
 
+          const token = jwt.sign({ email }, getJwtSecret(), { expiresIn: JWT_EXPIRY });
           res.status(201).json({
             message: 'User created and logged in successfully',
             user: {
               email: email,
               createdAt: new Date().toISOString()
-            }
+            },
+            token
           });
         });
       }

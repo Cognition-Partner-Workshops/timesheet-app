@@ -75,6 +75,17 @@ describe('Database Initialization', () => {
   });
 
   describe('initializeDatabase', () => {
+    test('should enable foreign key enforcement first', async () => {
+      const db = getDatabase();
+      await initializeDatabase();
+
+      const runCalls = db.run.mock.calls;
+      const queries = runCalls.map(call => call[0]);
+      
+      // PRAGMA foreign_keys = ON should be the first statement
+      expect(queries[0]).toBe('PRAGMA foreign_keys = ON');
+    });
+
     test('should create all required tables', async () => {
       const db = getDatabase();
       await initializeDatabase();
