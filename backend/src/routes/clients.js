@@ -186,7 +186,7 @@ router.put('/:id', (req, res, next) => {
   }
 });
 
-// Delete all clients for authenticated user
+// Delete all clients for authenticated user (CASCADE deletes associated work entries)
 router.delete('/', (req, res) => {
   const db = getDatabase();
   
@@ -200,7 +200,7 @@ router.delete('/', (req, res) => {
       }
       
       res.json({ 
-        message: 'All clients deleted successfully',
+        message: 'All clients and associated work entries deleted successfully',
         deletedCount: this.changes
       });
     }
