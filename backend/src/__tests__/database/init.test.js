@@ -142,6 +142,47 @@ describe('Database Initialization', () => {
 
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
+
+    function createSqliteMock(closeImpl) {
+      return {
+        verbose: jest.fn(() => ({
+          Database: jest.fn((path, callback) => {
+            callback(null);
+            return {
+              serialize: jest.fn((cb) => cb()),
+              run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
+              close: jest.fn(closeImpl || ((cb) => cb(null)))
+            };
+          })
+        }))
+      };
+    }
+
+    test('should resolve when db is null and no connection exists', async () => {
+      jest.resetModules();
+      jest.doMock('sqlite3', () => createSqliteMock());
+
+      const { closeDatabase: closeFresh } = require('../../database/init');
+      await expect(closeFresh()).resolves.toBeUndefined();
+    });
+
+    test('should wait when close is already in progress', async () => {
+      jest.resetModules();
+
+      let closeCallback = null;
+      jest.doMock('sqlite3', () => createSqliteMock((cb) => { closeCallback = cb; }));
+
+      const { getDatabase: getDb, closeDatabase: closeDb } = require('../../database/init');
+      getDb();
+
+      const firstClose = closeDb();
+      const secondClose = closeDb();
+
+      closeCallback(null);
+
+      await firstClose;
+      await secondClose;
+    });
   });
 
   describe('Database Schema', () => {
