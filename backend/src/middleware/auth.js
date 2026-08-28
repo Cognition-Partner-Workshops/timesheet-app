@@ -1,46 +1,47 @@
+const jwt = require('jsonwebtoken');
 const { getDatabase } = require('../database/init');
 
-// Simple email-based authentication middleware
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
+
 function authenticateUser(req, res, next) {
-  const userEmail = req.headers['x-user-email'];
-  
-  if (!userEmail) {
-    return res.status(401).json({ error: 'User email required in x-user-email header' });
+  const token = req.cookies?.token || extractBearerToken(req);
+
+  if (!token) {
+    return res.status(401).json({ error: 'Authentication required' });
   }
 
-  // Validate email format
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(userEmail)) {
-    return res.status(400).json({ error: 'Invalid email format' });
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    req.userEmail = payload.email;
+    req.userRole = payload.role || 'user';
+    next();
+  } catch (err) {
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Token expired' });
+    }
+    return res.status(401).json({ error: 'Invalid token' });
   }
+}
 
-  const db = getDatabase();
-  
-  // Check if user exists, create if not
-  db.get('SELECT email FROM users WHERE email = ?', [userEmail], (err, row) => {
-    if (err) {
-      console.error('Database error:', err);
-      return res.status(500).json({ error: 'Internal server error' });
+function extractBearerToken(req) {
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.slice(7);
+  }
+  return null;
+}
+
+function requireRole(role) {
+  return (req, res, next) => {
+    if (req.userRole !== role && req.userRole !== 'admin') {
+      return res.status(403).json({ error: 'Insufficient permissions' });
     }
-    
-    if (!row) {
-      // Create new user
-      db.run('INSERT INTO users (email) VALUES (?)', [userEmail], (err) => {
-        if (err) {
-          console.error('Error creating user:', err);
-          return res.status(500).json({ error: 'Failed to create user' });
-        }
-        
-        req.userEmail = userEmail;
-        next();
-      });
-    } else {
-      req.userEmail = userEmail;
-      next();
-    }
-  });
+    next();
+  };
 }
 
 module.exports = {
-  authenticateUser
+  authenticateUser,
+  requireRole,
+  JWT_SECRET
 };

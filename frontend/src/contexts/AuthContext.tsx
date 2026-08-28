@@ -13,16 +13,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const storedEmail = localStorage.getItem('userEmail');
-      
-      if (storedEmail) {
-        try {
-          const response = await apiClient.getCurrentUser();
-          setUser(response.user);
-        } catch (error) {
-          console.error('Auth check failed:', error);
-          localStorage.removeItem('userEmail');
-        }
+      try {
+        const response = await apiClient.getCurrentUser();
+        setUser(response.user);
+      } catch {
+        setUser(null);
       }
       setIsLoading(false);
     };
@@ -30,25 +25,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkAuth();
   }, []);
 
-  const login = async (email: string) => {
+  const login = async (email: string, password: string) => {
     try {
-      const response = await apiClient.login(email);
+      const response = await apiClient.login(email, password);
       setUser(response.user);
-      localStorage.setItem('userEmail', email);
     } catch (error) {
       console.error('Login failed:', error);
       throw error;
     }
   };
 
-  const logout = () => {
+  const register = async (email: string, password: string) => {
+    try {
+      const response = await apiClient.register(email, password);
+      setUser(response.user);
+    } catch (error) {
+      console.error('Registration failed:', error);
+      throw error;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await apiClient.logout();
+    } catch {
+      // Ignore logout errors
+    }
     setUser(null);
-    localStorage.removeItem('userEmail');
   };
 
   const value: AuthContextType = {
     user,
     login,
+    register,
     logout,
     isLoading,
     isAuthenticated: !!user,

@@ -31,7 +31,21 @@ async function initializeDatabase() {
       database.run(`
         CREATE TABLE IF NOT EXISTS users (
           email TEXT PRIMARY KEY,
+          password_hash TEXT NOT NULL,
+          role TEXT NOT NULL DEFAULT 'user',
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // Create refresh_tokens table
+      database.run(`
+        CREATE TABLE IF NOT EXISTS refresh_tokens (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_email TEXT NOT NULL,
+          token TEXT NOT NULL UNIQUE,
+          expires_at DATETIME NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
         )
       `);
 
@@ -71,6 +85,8 @@ async function initializeDatabase() {
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_client_id ON work_entries (client_id)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_user_email ON work_entries (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_date ON work_entries (date)`);
+      database.run(`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens (token)`);
+      database.run(`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_email ON refresh_tokens (user_email)`);
 
       console.log('Database tables created successfully');
       resolve();

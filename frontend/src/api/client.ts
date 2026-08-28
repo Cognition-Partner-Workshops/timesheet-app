@@ -1,7 +1,5 @@
 import axios, { type AxiosInstance, type AxiosResponse } from 'axios';
 
-// Use empty string to make requests relative to the current origin
-// Vite proxy will forward /api requests to the backend
 const API_BASE_URL = '';
 
 class ApiClient {
@@ -11,32 +9,17 @@ class ApiClient {
     this.client = axios.create({
       baseURL: API_BASE_URL,
       timeout: 10000,
+      withCredentials: true,
       headers: {
         'Content-Type': 'application/json',
       },
     });
-
-    // Request interceptor to add email header
-    this.client.interceptors.request.use(
-      (config) => {
-        const userEmail = localStorage.getItem('userEmail');
-        if (userEmail) {
-          config.headers['x-user-email'] = userEmail;
-        }
-        return config;
-      },
-      (error) => {
-        return Promise.reject(error);
-      }
-    );
 
     // Response interceptor for error handling
     this.client.interceptors.response.use(
       (response: AxiosResponse) => response,
       (error) => {
         if (error.response?.status === 401) {
-          // Clear stored email on auth error
-          localStorage.removeItem('userEmail');
           window.location.href = '/login';
         }
         return Promise.reject(error);
@@ -45,8 +28,18 @@ class ApiClient {
   }
 
   // Auth endpoints
-  async login(email: string) {
-    const response = await this.client.post('/api/auth/login', { email });
+  async login(email: string, password: string) {
+    const response = await this.client.post('/api/auth/login', { email, password });
+    return response.data;
+  }
+
+  async register(email: string, password: string) {
+    const response = await this.client.post('/api/auth/register', { email, password });
+    return response.data;
+  }
+
+  async logout() {
+    const response = await this.client.post('/api/auth/logout');
     return response.data;
   }
 
@@ -78,11 +71,6 @@ class ApiClient {
 
   async deleteClient(id: number) {
     const response = await this.client.delete(`/api/clients/${id}`);
-    return response.data;
-  }
-
-  async deleteAllClients() {
-    const response = await this.client.delete('/api/clients');
     return response.data;
   }
 
