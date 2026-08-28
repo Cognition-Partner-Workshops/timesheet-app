@@ -585,4 +585,368 @@ describe('Work Entry Routes', () => {
       expect(response.body.message).toBe('Work entry updated successfully');
     });
   });
+
+  describe('POST /api/work-entries - Unexpected Error', () => {
+    test('should handle unexpected error in try-catch block', async () => {
+      getDatabase.mockImplementation(() => {
+        throw new Error('Unexpected error');
+      });
+
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({
+          clientId: 1,
+          hours: 5,
+          date: '2024-01-15'
+        });
+
+      expect(response.status).toBe(500);
+    });
+  });
+
+  describe('PUT /api/work-entries/:id - Unexpected Error', () => {
+    test('should handle unexpected error in try-catch block', async () => {
+      getDatabase.mockImplementation(() => {
+        throw new Error('Unexpected error');
+      });
+
+      const response = await request(app)
+        .put('/api/work-entries/1')
+        .send({ hours: 8 });
+
+      expect(response.status).toBe(500);
+    });
+  });
+
+  describe('Mutation Testing - SQL Query and Parameter Verification', () => {
+    test('GET / should query work_entries joined with clients using user_email', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, []);
+      });
+
+      await request(app).get('/api/work-entries');
+
+      const query = mockDb.all.mock.calls[0][0];
+      const params = mockDb.all.mock.calls[0][1];
+      expect(query).toContain('FROM work_entries we');
+      expect(query).toContain('JOIN clients c ON we.client_id = c.id');
+      expect(query).toContain('WHERE we.user_email = ?');
+      expect(query).toContain('ORDER BY we.date DESC');
+      expect(query).toContain('we.created_at DESC');
+      expect(query).toContain('c.name as client_name');
+      expect(params).toEqual(['test@example.com']);
+    });
+
+    test('GET / with clientId filter should append AND clause with parsed integer', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, []);
+      });
+
+      await request(app).get('/api/work-entries?clientId=5');
+
+      const query = mockDb.all.mock.calls[0][0];
+      const params = mockDb.all.mock.calls[0][1];
+      expect(query).toContain('AND we.client_id = ?');
+      expect(params).toEqual(['test@example.com', 5]);
+    });
+
+    test('GET /:id should query with id and user_email params', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { id: 3 });
+      });
+
+      await request(app).get('/api/work-entries/3');
+
+      const query = mockDb.get.mock.calls[0][0];
+      const params = mockDb.get.mock.calls[0][1];
+      expect(query).toContain('FROM work_entries we');
+      expect(query).toContain('JOIN clients c');
+      expect(query).toContain('WHERE we.id = ?');
+      expect(query).toContain('we.user_email = ?');
+      expect(params).toEqual([3, 'test@example.com']);
+    });
+
+    test('POST / should verify client ownership before insert', async () => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 2 });
+      });
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.lastID = 10;
+        callback.call(this, null);
+      });
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 10 });
+      });
+
+      await request(app).post('/api/work-entries').send({
+        clientId: 2, hours: 5, date: '2024-01-15'
+      });
+
+      const verifyQuery = mockDb.get.mock.calls[0][0];
+      const verifyParams = mockDb.get.mock.calls[0][1];
+      expect(verifyQuery).toContain('SELECT id FROM clients');
+      expect(verifyQuery).toContain('WHERE id = ?');
+      expect(verifyQuery).toContain('user_email');
+      expect(verifyParams).toEqual([2, 'test@example.com']);
+    });
+
+    test('POST / should INSERT with correct columns and parameters', async () => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 2 });
+      });
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.lastID = 10;
+        callback.call(this, null);
+      });
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 10 });
+      });
+
+      await request(app).post('/api/work-entries').send({
+        clientId: 2, hours: 5, description: 'Test work', date: '2024-01-15'
+      });
+
+      const insertQuery = mockDb.run.mock.calls[0][0];
+      const insertParams = mockDb.run.mock.calls[0][1];
+      expect(insertQuery).toContain('INSERT INTO work_entries');
+      expect(insertQuery).toContain('client_id');
+      expect(insertQuery).toContain('user_email');
+      expect(insertQuery).toContain('hours');
+      expect(insertQuery).toContain('description');
+      expect(insertQuery).toContain('date');
+      expect(insertParams[0]).toBe(2);
+      expect(insertParams[1]).toBe('test@example.com');
+      expect(insertParams[2]).toBe(5);
+      expect(insertParams[3]).toBe('Test work');
+      expect(insertParams).toHaveLength(5);
+    });
+
+    test('POST / should pass null for missing description', async () => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.lastID = 1;
+        callback.call(this, null);
+      });
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      await request(app).post('/api/work-entries').send({
+        clientId: 1, hours: 3, date: '2024-01-20'
+      });
+
+      const insertParams = mockDb.run.mock.calls[0][1];
+      expect(insertParams[3]).toBeNull();
+    });
+
+    test('POST / should retrieve created entry using lastID with JOIN', async () => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.lastID = 55;
+        callback.call(this, null);
+      });
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 55, client_name: 'Cl' });
+      });
+
+      const response = await request(app).post('/api/work-entries').send({
+        clientId: 1, hours: 2, date: '2024-01-20'
+      });
+
+      expect(response.status).toBe(201);
+      expect(response.body.message).toBe('Work entry created successfully');
+
+      const retrieveQuery = mockDb.get.mock.calls[1][0];
+      const retrieveParams = mockDb.get.mock.calls[1][1];
+      expect(retrieveQuery).toContain('FROM work_entries we');
+      expect(retrieveQuery).toContain('JOIN clients c');
+      expect(retrieveQuery).toContain('WHERE we.id = ?');
+      expect(retrieveParams).toEqual([55]);
+    });
+
+    test('PUT /:id should check work entry exists with id and user_email', async () => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 4 });
+      });
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 4 });
+      });
+
+      await request(app).put('/api/work-entries/4').send({ hours: 6 });
+
+      const checkQuery = mockDb.get.mock.calls[0][0];
+      const checkParams = mockDb.get.mock.calls[0][1];
+      expect(checkQuery).toContain('SELECT id FROM work_entries');
+      expect(checkQuery).toContain('WHERE id = ?');
+      expect(checkQuery).toContain('user_email');
+      expect(checkParams).toEqual([4, 'test@example.com']);
+    });
+
+    test('PUT /:id should build UPDATE with only hours field', async () => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1, hours: 8 });
+      });
+
+      await request(app).put('/api/work-entries/1').send({ hours: 8 });
+
+      const updateQuery = mockDb.run.mock.calls[0][0];
+      const updateParams = mockDb.run.mock.calls[0][1];
+      expect(updateQuery).toContain('UPDATE work_entries SET');
+      expect(updateQuery).toContain('hours = ?');
+      expect(updateQuery).toContain('updated_at = CURRENT_TIMESTAMP');
+      expect(updateQuery).toContain('WHERE id = ?');
+      expect(updateQuery).toContain('user_email');
+      expect(updateParams).toEqual([8, 1, 'test@example.com']);
+    });
+
+    test('PUT /:id should include description field and coerce empty to null', async () => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      await request(app).put('/api/work-entries/1').send({ description: '' });
+
+      const updateParams = mockDb.run.mock.calls[0][1];
+      expect(updateParams[0]).toBeNull();
+    });
+
+    test('PUT /:id should include date field when provided', async () => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      await request(app).put('/api/work-entries/1').send({ date: '2024-06-01' });
+
+      const updateQuery = mockDb.run.mock.calls[0][0];
+      const updateParams = mockDb.run.mock.calls[0][1];
+      expect(updateQuery).toContain('date = ?');
+      expect(updateParams[0]).toBeTruthy();
+    });
+
+    test('PUT /:id should include client_id field when clientId provided', async () => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 5 });
+      });
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      await request(app).put('/api/work-entries/1').send({ clientId: 5 });
+
+      const updateQuery = mockDb.run.mock.calls[0][0];
+      const updateParams = mockDb.run.mock.calls[0][1];
+      expect(updateQuery).toContain('client_id = ?');
+      expect(updateParams[0]).toBe(5);
+    });
+
+    test('PUT /:id should verify new client ownership when clientId updated', async () => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 7 });
+      });
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      await request(app).put('/api/work-entries/1').send({ clientId: 7 });
+
+      const clientCheckQuery = mockDb.get.mock.calls[1][0];
+      const clientCheckParams = mockDb.get.mock.calls[1][1];
+      expect(clientCheckQuery).toContain('SELECT id FROM clients');
+      expect(clientCheckQuery).toContain('WHERE id = ?');
+      expect(clientCheckQuery).toContain('user_email');
+      expect(clientCheckParams).toEqual([7, 'test@example.com']);
+    });
+
+    test('PUT /:id should retrieve updated entry with JOIN after update', async () => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 9 });
+      });
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 9, hours: 4 });
+      });
+
+      await request(app).put('/api/work-entries/9').send({ hours: 4 });
+
+      const retrieveQuery = mockDb.get.mock.calls[1][0];
+      const retrieveParams = mockDb.get.mock.calls[1][1];
+      expect(retrieveQuery).toContain('FROM work_entries we');
+      expect(retrieveQuery).toContain('JOIN clients c');
+      expect(retrieveQuery).toContain('WHERE we.id = ?');
+      expect(retrieveParams).toEqual([9]);
+    });
+
+    test('DELETE /:id should check existence with correct params', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { id: 6 });
+      });
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+
+      await request(app).delete('/api/work-entries/6');
+
+      const checkParams = mockDb.get.mock.calls[0][1];
+      expect(checkParams).toEqual([6, 'test@example.com']);
+
+      const deleteQuery = mockDb.run.mock.calls[0][0];
+      const deleteParams = mockDb.run.mock.calls[0][1];
+      expect(deleteQuery).toContain('DELETE FROM work_entries');
+      expect(deleteQuery).toContain('WHERE id = ?');
+      expect(deleteQuery).toContain('user_email');
+      expect(deleteParams).toEqual([6, 'test@example.com']);
+    });
+
+    test('DELETE /:id should return exact success message', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+
+      const response = await request(app).delete('/api/work-entries/1');
+
+      expect(response.body.message).toBe('Work entry deleted successfully');
+    });
+  });
 });
