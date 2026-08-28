@@ -18,8 +18,12 @@ function errorHandler(err, req, res, next) {
   }
 
   // Default error
-  res.status(err.status || 500).json({
-    error: err.message || 'Internal server error'
+  const statusCode = err.status || 500;
+  const isServerError = statusCode >= 500;
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  res.status(statusCode).json({
+    error: (isServerError && isProduction) ? 'Internal server error' : (err.message || 'Internal server error')
   });
 }
 
