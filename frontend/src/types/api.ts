@@ -77,3 +77,12 @@ export interface ApiResponse<T> {
   error?: string;
   message?: string;
 }
+
+/** Axios error shape returned by API calls, used in mutation error handlers. */
+export interface ApiError {
+  response?: {
+    data?: {
+      error?: string;
+    };
+  };
+}

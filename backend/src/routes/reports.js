@@ -8,6 +8,10 @@ const fs = require('fs');
 
 const router = express.Router();
 
+// PDF layout constants
+const PDF_PAGE_BREAK_Y_THRESHOLD = 700;
+const PDF_SEPARATOR_INTERVAL = 5;
+
 // All routes require authentication
 router.use(authenticateUser);
 
@@ -219,8 +223,7 @@ router.get('/export/pdf/:clientId', (req, res) => {
           workEntries.forEach((entry, index) => {
             const y = doc.y;
             
-            // Check if we need a new page
-            if (y > 700) {
+            if (y > PDF_PAGE_BREAK_Y_THRESHOLD) {
               doc.addPage();
             }
             
@@ -229,8 +232,7 @@ router.get('/export/pdf/:clientId', (req, res) => {
             doc.text(entry.description || 'No description', 230, y, { width: 300 });
             doc.moveDown();
             
-            // Add separator line every 5 entries
-            if ((index + 1) % 5 === 0) {
+            if ((index + 1) % PDF_SEPARATOR_INTERVAL === 0) {
               doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
               doc.moveDown(0.5);
             }
