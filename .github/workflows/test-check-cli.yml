@@ -1,0 +1,430 @@
+name: Test Suite Maintenance (Devin CLI)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - feature/pr-test-update-workflow
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  analyze-changes:
+    name: Analyze Changes
+    if: "!contains(github.event.pull_request.user.login, 'devin')"
+    runs-on: ubuntu-latest
+    outputs:
+      needs_test_update: ${{ steps.categorize.outputs.needs_test_update }}
+      summary: ${{ steps.categorize.outputs.summary }}
+      tests_report: ${{ steps.categorize.outputs.tests_report }}
+      ui_changes: ${{ steps.categorize.outputs.ui_changes }}
+      backend_changes: ${{ steps.categorize.outputs.backend_changes }}
+      ui_missing: ${{ steps.categorize.outputs.ui_missing }}
+      ui_existing: ${{ steps.categorize.outputs.ui_existing }}
+      backend_missing: ${{ steps.categorize.outputs.backend_missing }}
+      backend_existing: ${{ steps.categorize.outputs.backend_existing }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CHANGED_FILES=$(gh pr diff ${{ github.event.pull_request.number }} --name-only)
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          {
+            echo "files<<FILES_EOF"
+            echo "$CHANGED_FILES"
+            echo "FILES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Categorize changes and check test coverage
+        id: categorize
+        run: |
+          CHANGED_FILES="${{ steps.changed.outputs.files }}"
+
+          UI_CHANGES=""
+          BACKEND_CHANGES=""
+          ENV_CHANGES=""
+          CONFIG_CHANGES=""
+
+          UI_MISSING_TESTS=""
+          UI_EXISTING_TESTS=""
+          BACKEND_MISSING_TESTS=""
+          BACKEND_EXISTING_TESTS=""
+
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+
+            # UI: frontend source files (excluding test files and config)
+            if echo "$file" | grep -qE '^frontend/src/.*\.(tsx?|css)$' && ! echo "$file" | grep -qE '__tests__|\.test\.|\.spec\.'; then
+              UI_CHANGES="${UI_CHANGES}${file}\n"
+
+              DIR=$(dirname "$file")
+              BASENAME=$(basename "$file")
+              NAME_NO_EXT="${BASENAME%.*}"
+              EXT="${BASENAME##*.}"
+
+              if [ "$EXT" = "css" ]; then
+                continue
+              fi
+
+              TEST_FILE="${DIR}/__tests__/${NAME_NO_EXT}.test.${EXT}"
+              SPEC_FILE="${DIR}/__tests__/${NAME_NO_EXT}.spec.${EXT}"
+
+              if [ -f "$TEST_FILE" ] || [ -f "$SPEC_FILE" ]; then
+                UI_EXISTING_TESTS="${UI_EXISTING_TESTS}- ${file} → test exists (${TEST_FILE})\n"
+              else
+                UI_MISSING_TESTS="${UI_MISSING_TESTS}- ${file} → no test found (expected ${TEST_FILE})\n"
+              fi
+
+            # Backend: backend source files (excluding test files and config)
+            elif echo "$file" | grep -qE '^backend/src/.*\.js$' && ! echo "$file" | grep -qE '__tests__|\.test\.|\.spec\.'; then
+              BACKEND_CHANGES="${BACKEND_CHANGES}${file}\n"
+
+              REL_PATH="${file#backend/src/}"
+              DIR=$(dirname "$REL_PATH")
+              BASENAME=$(basename "$REL_PATH")
+              NAME_NO_EXT="${BASENAME%.js}"
+
+              TEST_FILE="backend/src/__tests__/${DIR}/${NAME_NO_EXT}.test.js"
+
+              if [ -f "$TEST_FILE" ]; then
+                BACKEND_EXISTING_TESTS="${BACKEND_EXISTING_TESTS}- ${file} → test exists (${TEST_FILE})\n"
+              else
+                BACKEND_MISSING_TESTS="${BACKEND_MISSING_TESTS}- ${file} → no test found (expected ${TEST_FILE})\n"
+              fi
+
+            # Environment: .env files, docker, deployment configs
+            elif echo "$file" | grep -qE '\.env|docker/|Dockerfile|DEPLOYMENT|\.env\.example'; then
+              ENV_CHANGES="${ENV_CHANGES}${file}\n"
+
+            # Config: package.json, tsconfig, eslint, vite, jest, sonar, CI workflows, etc.
+            elif echo "$file" | grep -qE 'package\.json|package-lock\.json|tsconfig|eslint|vite\.config|jest\.config|sonar-project|\.github/|\.windsurf/'; then
+              CONFIG_CHANGES="${CONFIG_CHANGES}${file}\n"
+            fi
+
+          done <<< "$CHANGED_FILES"
+
+          # --- Build summary ---
+          SUMMARY=""
+          NEEDS_TEST_UPDATE="false"
+
+          if [ -n "$UI_CHANGES" ]; then
+            SUMMARY="${SUMMARY}### UI Changes\n\`\`\`\n$(echo -e "$UI_CHANGES")\`\`\`\n\n"
+          fi
+          if [ -n "$BACKEND_CHANGES" ]; then
+            SUMMARY="${SUMMARY}### Backend Changes\n\`\`\`\n$(echo -e "$BACKEND_CHANGES")\`\`\`\n\n"
+          fi
+          if [ -n "$ENV_CHANGES" ]; then
+            SUMMARY="${SUMMARY}### Environment Changes\n\`\`\`\n$(echo -e "$ENV_CHANGES")\`\`\`\n\n"
+          fi
+          if [ -n "$CONFIG_CHANGES" ]; then
+            SUMMARY="${SUMMARY}### Config Changes\n\`\`\`\n$(echo -e "$CONFIG_CHANGES")\`\`\`\n\n"
+          fi
+
+          TESTS_REPORT=""
+          if [ -n "$UI_EXISTING_TESTS" ]; then
+            TESTS_REPORT="${TESTS_REPORT}#### UI – Tests to Update\n$(echo -e "$UI_EXISTING_TESTS")\n"
+            NEEDS_TEST_UPDATE="true"
+          fi
+          if [ -n "$UI_MISSING_TESTS" ]; then
+            TESTS_REPORT="${TESTS_REPORT}#### UI – Tests to Create\n$(echo -e "$UI_MISSING_TESTS")\n"
+            NEEDS_TEST_UPDATE="true"
+          fi
+          if [ -n "$BACKEND_EXISTING_TESTS" ]; then
+            TESTS_REPORT="${TESTS_REPORT}#### Backend – Tests to Update\n$(echo -e "$BACKEND_EXISTING_TESTS")\n"
+            NEEDS_TEST_UPDATE="true"
+          fi
+          if [ -n "$BACKEND_MISSING_TESTS" ]; then
+            TESTS_REPORT="${TESTS_REPORT}#### Backend – Tests to Create\n$(echo -e "$BACKEND_MISSING_TESTS")\n"
+            NEEDS_TEST_UPDATE="true"
+          fi
+
+          echo "needs_test_update=${NEEDS_TEST_UPDATE}" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "summary<<SUMMARY_EOF"
+            echo -e "$SUMMARY"
+            echo "SUMMARY_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "tests_report<<TESTS_EOF"
+            echo -e "$TESTS_REPORT"
+            echo "TESTS_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "ui_changes<<UI_EOF"
+            echo -e "$UI_CHANGES"
+            echo "UI_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "backend_changes<<BE_EOF"
+            echo -e "$BACKEND_CHANGES"
+            echo "BE_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "ui_missing<<UIM_EOF"
+            echo -e "$UI_MISSING_TESTS"
+            echo "UIM_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "ui_existing<<UIE_EOF"
+            echo -e "$UI_EXISTING_TESTS"
+            echo "UIE_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "backend_missing<<BEM_EOF"
+            echo -e "$BACKEND_MISSING_TESTS"
+            echo "BEM_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "backend_existing<<BEE_EOF"
+            echo -e "$BACKEND_EXISTING_TESTS"
+            echo "BEE_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ "$NEEDS_TEST_UPDATE" = "true" ]; then
+            echo "Test maintenance needed."
+          else
+            echo "No test maintenance needed — changes are config/env only or all tests already exist."
+          fi
+
+      - name: Comment analysis on PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NEEDS="${{ steps.categorize.outputs.needs_test_update }}"
+
+          COMMENT="## Test Suite Maintenance – Change Analysis"
+          COMMENT="${COMMENT}\n\n${{ steps.categorize.outputs.summary }}"
+
+          if [ "$NEEDS" = "true" ]; then
+            COMMENT="${COMMENT}\n### Test Coverage Gap Detected\n\n${{ steps.categorize.outputs.tests_report }}"
+            COMMENT="${COMMENT}\n\n> Devin CLI will run headlessly to create/update tests and push to this PR."
+          else
+            COMMENT="${COMMENT}\n\nAll changed source files have corresponding tests, or changes are limited to config/env files. No test maintenance required."
+          fi
+
+          echo -e "$COMMENT" | gh pr comment ${{ github.event.pull_request.number }} --body-file -
+
+  maintain-tests:
+    name: Devin CLI - Maintain Tests
+    needs: [analyze-changes]
+    if: needs.analyze-changes.outputs.needs_test_update == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          (cd frontend && npm ci)
+          (cd backend && npm ci)
+
+      - name: Build test maintenance prompt
+        id: prompt
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          UI_CHANGES: ${{ needs.analyze-changes.outputs.ui_changes }}
+          BACKEND_CHANGES: ${{ needs.analyze-changes.outputs.backend_changes }}
+          UI_MISSING: ${{ needs.analyze-changes.outputs.ui_missing }}
+          UI_EXISTING: ${{ needs.analyze-changes.outputs.ui_existing }}
+          BACKEND_MISSING: ${{ needs.analyze-changes.outputs.backend_missing }}
+          BACKEND_EXISTING: ${{ needs.analyze-changes.outputs.backend_existing }}
+        run: |
+          cat > test-maintenance-prompt.txt <<'PROMPT_HEADER'
+          You are a test maintenance engineer. Source code has changed and the test suite needs updating.
+          Review the code changes (use git diff) and maintain the test suite accordingly.
+
+          PROMPT_HEADER
+
+          # --- UI test tasks ---
+          if [ -n "$UI_EXISTING" ] || [ -n "$UI_MISSING" ]; then
+            cat >> test-maintenance-prompt.txt <<TASK_UI
+          == UI Test Maintenance ==
+          Changed frontend source files:
+          ${UI_CHANGES}
+          TASK_UI
+
+            if [ -n "$UI_EXISTING" ]; then
+              cat >> test-maintenance-prompt.txt <<EXISTING_UI
+          Tests that EXIST and need updating to match the new code:
+          ${UI_EXISTING}
+
+          For each file above, review the code diff and update the corresponding test file so it validates the new behavior. Do not remove existing valid test cases — add or modify as needed.
+          EXISTING_UI
+            fi
+
+            if [ -n "$UI_MISSING" ]; then
+              cat >> test-maintenance-prompt.txt <<MISSING_UI
+          Tests that need to be CREATED:
+          ${UI_MISSING}
+
+          For each file above, create a new test file at the expected path. Write meaningful unit tests that cover the component's rendering, user interactions, and key behaviors. Aim for at least 80% coverage of the changed file.
+          MISSING_UI
+            fi
+
+            cat >> test-maintenance-prompt.txt <<'UI_CONSTRAINTS'
+
+          UI Test Constraints:
+          - Use vitest with @testing-library/react for all frontend tests.
+          - The test setup file is at frontend/src/test/setup.ts (imports jest-dom matchers).
+          - Place tests in the __tests__/ subdirectory adjacent to the source file.
+          - Run: cd frontend && npm run test — to verify tests pass.
+          - Run: cd frontend && npm run build — to verify the build still succeeds.
+          - Do NOT modify source components — only add or update test files.
+
+          UI_CONSTRAINTS
+          fi
+
+          # --- Backend test tasks ---
+          if [ -n "$BACKEND_EXISTING" ] || [ -n "$BACKEND_MISSING" ]; then
+            cat >> test-maintenance-prompt.txt <<TASK_BE
+          == Backend Test Maintenance ==
+          Changed backend source files:
+          ${BACKEND_CHANGES}
+          TASK_BE
+
+            if [ -n "$BACKEND_EXISTING" ]; then
+              cat >> test-maintenance-prompt.txt <<EXISTING_BE
+          Tests that EXIST and need updating to match the new code:
+          ${BACKEND_EXISTING}
+
+          For each file above, review the code diff and update the corresponding test file so it validates the new behavior. Do not remove existing valid test cases — add or modify as needed.
+          EXISTING_BE
+            fi
+
+            if [ -n "$BACKEND_MISSING" ]; then
+              cat >> test-maintenance-prompt.txt <<MISSING_BE
+          Tests that need to be CREATED:
+          ${BACKEND_MISSING}
+
+          For each file above, create a new test file at the expected path under backend/src/__tests__/. Write meaningful unit tests using Jest that cover the module's exported functions, error handling, and edge cases.
+          MISSING_BE
+            fi
+
+            cat >> test-maintenance-prompt.txt <<'BE_CONSTRAINTS'
+
+          Backend Test Constraints:
+          - Use Jest for all backend tests. Test setup is in backend/src/__tests__/setup.js.
+          - Place tests in backend/src/__tests__/ mirroring the source directory structure.
+          - Run: cd backend && npm test — to verify tests pass.
+          - Do NOT modify source code — only add or update test files.
+
+          BE_CONSTRAINTS
+          fi
+
+          cat >> test-maintenance-prompt.txt <<'PROMPT_FOOTER'
+          General rules:
+          - ONLY modify or create test files. Do NOT change source code.
+          - Tests must be meaningful — validate real behavior, not just assert true.
+          - Maintain consistent style with the existing test files in the repo.
+          - If a changed file is a CSS file, a config file, or an env file, skip it.
+          - After writing all tests, run the full test suites and the build to confirm everything passes.
+          PROMPT_FOOTER
+
+          echo "Prompt written to test-maintenance-prompt.txt"
+          cat test-maintenance-prompt.txt
+
+      - name: Install and authenticate Devin CLI
+        env:
+          WINDSURF_API_KEY: ${{ secrets.WINDSURF_API_KEY }}
+        run: |
+          for dir in "$HOME/.local/share/cognition" "$HOME/.local/share/devin"; do
+            mkdir -p "$dir"
+            echo "windsurf_api_key = \"$WINDSURF_API_KEY\"" > "$dir/credentials.toml"
+          done
+
+          curl -fsSL https://cli.devin.ai/install.sh | sed '/setup$/d' | bash
+
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+
+          devin --version
+          devin auth status 2>&1 || true
+
+      - name: Run Devin CLI to maintain tests
+        env:
+          WINDSURF_API_KEY: ${{ secrets.WINDSURF_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            BACKEND_FLAG="--backend anthropic"
+          else
+            BACKEND_FLAG=""
+          fi
+
+          PROMPT=$(cat test-maintenance-prompt.txt)
+
+          devin -p $BACKEND_FLAG --permission-mode dangerous \
+            -- "$PROMPT" \
+            | tee devin-output.txt
+
+          echo "## Devin CLI Test Maintenance Output" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat devin-output.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit and push test updates
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A '*.test.*' '*.spec.*' '*/__tests__/*'
+
+          if git diff --cached --quiet; then
+            echo "No test file changes to commit."
+          else
+            git commit -m "test: auto-maintain test suite for PR changes
+
+          Generated by Devin CLI in GitHub Actions"
+            git push origin HEAD:${PR_BRANCH}
+          fi
+
+      - name: Comment results on PR
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -f devin-output.txt ]; then
+            RESULT_COMMENT="## Test Suite Maintenance — Complete"
+            RESULT_COMMENT="${RESULT_COMMENT}\n\nDevin CLI ran headlessly and processed the test maintenance tasks."
+            RESULT_COMMENT="${RESULT_COMMENT}\n\n<details><summary>Devin CLI Output</summary>\n\n\`\`\`\n$(cat devin-output.txt)\n\`\`\`\n\n</details>"
+
+            echo -e "$RESULT_COMMENT" | gh pr comment ${{ github.event.pull_request.number }} --body-file -
+          fi

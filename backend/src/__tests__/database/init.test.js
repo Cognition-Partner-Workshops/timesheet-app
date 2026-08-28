@@ -171,6 +171,18 @@ describe('Database Initialization', () => {
       expect(clientTableQuery[0]).toContain('FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE');
     });
 
+    test('clients table should have phone column', async () => {
+      const db = getDatabase();
+      await initializeDatabase();
+
+      const clientTableQuery = db.run.mock.calls.find(call => 
+        call[0].includes('CREATE TABLE IF NOT EXISTS clients')
+      );
+
+      expect(clientTableQuery).toBeDefined();
+      expect(clientTableQuery[0]).toContain('phone TEXT');
+    });
+
     test('work_entries table should have foreign keys', async () => {
       const db = getDatabase();
       await initializeDatabase();

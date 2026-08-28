@@ -60,6 +60,37 @@ describe('Client Routes', () => {
       );
     });
 
+    test('should include phone field in the SELECT query', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, []);
+      });
+
+      await request(app).get('/api/clients');
+
+      expect(mockDb.all).toHaveBeenCalledWith(
+        expect.stringContaining('phone'),
+        expect.any(Array),
+        expect.any(Function)
+      );
+    });
+
+    test('should return clients with phone field', async () => {
+      const mockClients = [
+        { id: 1, name: 'Client A', description: 'Desc A', phone: '555-1111', created_at: '2024-01-01', updated_at: '2024-01-01' },
+        { id: 2, name: 'Client B', description: 'Desc B', phone: null, created_at: '2024-01-02', updated_at: '2024-01-02' }
+      ];
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, mockClients);
+      });
+
+      const response = await request(app).get('/api/clients');
+
+      expect(response.status).toBe(200);
+      expect(response.body.clients[0].phone).toBe('555-1111');
+      expect(response.body.clients[1].phone).toBeNull();
+    });
+
     test('should return empty array when no clients exist', async () => {
       mockDb.all.mockImplementation((query, params, callback) => {
         callback(null, []);
@@ -95,6 +126,24 @@ describe('Client Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({ client: mockClient });
+    });
+
+    test('should include phone field in the single client SELECT query', async () => {
+      const mockClient = { id: 1, name: 'Client A', phone: '555-4321' };
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, mockClient);
+      });
+
+      const response = await request(app).get('/api/clients/1');
+
+      expect(response.status).toBe(200);
+      expect(mockDb.get).toHaveBeenCalledWith(
+        expect.stringContaining('phone'),
+        expect.any(Array),
+        expect.any(Function)
+      );
+      expect(response.body.client.phone).toBe('555-4321');
     });
 
     test('should return 404 if client not found', async () => {
@@ -148,6 +197,74 @@ describe('Client Routes', () => {
       expect(response.status).toBe(201);
       expect(response.body.message).toBe('Client created successfully');
       expect(response.body.client).toEqual(createdClient);
+    });
+
+    test('should create client with phone field', async () => {
+      const newClient = { name: 'Phone Client', phone: '555-9999' };
+      const createdClient = { id: 2, name: 'Phone Client', phone: '555-9999', created_at: '2024-01-01', updated_at: '2024-01-01' };
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.lastID = 2;
+        callback.call(this, null);
+      });
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, createdClient);
+      });
+
+      const response = await request(app)
+        .post('/api/clients')
+        .send(newClient);
+
+      expect(response.status).toBe(201);
+      expect(response.body.client.phone).toBe('555-9999');
+      expect(mockDb.run).toHaveBeenCalledWith(
+        expect.stringContaining('phone'),
+        expect.arrayContaining(['555-9999']),
+        expect.any(Function)
+      );
+    });
+
+    test('should create client with all fields including phone', async () => {
+      const newClient = { name: 'Full Client', description: 'Desc', department: 'Sales', email: 'full@test.com', phone: '555-0000' };
+      const createdClient = { id: 3, ...newClient, created_at: '2024-01-01', updated_at: '2024-01-01' };
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.lastID = 3;
+        callback.call(this, null);
+      });
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, createdClient);
+      });
+
+      const response = await request(app)
+        .post('/api/clients')
+        .send(newClient);
+
+      expect(response.status).toBe(201);
+      expect(response.body.client).toEqual(createdClient);
+    });
+
+    test('should create client without phone (null in db)', async () => {
+      const newClient = { name: 'No Phone Client' };
+      const createdClient = { id: 4, name: 'No Phone Client', phone: null, created_at: '2024-01-01', updated_at: '2024-01-01' };
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.lastID = 4;
+        callback.call(this, null);
+      });
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, createdClient);
+      });
+
+      const response = await request(app)
+        .post('/api/clients')
+        .send(newClient);
+
+      expect(response.status).toBe(201);
+      expect(response.body.client.phone).toBeNull();
     });
 
     test('should create client without description', async () => {
@@ -243,6 +360,76 @@ describe('Client Routes', () => {
         .send({ description: 'New Description' });
 
       expect(response.status).toBe(200);
+    });
+
+    test('should update client phone', async () => {
+      const updatedClient = { id: 1, name: 'Client', phone: '555-updated' };
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, updatedClient);
+      });
+
+      const response = await request(app)
+        .put('/api/clients/1')
+        .send({ phone: '555-updated' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.client.phone).toBe('555-updated');
+    });
+
+    test('should update phone along with other fields', async () => {
+      const updatedClient = { id: 1, name: 'New Name', phone: '555-combo', email: 'new@test.com' };
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, updatedClient);
+      });
+
+      const response = await request(app)
+        .put('/api/clients/1')
+        .send({ name: 'New Name', phone: '555-combo', email: 'new@test.com' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.client.phone).toBe('555-combo');
+      expect(response.body.client.name).toBe('New Name');
+    });
+
+    test('should clear phone by sending empty string', async () => {
+      const updatedClient = { id: 1, name: 'Client', phone: null };
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, updatedClient);
+      });
+
+      const response = await request(app)
+        .put('/api/clients/1')
+        .send({ phone: '' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.client.phone).toBeNull();
     });
 
     test('should return 404 if client not found', async () => {
