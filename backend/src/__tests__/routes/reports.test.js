@@ -63,7 +63,7 @@ describe('Report Routes', () => {
       const mockClient = { id: 1, name: 'Test Client' };
       const mockWorkEntries = [
         { id: 1, hours: 5.5, description: 'Work 1', date: '2024-01-01' },
-        { id: 2, hours: 3.0, description: 'Work 2', date: '2024-01-02' }
+        { id: 2, hours: 3, description: 'Work 2', date: '2024-01-02' }
       ];
 
       mockDb.get.mockImplementation((query, params, callback) => {

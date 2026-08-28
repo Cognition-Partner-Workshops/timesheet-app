@@ -8,6 +8,19 @@ const fs = require('fs');
 
 const router = express.Router();
 
+function sendFileAndCleanup(res, tempPath, filename) {
+  res.download(tempPath, filename, (err) => {
+    if (err) {
+      console.error('Error sending file:', err);
+    }
+    fs.unlink(tempPath, (unlinkErr) => {
+      if (unlinkErr) {
+        console.error('Error deleting temp file:', unlinkErr);
+      }
+    });
+  });
+}
+
 // All routes require authentication
 router.use(authenticateUser);
 
@@ -101,8 +114,8 @@ router.get('/export/csv/:clientId', (req, res) => {
           }
           
           // Create temporary CSV file
-          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-          const filename = `${client.name.replace(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.csv`;
+          const timestamp = new Date().toISOString().replaceAll(/[:.]/g, '-');
+          const filename = `${client.name.replaceAll(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.csv`;
           const tempPath = path.join(__dirname, '../../temp', filename);
           
           // Ensure temp directory exists
@@ -123,18 +136,7 @@ router.get('/export/csv/:clientId', (req, res) => {
           
           csvWriter.writeRecords(workEntries)
             .then(() => {
-              // Send file and clean up
-              res.download(tempPath, filename, (err) => {
-                if (err) {
-                  console.error('Error sending file:', err);
-                }
-                // Clean up temp file
-                fs.unlink(tempPath, (unlinkErr) => {
-                  if (unlinkErr) {
-                    console.error('Error deleting temp file:', unlinkErr);
-                  }
-                });
-              });
+              sendFileAndCleanup(res, tempPath, filename);
             })
             .catch((error) => {
               console.error('Error creating CSV:', error);
@@ -185,8 +187,8 @@ router.get('/export/pdf/:clientId', (req, res) => {
           
           // Create PDF
           const doc = new PDFDocument();
-          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-          const filename = `${client.name.replace(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.pdf`;
+          const timestamp = new Date().toISOString().replaceAll(/[:.]/g, '-');
+          const filename = `${client.name.replaceAll(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.pdf`;
           
           // Set response headers
           res.setHeader('Content-Type', 'application/pdf');
