@@ -11,6 +11,7 @@ import {
 } from '@mui/material';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
+import { getApiErrorMessage } from '../types/api';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -28,8 +29,7 @@ const LoginPage: React.FC = () => {
       await login(email);
       navigate('/dashboard');
     } catch (err: unknown) {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Login failed. Please try again.');
+      setError(getApiErrorMessage(err, 'Login failed. Please try again.'));
     } finally {
       setIsLoading(false);
     }
