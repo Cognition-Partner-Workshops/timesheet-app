@@ -1,11 +1,11 @@
 const express = require('express');
 const { getDatabase } = require('../database/init');
 const { emailSchema } = require('../validation/schemas');
-const { authenticateUser } = require('../middleware/auth');
+const { authenticateUser, generateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Login endpoint - creates user if doesn't exist
+// Login endpoint - creates user if doesn't exist, returns JWT token
 router.post('/login', async (req, res, next) => {
   try {
     const { error, value } = emailSchema.validate(req.body);
@@ -24,9 +24,11 @@ router.post('/login', async (req, res, next) => {
       }
 
       if (row) {
-        // User exists
+        // User exists - issue JWT token
+        const token = generateToken(row.email);
         return res.json({
           message: 'Login successful',
+          token,
           user: {
             email: row.email,
             createdAt: row.created_at
@@ -40,8 +42,11 @@ router.post('/login', async (req, res, next) => {
             return res.status(500).json({ error: 'Failed to create user' });
           }
 
+          // Issue JWT token for new user
+          const token = generateToken(email);
           res.status(201).json({
             message: 'User created and logged in successfully',
+            token,
             user: {
               email: email,
               createdAt: new Date().toISOString()
