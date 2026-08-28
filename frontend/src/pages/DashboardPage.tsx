@@ -1,41 +1,36 @@
-import React from 'react';
-import {
-  Grid,
-  Card,
-  CardContent,
-  Typography,
-  Box,
-  Button,
-  Paper,
-} from '@mui/material';
+import React from 'react'
+import { Grid, Card, CardContent, Typography, Box, Button, Paper } from '@mui/material'
 import {
   Business as BusinessIcon,
   Assignment as AssignmentIcon,
   Assessment as AssessmentIcon,
   Add as AddIcon,
-} from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import apiClient from '../api/client';
+} from '@mui/icons-material'
+import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import apiClient from '../api/client'
 
 const DashboardPage: React.FC = () => {
-  const navigate = useNavigate();
+  const navigate = useNavigate()
 
   const { data: clientsData } = useQuery({
     queryKey: ['clients'],
     queryFn: () => apiClient.getClients(),
-  });
+  })
 
   const { data: workEntriesData } = useQuery({
     queryKey: ['workEntries'],
     queryFn: () => apiClient.getWorkEntries(),
-  });
+  })
 
-  const clients = clientsData?.clients || [];
-  const workEntries = workEntriesData?.workEntries || [];
+  const clients = clientsData?.clients || []
+  const workEntries = workEntriesData?.workEntries || []
 
-  const totalHours = workEntries.reduce((sum: number, entry: { hours: number }) => sum + entry.hours, 0);
-  const recentEntries = workEntries.slice(0, 5);
+  const totalHours = workEntries.reduce(
+    (sum: number, entry: { hours: number }) => sum + entry.hours,
+    0,
+  )
+  const recentEntries = workEntries.slice(0, 5)
 
   const statsCards = [
     {
@@ -59,7 +54,7 @@ const DashboardPage: React.FC = () => {
       color: '#f57c00',
       action: () => navigate('/reports'),
     },
-  ];
+  ]
 
   return (
     <Box>
@@ -125,19 +120,27 @@ const DashboardPage: React.FC = () => {
               </Button>
             </Box>
             {recentEntries.length > 0 ? (
-              recentEntries.map((entry: { id: number; client_name: string; hours: number; date: string; description?: string }) => (
-                <Box key={entry.id} sx={{ mb: 2, pb: 2, borderBottom: '1px solid #eee' }}>
-                  <Typography variant="subtitle1">{entry.client_name}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {entry.hours} hours - {new Date(entry.date).toLocaleDateString()}
-                  </Typography>
-                  {entry.description && (
-                    <Typography variant="body2" sx={{ mt: 1 }}>
-                      {entry.description}
+              recentEntries.map(
+                (entry: {
+                  id: number
+                  client_name: string
+                  hours: number
+                  date: string
+                  description?: string
+                }) => (
+                  <Box key={entry.id} sx={{ mb: 2, pb: 2, borderBottom: '1px solid #eee' }}>
+                    <Typography variant="subtitle1">{entry.client_name}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {entry.hours} hours - {new Date(entry.date).toLocaleDateString()}
                     </Typography>
-                  )}
-                </Box>
-              ))
+                    {entry.description && (
+                      <Typography variant="body2" sx={{ mt: 1 }}>
+                        {entry.description}
+                      </Typography>
+                    )}
+                  </Box>
+                ),
+              )
             ) : (
               <Typography color="text.secondary">No work entries yet</Typography>
             )}
@@ -180,7 +183,7 @@ const DashboardPage: React.FC = () => {
         </Grid>
       </Grid>
     </Box>
-  );
-};
+  )
+}
 
-export default DashboardPage;
+export default DashboardPage
