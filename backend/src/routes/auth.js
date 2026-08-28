@@ -2,6 +2,7 @@ const express = require('express');
 const { getDatabase } = require('../database/init');
 const { emailSchema } = require('../validation/schemas');
 const { authenticateUser } = require('../middleware/auth');
+const { logFailedLogin } = require('../middleware/securityLogger');
 
 const router = express.Router();
 
@@ -20,6 +21,7 @@ router.post('/login', async (req, res, next) => {
     db.get('SELECT email, created_at FROM users WHERE email = ?', [email], (err, row) => {
       if (err) {
         console.error('Database error:', err);
+        logFailedLogin(email, req.ip, 'database_error');
         return res.status(500).json({ error: 'Internal server error' });
       }
 
