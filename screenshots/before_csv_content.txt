@@ -1,0 +1,11 @@
+BEFORE FIX - CSV Export shows raw timestamps instead of dates:
+=========================================================
+
+Date,Hours,Description,Created At
+1782259200000,8,Frontend development - implemented login page,2026-06-24 14:00:12
+1782259200000,4.5,API integration and testing,2026-06-24 14:00:31
+
+=========================================================
+The "Date" column shows Unix epoch milliseconds (1782259200000)
+instead of human-readable dates like "2026-06-24".
+This makes the exported CSV reports completely unusable.
