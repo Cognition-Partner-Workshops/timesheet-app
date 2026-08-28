@@ -21,7 +21,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setUser(response.user);
         } catch (error) {
           console.error('Auth check failed:', error);
-          localStorage.removeItem('userEmail');
+          const status = (error as { response?: { status?: number } }).response?.status;
+          if (status === 401 || status === 403) {
+            localStorage.removeItem('userEmail');
+          } else {
+            setUser({ email: storedEmail, createdAt: '' });
+          }
         }
       }
       setIsLoading(false);

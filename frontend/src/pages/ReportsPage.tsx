@@ -149,6 +149,7 @@ const ReportsPage: React.FC = () => {
                       disabled={!selectedClientId || reportLoading}
                       color="primary"
                       size="large"
+                      aria-label="Export as CSV"
                     >
                       <CsvIcon />
                     </IconButton>
@@ -159,6 +160,7 @@ const ReportsPage: React.FC = () => {
                       disabled={!selectedClientId || reportLoading}
                       color="error"
                       size="large"
+                      aria-label="Export as PDF"
                     >
                       <PdfIcon />
                     </IconButton>

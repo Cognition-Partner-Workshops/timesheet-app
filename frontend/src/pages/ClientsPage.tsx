@@ -48,11 +48,12 @@ const ClientsPage: React.FC = () => {
       apiClient.createClient(clientData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['clientReport'] });
       handleClose();
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to create client');
+      const error = err as { response?: { data?: { error?: string; details?: string[] } } };
+      setError(error.response?.data?.details?.[0] || error.response?.data?.error || 'Failed to create client');
     },
   });
 
@@ -61,11 +62,12 @@ const ClientsPage: React.FC = () => {
       apiClient.updateClient(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['clientReport'] });
       handleClose();
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to update client');
+      const error = err as { response?: { data?: { error?: string; details?: string[] } } };
+      setError(error.response?.data?.details?.[0] || error.response?.data?.error || 'Failed to update client');
     },
   });
 
@@ -73,9 +75,10 @@ const ClientsPage: React.FC = () => {
     mutationFn: (id: number) => apiClient.deleteClient(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['clientReport'] });
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
+      const error = err as { response?: { data?: { error?: string; details?: string[] } } };
       setError(error.response?.data?.error || 'Failed to delete client');
     },
   });
@@ -84,9 +87,10 @@ const ClientsPage: React.FC = () => {
     mutationFn: () => apiClient.deleteAllClients(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['clientReport'] });
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
+      const error = err as { response?: { data?: { error?: string; details?: string[] } } };
       setError(error.response?.data?.error || 'Failed to delete all clients');
     },
   });
@@ -188,7 +192,7 @@ const ClientsPage: React.FC = () => {
         </Box>
       </Box>
 
-      {error && (
+      {error && !open && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
           {error}
         </Alert>
@@ -253,6 +257,7 @@ const ClientsPage: React.FC = () => {
                         onClick={() => handleOpen(client)}
                         color="primary"
                         size="small"
+                        aria-label={`Edit client ${client.name}`}
                       >
                         <EditIcon />
                       </IconButton>
@@ -260,6 +265,7 @@ const ClientsPage: React.FC = () => {
                         onClick={() => handleDelete(client)}
                         color="error"
                         size="small"
+                        aria-label={`Delete client ${client.name}`}
                       >
                         <DeleteIcon />
                       </IconButton>
@@ -284,8 +290,13 @@ const ClientsPage: React.FC = () => {
         <DialogTitle>
           {editingClient ? 'Edit Client' : 'Add New Client'}
         </DialogTitle>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           <DialogContent>
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+                {error}
+              </Alert>
+            )}
             <TextField
               autoFocus
               margin="dense"
