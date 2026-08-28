@@ -66,11 +66,26 @@ async function initializeDatabase() {
         )
       `);
 
+      // Create timesheet_submissions table
+      database.run(`
+        CREATE TABLE IF NOT EXISTS timesheet_submissions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_email TEXT NOT NULL,
+          week_start DATE NOT NULL,
+          week_end DATE NOT NULL,
+          total_hours DECIMAL(7,2) NOT NULL DEFAULT 0,
+          status TEXT NOT NULL DEFAULT 'submitted',
+          submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
+        )
+      `);
+
       // Create indexes for better performance
       database.run(`CREATE INDEX IF NOT EXISTS idx_clients_user_email ON clients (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_client_id ON work_entries (client_id)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_user_email ON work_entries (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_date ON work_entries (date)`);
+      database.run(`CREATE INDEX IF NOT EXISTS idx_timesheet_submissions_user_week ON timesheet_submissions (user_email, week_start)`);
 
       console.log('Database tables created successfully');
       resolve();
