@@ -7,6 +7,13 @@ jest.mock('../../database/init');
 jest.mock('../../middleware/auth', () => ({
   authenticateUser: (req, res, next) => {
     req.userEmail = 'test@example.com';
+    req.userRole = req.headers['x-user-role'] || 'member';
+    next();
+  },
+  requireApprover: (req, res, next) => {
+    if (req.userRole !== 'approver') {
+      return res.status(403).json({ error: 'Approver role required' });
+    }
     next();
   }
 }));
@@ -583,6 +590,131 @@ describe('Work Entry Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.message).toBe('Work entry updated successfully');
+    });
+  });
+
+  describe('Approval workflow', () => {
+    test.each([
+      ['draft', '/submit', 'submitted'],
+      ['rejected', '/submit', 'submitted'],
+    ])('should submit a %s entry', async (currentStatus, endpoint, nextStatus) => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { id: 1, status: currentStatus });
+      });
+      mockDb.run.mockImplementation((query, params, callback) => callback(null));
+
+      const response = await request(app).post(`/api/work-entries/1${endpoint}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe(nextStatus);
+      expect(mockDb.run).toHaveBeenCalledWith(
+        expect.stringContaining('SET status = ?'),
+        [nextStatus, 1, 'test@example.com'],
+        expect.any(Function)
+      );
+    });
+
+    test('should approve a submitted entry', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { id: 1, status: 'submitted' });
+      });
+      mockDb.run.mockImplementation((query, params, callback) => callback(null));
+
+      const response = await request(app)
+        .post('/api/work-entries/1/approve')
+        .set('x-user-role', 'approver');
+
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe('approved');
+      expect(mockDb.run).toHaveBeenCalledWith(
+        expect.stringContaining('SET status = ?'),
+        ['approved', 1],
+        expect.any(Function)
+      );
+    });
+
+    test('should reject a submitted entry', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { id: 1, status: 'submitted' });
+      });
+      mockDb.run.mockImplementation((query, params, callback) => callback(null));
+
+      const response = await request(app)
+        .post('/api/work-entries/1/reject')
+        .set('x-user-role', 'approver');
+
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe('rejected');
+    });
+
+    test.each([
+      ['submit', 'submitted', 'member'],
+      ['submit', 'approved', 'member'],
+      ['approve', 'draft', 'approver'],
+      ['approve', 'approved', 'approver'],
+      ['approve', 'rejected', 'approver'],
+      ['reject', 'draft', 'approver'],
+      ['reject', 'approved', 'approver'],
+      ['reject', 'rejected', 'approver'],
+    ])('should reject %s on a %s entry', async (action, currentStatus, role) => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { id: 1, status: currentStatus });
+      });
+
+      const response = await request(app)
+        .post(`/api/work-entries/1/${action}`)
+        .set('x-user-role', role);
+
+      expect(response.status).toBe(409);
+      expect(response.body.error).toContain(`status '${currentStatus}'`);
+      expect(mockDb.run).not.toHaveBeenCalled();
+    });
+
+    test.each(['/approve', '/reject'])('should return 403 to non-approvers for %s', async (endpoint) => {
+      const response = await request(app).post(`/api/work-entries/1${endpoint}`);
+
+      expect(response.status).toBe(403);
+      expect(response.body).toEqual({ error: 'Approver role required' });
+      expect(mockDb.get).not.toHaveBeenCalled();
+    });
+
+    test('should return submitted entries in the approver queue', async () => {
+      const entries = [{ id: 1, user_email: 'owner@example.com', status: 'submitted' }];
+      mockDb.all.mockImplementation((query, params, callback) => callback(null, entries));
+
+      const response = await request(app)
+        .get('/api/work-entries/pending-approvals')
+        .set('x-user-role', 'approver');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ workEntries: entries });
+      expect(mockDb.all).toHaveBeenCalledWith(
+        expect.stringContaining("WHERE we.status = 'submitted'"),
+        [],
+        expect.any(Function)
+      );
+    });
+
+    test('should return 403 to non-approvers for pending approvals', async () => {
+      const response = await request(app).get('/api/work-entries/pending-approvals');
+
+      expect(response.status).toBe(403);
+      expect(response.body).toEqual({ error: 'Approver role required' });
+      expect(mockDb.all).not.toHaveBeenCalled();
+    });
+
+    test.each(['put', 'delete'])('should not %s an approved entry', async (method) => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { id: 1, status: 'approved' });
+      });
+
+      const response = method === 'put'
+        ? await request(app).put('/api/work-entries/1').send({ hours: 8 })
+        : await request(app).delete('/api/work-entries/1');
+
+      expect(response.status).toBe(403);
+      expect(response.body).toEqual({ error: 'Approved entries cannot be modified' });
+      expect(mockDb.run).not.toHaveBeenCalled();
     });
   });
 });

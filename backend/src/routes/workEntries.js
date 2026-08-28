@@ -1,6 +1,6 @@
 const express = require('express');
 const { getDatabase } = require('../database/init');
-const { authenticateUser } = require('../middleware/auth');
+const { authenticateUser, requireApprover } = require('../middleware/auth');
 const { workEntrySchema, updateWorkEntrySchema } = require('../validation/schemas');
 
 const router = express.Router();
@@ -15,7 +15,7 @@ router.get('/', (req, res) => {
   
   let query = `
     SELECT we.id, we.client_id, we.hours, we.description, we.date, 
-           we.created_at, we.updated_at, c.name as client_name
+           we.created_at, we.updated_at, we.status, c.name as client_name
     FROM work_entries we
     JOIN clients c ON we.client_id = c.id
     WHERE we.user_email = ?
@@ -44,6 +44,29 @@ router.get('/', (req, res) => {
   });
 });
 
+// Get all submitted work entries for approvers
+router.get('/pending-approvals', requireApprover, (req, res) => {
+  const db = getDatabase();
+
+  db.all(
+    `SELECT we.id, we.client_id, we.user_email, we.hours, we.description, we.date,
+            we.created_at, we.updated_at, we.status, c.name as client_name
+     FROM work_entries we
+     JOIN clients c ON we.client_id = c.id
+     WHERE we.status = 'submitted'
+     ORDER BY we.date ASC, we.created_at ASC`,
+    [],
+    (err, rows) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      res.json({ workEntries: rows });
+    }
+  );
+});
+
 // Get specific work entry
 router.get('/:id', (req, res) => {
   const workEntryId = parseInt(req.params.id);
@@ -56,7 +79,7 @@ router.get('/:id', (req, res) => {
   
   db.get(
     `SELECT we.id, we.client_id, we.hours, we.description, we.date, 
-            we.created_at, we.updated_at, c.name as client_name
+            we.created_at, we.updated_at, we.status, c.name as client_name
      FROM work_entries we
      JOIN clients c ON we.client_id = c.id
      WHERE we.id = ? AND we.user_email = ?`,
@@ -114,7 +137,7 @@ router.post('/', (req, res, next) => {
             // Return the created work entry with client name
             db.get(
               `SELECT we.id, we.client_id, we.hours, we.description, we.date, 
-                      we.created_at, we.updated_at, c.name as client_name
+                      we.created_at, we.updated_at, we.status, c.name as client_name
                FROM work_entries we
                JOIN clients c ON we.client_id = c.id
                WHERE we.id = ?`,
@@ -158,7 +181,7 @@ router.put('/:id', (req, res, next) => {
 
     // Check if work entry exists and belongs to user
     db.get(
-      'SELECT id FROM work_entries WHERE id = ? AND user_email = ?',
+      'SELECT id, status FROM work_entries WHERE id = ? AND user_email = ?',
       [workEntryId, req.userEmail],
       (err, row) => {
         if (err) {
@@ -168,6 +191,10 @@ router.put('/:id', (req, res, next) => {
 
         if (!row) {
           return res.status(404).json({ error: 'Work entry not found' });
+        }
+
+        if (row.status === 'approved') {
+          return res.status(403).json({ error: 'Approved entries cannot be modified' });
         }
 
         // If clientId is being updated, verify it belongs to user
@@ -231,7 +258,7 @@ router.put('/:id', (req, res, next) => {
             // Return updated work entry with client name
             db.get(
               `SELECT we.id, we.client_id, we.hours, we.description, we.date, 
-                      we.created_at, we.updated_at, c.name as client_name
+                      we.created_at, we.updated_at, we.status, c.name as client_name
                FROM work_entries we
                JOIN clients c ON we.client_id = c.id
                WHERE we.id = ?`,
@@ -269,7 +296,7 @@ router.delete('/:id', (req, res) => {
   
   // Check if work entry exists and belongs to user
   db.get(
-    'SELECT id FROM work_entries WHERE id = ? AND user_email = ?',
+    'SELECT id, status FROM work_entries WHERE id = ? AND user_email = ?',
     [workEntryId, req.userEmail],
     (err, row) => {
       if (err) {
@@ -279,6 +306,10 @@ router.delete('/:id', (req, res) => {
       
       if (!row) {
         return res.status(404).json({ error: 'Work entry not found' });
+      }
+
+      if (row.status === 'approved') {
+        return res.status(403).json({ error: 'Approved entries cannot be modified' });
       }
       
       // Delete work entry
@@ -297,5 +328,71 @@ router.delete('/:id', (req, res) => {
     }
   );
 });
+
+// Submit a work entry for approval
+router.post('/:id/submit', (req, res) => {
+  updateApprovalStatus(req, res, ['draft', 'rejected'], 'submitted', 'submit');
+});
+
+// Approve a submitted work entry
+router.post('/:id/approve', requireApprover, (req, res) => {
+  updateApprovalStatus(req, res, ['submitted'], 'approved', 'approve');
+});
+
+// Reject a submitted work entry
+router.post('/:id/reject', requireApprover, (req, res) => {
+  updateApprovalStatus(req, res, ['submitted'], 'rejected', 'reject');
+});
+
+function updateApprovalStatus(req, res, validStatuses, nextStatus, action) {
+  const workEntryId = parseInt(req.params.id);
+
+  if (isNaN(workEntryId)) {
+    return res.status(400).json({ error: 'Invalid work entry ID' });
+  }
+
+  const db = getDatabase();
+  const ownerScoped = action === 'submit';
+  const query = ownerScoped
+    ? 'SELECT id, status FROM work_entries WHERE id = ? AND user_email = ?'
+    : 'SELECT id, status FROM work_entries WHERE id = ?';
+  const params = ownerScoped ? [workEntryId, req.userEmail] : [workEntryId];
+
+  db.get(query, params, (err, row) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
+    if (!row) {
+      return res.status(404).json({ error: 'Work entry not found' });
+    }
+
+    if (!validStatuses.includes(row.status)) {
+      return res.status(409).json({
+        error: `Cannot ${action} work entry with status '${row.status}'`
+      });
+    }
+
+    const updateQuery = ownerScoped
+      ? 'UPDATE work_entries SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_email = ?'
+      : 'UPDATE work_entries SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?';
+    const updateParams = ownerScoped
+      ? [nextStatus, workEntryId, req.userEmail]
+      : [nextStatus, workEntryId];
+
+    db.run(updateQuery, updateParams, (updateErr) => {
+      if (updateErr) {
+        console.error('Database error:', updateErr);
+        return res.status(500).json({ error: `Failed to ${action} work entry` });
+      }
+
+      res.json({
+        message: `Work entry ${nextStatus} successfully`,
+        status: nextStatus
+      });
+    });
+  });
+}
 
 module.exports = router;
