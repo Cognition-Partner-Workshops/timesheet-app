@@ -1,0 +1,435 @@
+name: Test Regression Healer
+
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  run-tests:
+    name: Run Backend Test Suite
+    # Prevent infinite loops: skip when Devin pushes a fix
+    if: github.actor != 'devin-ai-integration[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      test_failed: ${{ steps.backend_test.outputs.test_failed }}
+      failure_summary: ${{ steps.backend_test.outputs.failure_summary }}
+      failed_test_names: ${{ steps.backend_test.outputs.failed_test_names }}
+      error_log: ${{ steps.backend_test.outputs.error_log }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Run backend tests
+        id: backend_test
+        working-directory: backend
+        continue-on-error: true
+        run: |
+          set +e
+          TEST_OUTPUT=$(npm run test:ci -- --json --outputFile=/tmp/test-results.json 2>&1)
+          TEST_EXIT=$?
+
+          echo "$TEST_OUTPUT" > /tmp/test-full-output.txt
+
+          if [ $TEST_EXIT -eq 0 ]; then
+            echo "test_failed=false" >> "$GITHUB_OUTPUT"
+            echo "All tests passed."
+            exit 0
+          fi
+
+          echo "test_failed=true" >> "$GITHUB_OUTPUT"
+
+          # Extract failed test names from JSON report
+          FAILED_TESTS="[]"
+          if [ -f /tmp/test-results.json ]; then
+            FAILED_TESTS=$(jq -c '[
+              .testResults[]
+              | select(.status == "failed")
+              | .assertionResults[]
+              | select(.status == "failed")
+              | .ancestorTitles + [.title]
+              | join(" > ")
+            ]' /tmp/test-results.json 2>/dev/null || echo "[]")
+          fi
+
+          {
+            echo "failed_test_names<<TESTS_EOF"
+            echo "$FAILED_TESTS"
+            echo "TESTS_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          # Build human-readable failure summary from Jest output
+          SUMMARY=$(echo "$TEST_OUTPUT" | grep -A 3 "● " | head -100)
+          if [ -z "$SUMMARY" ]; then
+            SUMMARY=$(echo "$TEST_OUTPUT" | grep -E "(FAIL|Error|expect)" | head -50)
+          fi
+
+          {
+            echo "failure_summary<<SUMMARY_EOF"
+            echo "$SUMMARY"
+            echo "SUMMARY_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          # Capture error log (stack traces and assertion errors)
+          ERROR_LOG=$(echo "$TEST_OUTPUT" | sed -n '/● /,/^$/p' | head -200)
+          if [ -z "$ERROR_LOG" ]; then
+            ERROR_LOG=$(echo "$TEST_OUTPUT" | tail -80)
+          fi
+
+          {
+            echo "error_log<<LOG_EOF"
+            echo "$ERROR_LOG"
+            echo "LOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "::warning::Backend tests failed. Regression healer will report and attempt recovery."
+
+  report-and-heal:
+    name: Report Failures & Trigger Healing
+    needs: run-tests
+    if: needs.run-tests.outputs.test_failed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    concurrency:
+      group: regression-healer-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Find associated PR
+        id: find_pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: |
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
+
+          PR_NUMBER=$(gh api "repos/${REPO}/pulls?head=${REPO_OWNER}:${BRANCH}&state=open" \
+            --jq '.[0].number // empty' 2>/dev/null || true)
+
+          if [ -n "$PR_NUMBER" ]; then
+            echo "pr_number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+            echo "has_pr=true" >> "$GITHUB_OUTPUT"
+            echo "Found open PR #${PR_NUMBER} for branch ${BRANCH}"
+          else
+            echo "has_pr=false" >> "$GITHUB_OUTPUT"
+            echo "No open PR found for branch ${BRANCH}. Will skip PR comment."
+          fi
+
+      - name: Check circuit breaker
+        id: circuit_breaker
+        if: steps.find_pr.outputs.has_pr == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          FAILED_TEST_NAMES: ${{ needs.run-tests.outputs.failed_test_names }}
+          PR_NUMBER: ${{ steps.find_pr.outputs.pr_number }}
+        run: |
+          # Fetch all previous Regression Healer comments on this PR
+          HEALER_COMMENTS=$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+            --paginate --jq '[
+              .[]
+              | select(.body | contains("<!-- REGRESSION_HEALER_DATA:"))
+              | .body
+              | capture("<!-- REGRESSION_HEALER_DATA:(?<data>.+?)-->")
+              | .data
+            ]' 2>/dev/null || echo "[]")
+
+          echo "Previous healer comments found: $(echo "$HEALER_COMMENTS" | jq 'length')"
+
+          # Parse current failed tests
+          CURRENT_FAILURES=$(echo "$FAILED_TEST_NAMES" | jq -c '.' 2>/dev/null || echo "[]")
+
+          # Count consecutive failures per test across previous Devin fix attempts
+          # A "Devin fix attempt" is tracked by comments containing REGRESSION_HEALER_DATA
+          TRIPPED_TESTS="[]"
+          TRIPPED="false"
+
+          while IFS= read -r TEST_NAME; do
+            [ -z "$TEST_NAME" ] && continue
+            CONSECUTIVE_COUNT=0
+
+            # Count how many consecutive recent healer comments include this test
+            # Walk newest-first; stop counting when the test is NOT found
+            while IFS= read -r DATA; do
+              [ -z "$DATA" ] && continue
+              DECODED=$(echo "$DATA" | base64 -d 2>/dev/null || true)
+              PARSED=$(echo "$DECODED" | jq -c '.' 2>/dev/null || echo "[]")
+
+              if echo "$PARSED" | jq -e --arg name "$TEST_NAME" 'index($name)' > /dev/null 2>&1; then
+                CONSECUTIVE_COUNT=$((CONSECUTIVE_COUNT + 1))
+              else
+                break
+              fi
+            done < <(echo "$HEALER_COMMENTS" | jq -r '[.[] | @base64] | reverse | .[]' 2>/dev/null)
+
+            # Current failure + previous consecutive = total consecutive failures
+            TOTAL=$((CONSECUTIVE_COUNT + 1))
+
+            if [ "$TOTAL" -ge 3 ]; then
+              TRIPPED="true"
+              TRIPPED_TESTS=$(echo "$TRIPPED_TESTS" | jq -c --arg name "$TEST_NAME" --argjson count "$TOTAL" '. + [{"test": $name, "count": $count}]')
+            fi
+          done < <(echo "$CURRENT_FAILURES" | jq -r '.[]' 2>/dev/null)
+
+          echo "tripped=${TRIPPED}" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "tripped_tests<<TRIPPED_EOF"
+            echo "$TRIPPED_TESTS"
+            echo "TRIPPED_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ "$TRIPPED" = "true" ]; then
+            echo "::warning::Circuit breaker tripped! Tests have failed 3+ consecutive times."
+            echo "$TRIPPED_TESTS" | jq -r '.[] | "  - \(.test) (\(.count) consecutive failures)"'
+          fi
+
+      - name: Post PR comment with failure summary
+        if: steps.find_pr.outputs.has_pr == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.find_pr.outputs.pr_number }}
+          BRANCH: ${{ steps.find_pr.outputs.branch }}
+          COMMIT_SHA: ${{ github.sha }}
+          FAILED_TEST_NAMES: ${{ needs.run-tests.outputs.failed_test_names }}
+          FAILURE_SUMMARY: ${{ needs.run-tests.outputs.failure_summary }}
+          ERROR_LOG: ${{ needs.run-tests.outputs.error_log }}
+          CIRCUIT_TRIPPED: ${{ steps.circuit_breaker.outputs.tripped }}
+        run: |
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+
+          # Build test list
+          TEST_LIST=$(echo "$FAILED_TEST_NAMES" | jq -r '.[] | "- `\(.)`"' 2>/dev/null || echo "- (could not parse test names)")
+
+          # Circuit breaker status
+          if [ "$CIRCUIT_TRIPPED" = "true" ]; then
+            CB_STATUS="**CIRCUIT BREAKER TRIPPED** — These tests have failed 3+ times consecutively. A GitHub Issue has been created for human review."
+          else
+            CB_STATUS="Circuit breaker: OK (fewer than 3 consecutive failures per test)"
+          fi
+
+          COMMENT=$(cat <<EOF
+          ## Test Regression Healer — Failures Detected
+
+          **Branch:** \`${BRANCH}\` | **Commit:** \`${SHORT_SHA}\` | **Triggered by:** \`push\`
+
+          ### Failed Tests
+
+          ${TEST_LIST}
+
+          ### Error Details
+
+          \`\`\`
+          ${FAILURE_SUMMARY}
+          \`\`\`
+
+          <details>
+          <summary>Full stack traces</summary>
+
+          \`\`\`
+          ${ERROR_LOG}
+          \`\`\`
+
+          </details>
+
+          ### Circuit Breaker Status
+
+          ${CB_STATUS}
+
+          <!-- REGRESSION_HEALER_DATA:${FAILED_TEST_NAMES}-->
+          EOF
+          )
+
+          gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" -f body="$COMMENT"
+
+      - name: Escalate to GitHub Issue (circuit breaker)
+        if: steps.circuit_breaker.outputs.tripped == 'true' && steps.find_pr.outputs.has_pr == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.find_pr.outputs.pr_number }}
+          BRANCH: ${{ steps.find_pr.outputs.branch }}
+          TRIPPED_TESTS: ${{ steps.circuit_breaker.outputs.tripped_tests }}
+          FAILURE_SUMMARY: ${{ needs.run-tests.outputs.failure_summary }}
+          ERROR_LOG: ${{ needs.run-tests.outputs.error_log }}
+        run: |
+          # Guard: skip if an escalation issue already exists for this PR
+          EXISTING=$(gh api "repos/${REPO}/issues?state=open&labels=regression,needs-human-review" \
+            --jq "[.[] | select(.title | contains(\"PR #${PR_NUMBER}\"))] | length" 2>/dev/null || echo "0")
+
+          if [ "$EXISTING" -gt 0 ]; then
+            echo "Escalation issue already exists for PR #${PR_NUMBER}. Skipping duplicate creation."
+            exit 0
+          fi
+
+          TEST_TABLE=$(echo "$TRIPPED_TESTS" | jq -r '.[] | "| `\(.test)` | \(.count) |"' 2>/dev/null || echo "| (unknown) | 3+ |")
+
+          ISSUE_BODY=$(cat <<EOF
+          ## Regression Healer — Circuit Breaker Escalation
+
+          The automated test regression healer has detected tests that have **failed 3 or more consecutive times** across Devin fix attempts on PR #${PR_NUMBER} (branch \`${BRANCH}\`).
+
+          Automated remediation has been **suspended** for these tests to prevent further churn. Human review is required.
+
+          ### Repeatedly Failing Tests
+
+          | Test | Consecutive Failures |
+          |------|---------------------|
+          ${TEST_TABLE}
+
+          ### Most Recent Error Output
+
+          \`\`\`
+          ${FAILURE_SUMMARY}
+          \`\`\`
+
+          <details>
+          <summary>Full stack traces</summary>
+
+          \`\`\`
+          ${ERROR_LOG}
+          \`\`\`
+
+          </details>
+
+          ### Recommended Actions
+
+          1. Review the failing tests and recent changes on branch \`${BRANCH}\`
+          2. Determine if the test expectations need updating or if there is a genuine regression
+          3. Apply the fix manually and close this issue
+          4. Re-enable automated healing by pushing a new commit to the branch
+
+          **Related PR:** #${PR_NUMBER}
+          EOF
+          )
+
+          gh api "repos/${REPO}/issues" \
+            -f title="[Regression Healer] Circuit breaker tripped on PR #${PR_NUMBER}" \
+            -f body="$ISSUE_BODY" \
+            -f "labels[]=regression" \
+            -f "labels[]=needs-human-review"
+
+          echo "::error::Circuit breaker tripped. GitHub Issue created for human review."
+
+      - name: Trigger Devin auto-fix (if circuit breaker not tripped)
+        if: steps.circuit_breaker.outputs.tripped != 'true' && steps.find_pr.outputs.has_pr == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
+          DEVIN_ORG_ID: ${{ secrets.DEVIN_ORG_ID }}
+          CREATE_AS_USER_ID: ${{ secrets.DEVIN_CREATE_AS_USER_ID }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.find_pr.outputs.pr_number }}
+          BRANCH: ${{ steps.find_pr.outputs.branch }}
+          FAILED_TEST_NAMES: ${{ needs.run-tests.outputs.failed_test_names }}
+          FAILURE_SUMMARY: ${{ needs.run-tests.outputs.failure_summary }}
+          ERROR_LOG: ${{ needs.run-tests.outputs.error_log }}
+        run: |
+          # Guard: skip if Devin has already been triggered for this PR
+          DEVIN_COMMENTS=$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --paginate \
+            --jq '[.[] | select(.body | contains("Regression Healer — Devin Auto-Fix"))] | length' 2>/dev/null || echo "0")
+
+          if [ "$DEVIN_COMMENTS" -gt 0 ]; then
+            echo "Devin has already been triggered for test regression on PR #${PR_NUMBER}. Skipping (max 1 active attempt)."
+            exit 0
+          fi
+
+          PROMPT=$(cat <<PROMPT_END
+          The backend test suite failed on PR #${PR_NUMBER} in repository ${REPO} on branch '${BRANCH}'.
+
+          Failed tests:
+          ${FAILED_TEST_NAMES}
+
+          Error summary:
+          ${FAILURE_SUMMARY}
+
+          Stack traces:
+          ${ERROR_LOG}
+
+          Instructions:
+          1. Clone the repository ${REPO} and checkout branch '${BRANCH}'.
+          2. In the backend/ directory, run \`npm test\` to reproduce the failures.
+          3. Analyze each failing test — the tests are the source of truth (TDD). Fix the source code, NOT the tests.
+          4. Run \`npm test\` again to verify all tests pass.
+          5. Commit the fix with message: "fix: resolve test regression on PR #${PR_NUMBER}"
+          6. Push to branch '${BRANCH}'.
+
+          Constraints:
+          - Fix the application code to satisfy the tests. Do NOT modify test files.
+          - Keep changes minimal and focused on the failing tests.
+          - This is an automated remediation attempt triggered by the Regression Healer workflow.
+          PROMPT_END
+          )
+
+          ESCAPED_PROMPT=$(echo "$PROMPT" | jq -Rs .)
+
+          REQUEST_BODY=$(jq -n \
+            --argjson prompt "$ESCAPED_PROMPT" \
+            --arg title "Fix test regression on PR #${PR_NUMBER}" \
+            --arg repo "${REPO}" \
+            --arg user_id "${CREATE_AS_USER_ID}" \
+            '{
+              prompt: $prompt,
+              title: $title,
+              repos: [$repo],
+              create_as_user_id: $user_id,
+              tags: ["regression-healer", "test-fix", "automated"]
+            }')
+
+          HTTP_RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST \
+            -H "Authorization: Bearer ${DEVIN_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "$REQUEST_BODY" \
+            "https://api.devin.ai/v3/organizations/${DEVIN_ORG_ID}/sessions")
+
+          HTTP_BODY=$(echo "$HTTP_RESPONSE" | sed '/^HTTP_STATUS:/d')
+          HTTP_CODE=$(echo "$HTTP_RESPONSE" | grep '^HTTP_STATUS:' | cut -d: -f2)
+
+          if [ "$HTTP_CODE" -eq 200 ]; then
+            SESSION_URL=$(echo "$HTTP_BODY" | jq -r '.url')
+            echo "Devin session created: ${SESSION_URL}"
+
+            {
+              echo "## Devin Test Auto-Fix Triggered"
+              echo ""
+              echo "Backend tests failed on PR #${PR_NUMBER}."
+              echo "A Devin session has been created for automated remediation."
+              echo ""
+              echo "**Session:** ${SESSION_URL}"
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            COMMENT=$(cat <<EOF
+          ## Regression Healer — Devin Auto-Fix In Progress
+
+          Backend tests failed on this branch. A Devin session has been created to automatically fix the regression.
+
+          **Devin Session:** ${SESSION_URL}
+
+          Devin will commit the fix directly to branch \`${BRANCH}\`.
+          EOF
+            )
+
+            gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" -f body="$COMMENT"
+          else
+            echo "::error::Failed to create Devin session (HTTP ${HTTP_CODE})"
+            echo "$HTTP_BODY"
+            exit 1
+          fi
