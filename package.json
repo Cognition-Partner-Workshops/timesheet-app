@@ -1,0 +1,20 @@
+{
+  "name": "app-timesheet-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Test automation framework for the Employee Time Tracking application.",
+  "scripts": {
+    "test": "npm run test:api && npm run test:e2e",
+    "test:api": "jest --config tests/jest.config.js",
+    "test:api:verbose": "jest --config tests/jest.config.js --verbose",
+    "test:e2e": "npx playwright test --config tests/playwright.config.js",
+    "test:e2e:headed": "npx playwright test --config tests/playwright.config.js --headed",
+    "test:e2e:debug": "npx playwright test --config tests/playwright.config.js --debug",
+    "test:e2e:report": "npx playwright show-report tests/playwright-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "jest": "^30.4.2",
+    "supertest": "^7.2.2"
+  }
+}
