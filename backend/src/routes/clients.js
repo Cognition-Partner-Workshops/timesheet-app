@@ -2,6 +2,7 @@ const express = require('express');
 const { getDatabase } = require('../database/init');
 const { authenticateUser } = require('../middleware/auth');
 const { clientSchema, updateClientSchema } = require('../validation/schemas');
+const { getLog } = require('../lib/routeHelpers');
 
 const router = express.Router();
 
@@ -17,7 +18,7 @@ router.get('/', (req, res) => {
     [req.userEmail],
     (err, rows) => {
       if (err) {
-        console.error('Database error:', err);
+        getLog(req).error({ err }, 'database error fetching clients');
         return res.status(500).json({ error: 'Internal server error' });
       }
       
@@ -41,7 +42,7 @@ router.get('/:id', (req, res) => {
     [clientId, req.userEmail],
     (err, row) => {
       if (err) {
-        console.error('Database error:', err);
+        getLog(req).error({ err }, 'database error fetching client');
         return res.status(500).json({ error: 'Internal server error' });
       }
       
@@ -64,13 +65,12 @@ router.post('/', (req, res, next) => {
 
     const { name, description, department, email } = value;
     const db = getDatabase();
-
     db.run(
       'INSERT INTO clients (name, description, department, email, user_email) VALUES (?, ?, ?, ?, ?)',
       [name, description || null, department || null, email || null, req.userEmail],
       function(err) {
         if (err) {
-          console.error('Database error:', err);
+          getLog(req).error({ err }, 'database error creating client');
           return res.status(500).json({ error: 'Failed to create client' });
         }
 
@@ -80,7 +80,7 @@ router.post('/', (req, res, next) => {
           [this.lastID],
           (err, row) => {
             if (err) {
-              console.error('Database error:', err);
+              getLog(req).error({ err }, 'database error retrieving created client');
               return res.status(500).json({ error: 'Client created but failed to retrieve' });
             }
 
@@ -112,14 +112,13 @@ router.put('/:id', (req, res, next) => {
     }
 
     const db = getDatabase();
-
     // Check if client exists and belongs to user
     db.get(
       'SELECT id FROM clients WHERE id = ? AND user_email = ?',
       [clientId, req.userEmail],
       (err, row) => {
         if (err) {
-          console.error('Database error:', err);
+          getLog(req).error({ err }, 'database error checking client ownership');
           return res.status(500).json({ error: 'Internal server error' });
         }
 
@@ -158,7 +157,7 @@ router.put('/:id', (req, res, next) => {
 
         db.run(query, values, function(err) {
           if (err) {
-            console.error('Database error:', err);
+            getLog(req).error({ err }, 'database error updating client');
             return res.status(500).json({ error: 'Failed to update client' });
           }
 
@@ -168,7 +167,7 @@ router.put('/:id', (req, res, next) => {
             [clientId],
             (err, row) => {
               if (err) {
-                console.error('Database error:', err);
+                getLog(req).error({ err }, 'database error retrieving updated client');
                 return res.status(500).json({ error: 'Client updated but failed to retrieve' });
               }
 
@@ -195,7 +194,7 @@ router.delete('/', (req, res) => {
     [req.userEmail],
     function(err) {
       if (err) {
-        console.error('Database error:', err);
+        getLog(req).error({ err }, 'database error deleting clients');
         return res.status(500).json({ error: 'Failed to delete clients' });
       }
       
@@ -223,7 +222,7 @@ router.delete('/:id', (req, res) => {
     [clientId, req.userEmail],
     (err, row) => {
       if (err) {
-        console.error('Database error:', err);
+        getLog(req).error({ err }, 'database error checking client');
         return res.status(500).json({ error: 'Internal server error' });
       }
       
@@ -237,7 +236,7 @@ router.delete('/:id', (req, res) => {
         [clientId, req.userEmail],
         function(err) {
           if (err) {
-            console.error('Database error:', err);
+            getLog(req).error({ err }, 'database error deleting client');
             return res.status(500).json({ error: 'Failed to delete client' });
           }
           

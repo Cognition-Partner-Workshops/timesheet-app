@@ -1,4 +1,5 @@
 const { getDatabase } = require('../database/init');
+const { getLog } = require('../lib/routeHelpers');
 
 // Simple email-based authentication middleware
 function authenticateUser(req, res, next) {
@@ -19,7 +20,7 @@ function authenticateUser(req, res, next) {
   // Check if user exists, create if not
   db.get('SELECT email FROM users WHERE email = ?', [userEmail], (err, row) => {
     if (err) {
-      console.error('Database error:', err);
+      getLog(req).error({ err }, 'database error during authentication');
       return res.status(500).json({ error: 'Internal server error' });
     }
     
@@ -27,7 +28,7 @@ function authenticateUser(req, res, next) {
       // Create new user
       db.run('INSERT INTO users (email) VALUES (?)', [userEmail], (err) => {
         if (err) {
-          console.error('Error creating user:', err);
+          getLog(req).error({ err }, 'error creating user');
           return res.status(500).json({ error: 'Failed to create user' });
         }
         
