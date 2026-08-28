@@ -8,8 +8,22 @@ const fs = require('fs');
 
 const router = express.Router();
 
+// PDF layout constants
+const PDF_PAGE_BREAK_Y = 700; // Y position past which a new page is started
+const PDF_SEPARATOR_ROW_INTERVAL = 5; // Draw a separator line every N entries
+
 // All routes require authentication
 router.use(authenticateUser);
+
+/**
+ * Sum the `hours` column across a set of work entries.
+ * Values are parsed as floats so string-typed hours are handled safely.
+ * @param {Array<{hours: number|string}>} workEntries
+ * @returns {number} total hours
+ */
+function calculateTotalHours(workEntries) {
+  return workEntries.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
+}
 
 // Get hourly report for specific client
 router.get('/client/:clientId', (req, res) => {
@@ -48,8 +62,7 @@ router.get('/client/:clientId', (req, res) => {
             return res.status(500).json({ error: 'Internal server error' });
           }
           
-          // Calculate total hours
-          const totalHours = workEntries.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
+          const totalHours = calculateTotalHours(workEntries);
           
           res.json({
             client: client,
@@ -199,7 +212,7 @@ router.get('/export/pdf/:clientId', (req, res) => {
           doc.fontSize(20).text(`Time Report for ${client.name}`, { align: 'center' });
           doc.moveDown();
           
-          const totalHours = workEntries.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
+          const totalHours = calculateTotalHours(workEntries);
           doc.fontSize(14).text(`Total Hours: ${totalHours.toFixed(2)}`);
           doc.text(`Total Entries: ${workEntries.length}`);
           doc.text(`Generated: ${new Date().toLocaleString()}`);
@@ -220,7 +233,7 @@ router.get('/export/pdf/:clientId', (req, res) => {
             const y = doc.y;
             
             // Check if we need a new page
-            if (y > 700) {
+            if (y > PDF_PAGE_BREAK_Y) {
               doc.addPage();
             }
             
@@ -229,8 +242,8 @@ router.get('/export/pdf/:clientId', (req, res) => {
             doc.text(entry.description || 'No description', 230, y, { width: 300 });
             doc.moveDown();
             
-            // Add separator line every 5 entries
-            if ((index + 1) % 5 === 0) {
+            // Add separator line at a fixed interval
+            if ((index + 1) % PDF_SEPARATOR_ROW_INTERVAL === 0) {
               doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
               doc.moveDown(0.5);
             }
