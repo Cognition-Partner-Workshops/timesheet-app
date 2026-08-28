@@ -88,6 +88,7 @@ describe('Database Initialization', () => {
       
       expect(queries.some(q => q.includes('CREATE TABLE IF NOT EXISTS users'))).toBe(true);
       expect(queries.some(q => q.includes('CREATE TABLE IF NOT EXISTS clients'))).toBe(true);
+      expect(queries.some(q => q.includes('CREATE TABLE IF NOT EXISTS projects'))).toBe(true);
       expect(queries.some(q => q.includes('CREATE TABLE IF NOT EXISTS work_entries'))).toBe(true);
     });
 
@@ -99,9 +100,18 @@ describe('Database Initialization', () => {
       const queries = runCalls.map(call => call[0]);
       
       expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_clients_user_email'))).toBe(true);
+      expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_projects_user_email'))).toBe(true);
+      expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_projects_client_id'))).toBe(true);
       expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_work_entries_client_id'))).toBe(true);
       expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_work_entries_user_email'))).toBe(true);
       expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_work_entries_date'))).toBe(true);
+    });
+
+    test('should enable foreign key enforcement', async () => {
+      const db = getDatabase();
+      await initializeDatabase();
+
+      expect(db.run).toHaveBeenCalledWith('PRAGMA foreign_keys = ON');
     });
 
     test('should log success message', async () => {
