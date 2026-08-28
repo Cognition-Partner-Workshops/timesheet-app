@@ -1,0 +1,12 @@
+default: >
+  src/__tests__/e2e/features
+  --require features/support
+  --require features/step_definitions
+  --format progress
+  --format html --out cucumber-report.html
+
+verbose: >
+  src/__tests__/e2e/features
+  --require features/support
+  --require features/step_definitions
+  --format pretty
