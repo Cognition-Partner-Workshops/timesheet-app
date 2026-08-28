@@ -1,0 +1,86 @@
+version: "3.8"
+
+services:
+  # ==========================================================================
+  # LiveKit Server (Self-Hosted)
+  # ==========================================================================
+  livekit:
+    image: livekit/livekit-server:latest
+    ports:
+      - "7880:7880"   # WebSocket/HTTP
+      - "7881:7881"   # WebRTC TCP
+      - "50000-50100:50000-50100/udp"  # WebRTC UDP
+    environment:
+      - LIVEKIT_KEYS=devkey:devsecret
+    command: >
+      --dev
+      --bind 0.0.0.0
+      --node-ip ${HOST_IP:-127.0.0.1}
+    restart: unless-stopped
+    networks:
+      - avatar-net
+
+  # ==========================================================================
+  # Avatar Agent
+  # ==========================================================================
+  avatar-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - livekit
+    environment:
+      # LiveKit
+      - LIVEKIT_URL=ws://livekit:7880
+      - LIVEKIT_API_KEY=devkey
+      - LIVEKIT_API_SECRET=devsecret
+      # STT
+      - WHISPER_MODE=${WHISPER_MODE:-local}
+      - WHISPER_MODEL_SIZE=${WHISPER_MODEL_SIZE:-large-v3}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # LLM
+      - LLM_PROVIDER=${LLM_PROVIDER:-openai}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4o}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # TTS
+      - AZURE_SPEECH_KEY=${AZURE_SPEECH_KEY}
+      - AZURE_SPEECH_REGION=${AZURE_SPEECH_REGION:-westeurope}
+      # Performance
+      - TARGET_FPS=${TARGET_FPS:-25}
+      - USE_FP16=${USE_FP16:-true}
+    volumes:
+      - ./assets:/app/assets:ro
+      - ./models:/app/models
+      - ./cache:/app/cache
+      - ./logs:/app/logs
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    networks:
+      - avatar-net
+
+  # ==========================================================================
+  # Prometheus Monitoring (Optional)
+  # ==========================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - avatar-agent
+    restart: unless-stopped
+    networks:
+      - avatar-net
+    profiles:
+      - monitoring
+
+networks:
+  avatar-net:
+    driver: bridge

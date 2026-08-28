@@ -1,0 +1,132 @@
+# =============================================================================
+# Live Avatar Streaming System - Configuration
+# =============================================================================
+
+# Avatar Engine Configuration
+avatar:
+  engine: musetalk
+  reference_image: "assets/avatar_reference.png"
+  output_resolution: [512, 512]
+  target_fps: 25
+  use_fp16: true
+  use_torch_compile: true
+  # MuseTalk-specific settings
+  musetalk:
+    model_dir: "models/musetalk"
+    bbox_shift: 5
+    batch_size: 4
+    # Preprocessing cache for faster startup
+    use_cache: true
+    cache_dir: "cache/musetalk"
+
+# Idle Motion Configuration
+idle:
+  # Number of pre-generated idle clips
+  num_clips: 5
+  # Duration of each idle clip in seconds
+  clip_duration_sec: 8
+  # Cross-fade frames between speaking and idle
+  crossfade_frames: 4
+  # Minimum idle time before looping (seconds)
+  min_loop_interval: 3.0
+  # Randomize clip order to avoid repetition
+  randomize_order: true
+  # Silent audio chunk settings for idle generation
+  silent_audio_sample_rate: 16000
+  silent_audio_chunk_duration: 0.5
+
+# State Machine Configuration
+state_machine:
+  # Silence threshold for turn-end detection (seconds)
+  silence_threshold: 0.7
+  # Maximum thinking time before timeout (seconds)
+  max_thinking_time: 30.0
+  # Transition durations (seconds)
+  speaking_to_idle_fade: 0.16  # ~4 frames at 25fps
+  idle_to_speaking_fade: 0.0   # Immediate cut
+
+# LiveKit Configuration
+livekit:
+  url: "${LIVEKIT_URL}"
+  api_key: "${LIVEKIT_API_KEY}"
+  api_secret: "${LIVEKIT_API_SECRET}"
+  room_name: "avatar-room"
+  participant_name: "avatar-agent"
+  # Video track settings
+  video:
+    width: 512
+    height: 512
+    fps: 25
+    codec: "VP8"
+  # Audio track settings
+  audio:
+    sample_rate: 48000
+    channels: 1
+
+# STT Configuration
+stt:
+  provider: "whisper"
+  whisper:
+    mode: "local"  # "local" or "api"
+    model_size: "large-v3"
+    language: null  # null for auto-detect (supports Arabic + English)
+    beam_size: 5
+    vad_filter: true
+  # VAD settings
+  vad:
+    model: "silero"
+    threshold: 0.5
+    min_speech_duration: 0.25
+    min_silence_duration: 0.5
+
+# LLM Configuration
+llm:
+  provider: "openai"
+  model: "gpt-4o"
+  temperature: 0.7
+  max_tokens: 1024
+  streaming: true
+  system_prompt: |
+    You are a helpful, friendly avatar assistant. You can communicate
+    in both Arabic and English. Respond in the same language the user
+    speaks to you in. Keep responses concise and natural for spoken
+    conversation — avoid long paragraphs. Be warm and conversational.
+
+# TTS Configuration
+tts:
+  provider: "azure"
+  azure:
+    region: "${AZURE_SPEECH_REGION}"
+    voices:
+      ar: "ar-SA-HamedNeural"
+      en: "en-US-JennyNeural"
+    # Output format matching avatar engine expectations
+    output_format: "raw-16khz-16bit-mono-pcm"
+    # Streaming chunk size in bytes
+    chunk_size: 8000  # 0.25s at 16kHz 16-bit mono
+  # Language detection for voice selection
+  auto_detect_language: true
+
+# Performance & Latency Budget (milliseconds)
+performance:
+  stt_budget_ms: 300
+  llm_first_token_budget_ms: 500
+  tts_first_chunk_budget_ms: 300
+  avatar_first_frame_budget_ms: 400
+  total_budget_ms: 1500
+
+# Monitoring & Logging
+monitoring:
+  prometheus:
+    enabled: true
+    port: 9090
+  logging:
+    level: "INFO"
+    format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    file: "logs/avatar_system.log"
+
+# Session Limits
+session:
+  max_duration_minutes: 60
+  idle_timeout_minutes: 5
+  max_concurrent: 1
