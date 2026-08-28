@@ -220,19 +220,21 @@ npm run test:watch          # Run tests in watch mode
 
 ### Test Coverage
 
-The backend has comprehensive test coverage with **161 tests** across 8 test suites:
+The backend has comprehensive test coverage with **214 tests** across 14 test suites:
 
 | File | Statements | Branches | Functions | Lines |
 |------|------------|----------|-----------|-------|
-| **Overall** | **90.16%** | **93.82%** | **92.18%** | **90.35%** |
-| database/init.js | 100% | 100% | 100% | 100% |
+| **Overall** | **99.34%** | **98.48%** | **100%** | **99.34%** |
+| database/init.js | 100% | 92.85% | 100% | 100% |
 | middleware/auth.js | 100% | 100% | 100% | 100% |
 | middleware/errorHandler.js | 100% | 100% | 100% | 100% |
 | routes/auth.js | 100% | 100% | 100% | 100% |
-| routes/clients.js | 97.89% | 100% | 100% | 97.89% |
-| routes/workEntries.js | 98.41% | 100% | 100% | 98.41% |
-| routes/reports.js | 64.15% | 69.44% | 68.75% | 64.42% |
+| routes/clients.js | 100% | 100% | 100% | 100% |
+| routes/workEntries.js | 100% | 100% | 100% | 100% |
+| routes/reports.js | 98.11% | 94.44% | 100% | 98.07% |
 | validation/schemas.js | 100% | 100% | 100% | 100% |
+
+`config/production.js` is not imported anywhere and is intentionally left untested.
 
 Coverage thresholds are configured in `jest.config.js`:
 - Statements: 60%
