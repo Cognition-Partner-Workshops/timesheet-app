@@ -133,6 +133,43 @@ class ApiClient {
     return response.data;
   }
 
+  // Recurring template endpoints
+  async getRecurringTemplates() {
+    const response = await this.client.get('/api/recurring');
+    return response.data;
+  }
+
+  async createRecurringTemplate(data: {
+    clientId: number; hours: number; description?: string;
+    frequency: string; daysOfWeek: number; startDate: string; endDate?: string | null;
+  }) {
+    const response = await this.client.post('/api/recurring', data);
+    return response.data;
+  }
+
+  async updateRecurringTemplate(id: number, data: {
+    clientId?: number; hours?: number; description?: string;
+    frequency?: string; daysOfWeek?: number; startDate?: string; endDate?: string | null; active?: boolean;
+  }) {
+    const response = await this.client.put(`/api/recurring/${id}`, data);
+    return response.data;
+  }
+
+  async deleteRecurringTemplate(id: number) {
+    const response = await this.client.delete(`/api/recurring/${id}`);
+    return response.data;
+  }
+
+  async generateRecurringEntries(id: number, from: string, to: string) {
+    const response = await this.client.post(`/api/recurring/${id}/generate`, { from, to });
+    return response.data;
+  }
+
+  async applyRecurringEntries(id: number, from: string, to: string) {
+    const response = await this.client.post(`/api/recurring/${id}/apply`, { from, to });
+    return response.data;
+  }
+
   // Health check
   async healthCheck() {
     const response = await this.client.get('/health');
