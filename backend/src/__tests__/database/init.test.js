@@ -142,6 +142,68 @@ describe('Database Initialization', () => {
 
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
+
+    test('should resolve immediately when no database connection exists', async () => {
+      // Don't call getDatabase() - so db is null
+      // closeDatabase should resolve without error
+      jest.resetModules();
+
+      jest.doMock('sqlite3', () => {
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, callback) => {
+              callback(null);
+              return {
+                serialize: jest.fn((cb) => cb()),
+                run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
+                close: jest.fn((cb) => cb(null))
+              };
+            })
+          }))
+        };
+      });
+
+      const { closeDatabase: closeFresh } = require('../../database/init');
+      // No getDatabase call, so db is null
+      await expect(closeFresh()).resolves.toBeUndefined();
+    });
+
+    test('should wait when close is already in progress', async () => {
+      jest.resetModules();
+
+      let closeCallback = null;
+      const mockDb = {
+        serialize: jest.fn((cb) => cb()),
+        run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
+        close: jest.fn((cb) => { closeCallback = cb; })
+      };
+
+      jest.doMock('sqlite3', () => {
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, callback) => {
+              callback(null);
+              return mockDb;
+            })
+          }))
+        };
+      });
+
+      const { getDatabase: getDb, closeDatabase: closeDb } = require('../../database/init');
+      getDb(); // Initialize db
+
+      // Start first close (will hang because closeCallback is captured)
+      const firstClose = closeDb();
+      // Start second close while first is in progress (isClosing = true)
+      const secondClose = closeDb();
+
+      // Now complete the first close
+      closeCallback(null);
+
+      // Both should resolve
+      await expect(firstClose).resolves.toBeUndefined();
+      await expect(secondClose).resolves.toBeUndefined();
+    });
   });
 
   describe('Database Schema', () => {
