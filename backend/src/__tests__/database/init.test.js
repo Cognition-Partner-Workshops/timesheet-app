@@ -133,6 +133,40 @@ describe('Database Initialization', () => {
       expect(consoleErrorSpy).toHaveBeenCalledWith('Error closing database:', expect.any(Error));
     });
 
+    test('should resolve immediately when there is no open connection', async () => {
+      jest.resetModules();
+      const { closeDatabase: closeWithoutConnection } = require('../../database/init');
+
+      await expect(closeWithoutConnection()).resolves.toBeUndefined();
+    });
+
+    test('should resolve immediately once the connection is already closed', async () => {
+      const db = getDatabase();
+      db.close.mockImplementation((callback) => callback(null));
+
+      await closeDatabase();
+      consoleLogSpy.mockClear();
+      await closeDatabase();
+
+      expect(db.close).toHaveBeenCalledTimes(1);
+      expect(consoleLogSpy).not.toHaveBeenCalledWith('Database connection closed');
+    });
+
+    test('should wait for an in-flight close instead of closing twice', async () => {
+      const db = getDatabase();
+      let finishClose;
+      db.close.mockImplementation((callback) => {
+        finishClose = () => callback(null);
+      });
+
+      const firstClose = closeDatabase();
+      const secondClose = closeDatabase();
+      finishClose();
+
+      await expect(Promise.all([firstClose, secondClose])).resolves.toEqual([undefined, undefined]);
+      expect(db.close).toHaveBeenCalledTimes(1);
+    });
+
     test('should handle multiple close calls safely', () => {
       const db = getDatabase();
       // Reset close mock to default behavior (no error)
