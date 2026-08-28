@@ -8,6 +8,17 @@ const fs = require('fs');
 
 const router = express.Router();
 
+// Helper to format date values that may be stored as timestamps or ISO strings
+function formatDate(dateValue) {
+  if (!dateValue) return '';
+  // If it's a number (Unix timestamp in ms), convert to date string
+  if (typeof dateValue === 'number') {
+    return new Date(dateValue).toISOString().split('T')[0];
+  }
+  // If it's already a string, return as-is
+  return String(dateValue);
+}
+
 // All routes require authentication
 router.use(authenticateUser);
 
@@ -51,9 +62,15 @@ router.get('/client/:clientId', (req, res) => {
           // Calculate total hours
           const totalHours = workEntries.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
           
+          // Format dates in work entries for consistent API response
+          const formattedEntries = workEntries.map(entry => ({
+            ...entry,
+            date: formatDate(entry.date)
+          }));
+          
           res.json({
             client: client,
-            workEntries: workEntries,
+            workEntries: formattedEntries,
             totalHours: totalHours,
             entryCount: workEntries.length
           });
@@ -121,7 +138,13 @@ router.get('/export/csv/:clientId', (req, res) => {
             ]
           });
           
-          csvWriter.writeRecords(workEntries)
+          // Format dates before writing to CSV
+          const formattedEntries = workEntries.map(entry => ({
+            ...entry,
+            date: formatDate(entry.date)
+          }));
+          
+          csvWriter.writeRecords(formattedEntries)
             .then(() => {
               // Send file and clean up
               res.download(tempPath, filename, (err) => {
@@ -224,7 +247,7 @@ router.get('/export/pdf/:clientId', (req, res) => {
               doc.addPage();
             }
             
-            doc.text(entry.date, 50, doc.y, { width: 100 });
+            doc.text(formatDate(entry.date), 50, doc.y, { width: 100 });
             doc.text(entry.hours.toString(), 150, y, { width: 80 });
             doc.text(entry.description || 'No description', 230, y, { width: 300 });
             doc.moveDown();
