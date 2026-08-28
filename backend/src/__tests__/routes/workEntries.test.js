@@ -585,4 +585,64 @@ describe('Work Entry Routes', () => {
       expect(response.body.message).toBe('Work entry updated successfully');
     });
   });
+
+  describe('POST /api/work-entries - Try/Catch Coverage', () => {
+    test('should handle unexpected errors thrown in POST handler', async () => {
+      getDatabase.mockImplementation(() => {
+        throw new Error('Unexpected error');
+      });
+
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({
+          clientId: 1,
+          hours: 5,
+          date: '2024-01-15'
+        });
+
+      expect(response.status).toBe(500);
+    });
+  });
+
+  describe('PUT /api/work-entries/:id - Try/Catch Coverage', () => {
+    test('should handle unexpected errors thrown in PUT handler', async () => {
+      getDatabase.mockImplementation(() => {
+        throw new Error('Unexpected error');
+      });
+
+      const response = await request(app)
+        .put('/api/work-entries/1')
+        .send({ hours: 8 });
+
+      expect(response.status).toBe(500);
+    });
+  });
+
+  describe('POST /api/work-entries - Create without description', () => {
+    test('should create work entry without description (null)', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        if (query.includes('clients')) {
+          callback(null, { id: 1 });
+        } else {
+          callback(null, { id: 1, client_id: 1, hours: 5, description: null, date: '2024-01-15', client_name: 'Client A' });
+        }
+      });
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.lastID = 1;
+        callback.call(this, null);
+      });
+
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({
+          clientId: 1,
+          hours: 5,
+          date: '2024-01-15'
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.message).toBe('Work entry created successfully');
+    });
+  });
 });
