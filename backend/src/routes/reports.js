@@ -23,7 +23,7 @@ router.get('/client/:clientId', (req, res) => {
   
   // Verify client belongs to user
   db.get(
-    'SELECT id, name FROM clients WHERE id = ? AND user_email = ?',
+    'SELECT id, name, hourly_rate FROM clients WHERE id = ? AND user_email = ?',
     [clientId, req.userEmail],
     (err, client) => {
       if (err) {
@@ -50,12 +50,16 @@ router.get('/client/:clientId', (req, res) => {
           
           // Calculate total hours
           const totalHours = workEntries.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
+          const hourlyRate = client.hourly_rate != null ? parseFloat(client.hourly_rate) : null;
+          const estimatedRevenue = hourlyRate != null ? totalHours * hourlyRate : null;
           
           res.json({
             client: client,
             workEntries: workEntries,
             totalHours: totalHours,
-            entryCount: workEntries.length
+            entryCount: workEntries.length,
+            hourlyRate: hourlyRate,
+            estimatedRevenue: estimatedRevenue
           });
         }
       );
@@ -75,7 +79,7 @@ router.get('/export/csv/:clientId', (req, res) => {
   
   // Verify client belongs to user and get data
   db.get(
-    'SELECT id, name FROM clients WHERE id = ? AND user_email = ?',
+    'SELECT id, name, hourly_rate FROM clients WHERE id = ? AND user_email = ?',
     [clientId, req.userEmail],
     (err, client) => {
       if (err) {
@@ -99,6 +103,13 @@ router.get('/export/csv/:clientId', (req, res) => {
             console.error('Database error:', err);
             return res.status(500).json({ error: 'Internal server error' });
           }
+
+          const hourlyRate = client.hourly_rate != null ? parseFloat(client.hourly_rate) : null;
+          const csvEntries = workEntries.map(entry => ({
+            ...entry,
+            hourly_rate: hourlyRate != null ? hourlyRate.toFixed(2) : '',
+            entry_revenue: hourlyRate != null ? (parseFloat(entry.hours) * hourlyRate).toFixed(2) : ''
+          }));
           
           // Create temporary CSV file
           const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -117,11 +128,13 @@ router.get('/export/csv/:clientId', (req, res) => {
               { id: 'date', title: 'Date' },
               { id: 'hours', title: 'Hours' },
               { id: 'description', title: 'Description' },
+              { id: 'hourly_rate', title: 'Hourly Rate' },
+              { id: 'entry_revenue', title: 'Entry Revenue' },
               { id: 'created_at', title: 'Created At' }
             ]
           });
           
-          csvWriter.writeRecords(workEntries)
+          csvWriter.writeRecords(csvEntries)
             .then(() => {
               // Send file and clean up
               res.download(tempPath, filename, (err) => {
@@ -158,7 +171,7 @@ router.get('/export/pdf/:clientId', (req, res) => {
   
   // Verify client belongs to user and get data
   db.get(
-    'SELECT id, name FROM clients WHERE id = ? AND user_email = ?',
+    'SELECT id, name, hourly_rate FROM clients WHERE id = ? AND user_email = ?',
     [clientId, req.userEmail],
     (err, client) => {
       if (err) {
@@ -200,8 +213,14 @@ router.get('/export/pdf/:clientId', (req, res) => {
           doc.moveDown();
           
           const totalHours = workEntries.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
+          const hourlyRate = client.hourly_rate != null ? parseFloat(client.hourly_rate) : null;
+          const totalRevenue = hourlyRate != null ? totalHours * hourlyRate : null;
           doc.fontSize(14).text(`Total Hours: ${totalHours.toFixed(2)}`);
           doc.text(`Total Entries: ${workEntries.length}`);
+          if (hourlyRate != null) {
+            doc.text(`Hourly Rate: $${hourlyRate.toFixed(2)}`);
+            doc.text(`Total Revenue: $${totalRevenue.toFixed(2)}`);
+          }
           doc.text(`Generated: ${new Date().toLocaleString()}`);
           doc.moveDown();
           

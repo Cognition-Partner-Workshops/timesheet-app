@@ -9,6 +9,7 @@ export interface Client {
   description: string | null;
   department: string | null;
   email: string | null;
+  hourly_rate: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -33,6 +34,8 @@ export interface ClientReport {
   workEntries: WorkEntry[];
   totalHours: number;
   entryCount: number;
+  hourlyRate: number | null;
+  estimatedRevenue: number | null;
 }
 
 export interface CreateClientRequest {
@@ -40,6 +43,7 @@ export interface CreateClientRequest {
   description?: string;
   department?: string;
   email?: string;
+  hourlyRate?: number | null;
 }
 
 export interface UpdateClientRequest {
@@ -47,6 +51,7 @@ export interface UpdateClientRequest {
   description?: string;
   department?: string;
   email?: string;
+  hourlyRate?: number | null;
 }
 
 export interface CreateWorkEntryRequest {
