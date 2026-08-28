@@ -142,6 +142,90 @@ describe('Database Initialization', () => {
 
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
+
+    test('should resolve immediately when no database connection exists', async () => {
+      // Force db to null by resetting modules and not calling getDatabase
+      jest.resetModules();
+
+      jest.doMock('sqlite3', () => {
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, callback) => {
+              callback(null);
+              return {
+                serialize: jest.fn((cb) => cb()),
+                run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
+                close: jest.fn((cb) => cb(null))
+              };
+            })
+          }))
+        };
+      });
+
+      const { closeDatabase: closeFresh } = require('../../database/init');
+      await expect(closeFresh()).resolves.toBeUndefined();
+    });
+
+    test('should resolve when already closed', async () => {
+      jest.resetModules();
+
+      jest.doMock('sqlite3', () => {
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, callback) => {
+              callback(null);
+              return {
+                serialize: jest.fn((cb) => cb()),
+                run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
+                close: jest.fn((cb) => cb(null))
+              };
+            })
+          }))
+        };
+      });
+
+      const { getDatabase: getFresh, closeDatabase: closeFresh } = require('../../database/init');
+      getFresh();
+      await closeFresh();
+      // Second close should resolve immediately (isClosed = true)
+      await expect(closeFresh()).resolves.toBeUndefined();
+    });
+
+    test('should wait when database is currently closing', async () => {
+      jest.resetModules();
+
+      let closeCallback;
+      jest.doMock('sqlite3', () => {
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, callback) => {
+              callback(null);
+              return {
+                serialize: jest.fn((cb) => cb()),
+                run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
+                close: jest.fn((cb) => {
+                  closeCallback = cb;
+                })
+              };
+            })
+          }))
+        };
+      });
+
+      const { getDatabase: getFresh, closeDatabase: closeFresh } = require('../../database/init');
+      getFresh();
+
+      // Start first close (will hang because we captured the callback)
+      const firstClose = closeFresh();
+      // Start second close while first is still closing (isClosing = true)
+      const secondClose = closeFresh();
+
+      // Now complete the first close
+      closeCallback(null);
+
+      await expect(firstClose).resolves.toBeUndefined();
+      await expect(secondClose).resolves.toBeUndefined();
+    });
   });
 
   describe('Database Schema', () => {
