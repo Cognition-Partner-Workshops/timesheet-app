@@ -324,5 +324,79 @@ describe('Validation Schemas', () => {
       const { error } = emailSchema.validate(data);
       expect(error).toBeUndefined();
     });
+
+    test('should reject empty string email', () => {
+      const data = { email: '' };
+      const { error } = emailSchema.validate(data);
+      expect(error).toBeDefined();
+    });
+
+    test('should reject email with spaces', () => {
+      const data = { email: 'user @example.com' };
+      const { error } = emailSchema.validate(data);
+      expect(error).toBeDefined();
+    });
+  });
+
+  describe('clientSchema - Extended Edge Cases', () => {
+    test.each([
+      ['name at max length (255 chars)', { name: 'a'.repeat(255) }, true],
+      ['description at max length (1000 chars)', { name: 'Test', description: 'a'.repeat(1000) }, true],
+      ['department field', { name: 'Test', department: 'Engineering' }, true],
+      ['email field', { name: 'Test', email: 'client@example.com' }, true],
+      ['empty department', { name: 'Test', department: '' }, true],
+      ['empty email', { name: 'Test', email: '' }, true],
+      ['invalid email', { name: 'Test', email: 'not-an-email' }, false],
+      ['department > 255 chars', { name: 'Test', department: 'a'.repeat(256) }, false],
+      ['name with only whitespace', { name: '   ' }, false],
+    ])('should handle %s', (_, data, shouldPass) => {
+      const { error } = clientSchema.validate(data);
+      shouldPass ? expect(error).toBeUndefined() : expect(error).toBeDefined();
+    });
+  });
+
+  describe('workEntrySchema - Extended Edge Cases', () => {
+    const base = { clientId: 1, hours: 5, date: '2024-01-15' };
+
+    test.each([
+      ['exactly 24 hours', { ...base, hours: 24 }, true],
+      ['0 hours', { ...base, hours: 0 }, false],
+      ['decimal hours (7.75)', { ...base, hours: 7.75 }, true],
+      ['non-integer clientId', { ...base, clientId: 1.5 }, false],
+      ['description at max length', { ...base, description: 'a'.repeat(1000) }, true],
+      ['description > 1000 chars', { ...base, description: 'a'.repeat(1001) }, false],
+      ['ISO date format', { ...base, date: '2024-12-31' }, true],
+    ])('should handle %s', (_, data, shouldPass) => {
+      const { error } = workEntrySchema.validate(data);
+      shouldPass ? expect(error).toBeUndefined() : expect(error).toBeDefined();
+    });
+  });
+
+  describe('updateWorkEntrySchema - Extended Edge Cases', () => {
+    test.each([
+      ['negative hours', { hours: -1 }, false],
+      ['hours > 24', { hours: 25 }, false],
+      ['all fields', { clientId: 2, hours: 8, description: 'Updated', date: '2024-03-01' }, true],
+      ['empty description', { description: '' }, true],
+      ['invalid date format', { date: '15/01/2024' }, false],
+    ])('should handle %s', (_, data, shouldPass) => {
+      const { error } = updateWorkEntrySchema.validate(data);
+      shouldPass ? expect(error).toBeUndefined() : expect(error).toBeDefined();
+    });
+  });
+
+  describe('updateClientSchema - Extended Edge Cases', () => {
+    test.each([
+      ['department update', { department: 'Engineering' }, true],
+      ['email update', { email: 'new@example.com' }, true],
+      ['empty department', { department: '' }, true],
+      ['empty email', { email: '' }, true],
+      ['invalid email', { email: 'not-an-email' }, false],
+      ['name > 255 chars', { name: 'a'.repeat(256) }, false],
+      ['all fields', { name: 'New', description: 'Desc', department: 'Eng', email: 'a@b.com' }, true],
+    ])('should handle %s', (_, data, shouldPass) => {
+      const { error } = updateClientSchema.validate(data);
+      shouldPass ? expect(error).toBeUndefined() : expect(error).toBeDefined();
+    });
   });
 });
