@@ -232,7 +232,7 @@ const ReportsPage: React.FC = () => {
                           <TableRow key={entry.id}>
                             <TableCell>
                               <Typography variant="body2">
-                                {new Date(entry.date).toLocaleDateString()}
+                                {new Date(entry.date + 'T00:00:00').toLocaleDateString()}
                               </Typography>
                             </TableCell>
                             <TableCell>
