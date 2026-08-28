@@ -138,6 +138,17 @@ class ApiClient {
     const response = await this.client.get('/health');
     return response.data;
   }
+
+  // Chat bot endpoints
+  async sendChatMessage(message: string, conversationHistory: Array<{ role: string; content: string }>) {
+    const response = await this.client.post('/api/chat/message', { message, conversationHistory });
+    return response.data;
+  }
+
+  async getChatStatus() {
+    const response = await this.client.get('/api/chat/status');
+    return response.data;
+  }
 }
 
 export const apiClient = new ApiClient();
