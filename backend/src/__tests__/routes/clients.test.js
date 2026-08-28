@@ -454,4 +454,390 @@ describe('Client Routes', () => {
       expect(response.status).toBe(200);
     });
   });
+
+  describe('PUT /api/clients/:id - Additional Field Updates', () => {
+    test('should update client email field', async () => {
+      const updatedClient = { id: 1, name: 'Client', email: 'new@example.com' };
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, updatedClient);
+      });
+
+      const response = await request(app)
+        .put('/api/clients/1')
+        .send({ email: 'new@example.com' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.client).toEqual(updatedClient);
+    });
+
+    test('should update client department field', async () => {
+      const updatedClient = { id: 1, name: 'Client', department: 'Engineering' };
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, updatedClient);
+      });
+
+      const response = await request(app)
+        .put('/api/clients/1')
+        .send({ department: 'Engineering' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.client).toEqual(updatedClient);
+    });
+
+    test('should handle unexpected error in PUT try-catch block', async () => {
+      getDatabase.mockImplementation(() => {
+        throw new Error('Unexpected error');
+      });
+
+      const response = await request(app)
+        .put('/api/clients/1')
+        .send({ name: 'Updated' });
+
+      expect(response.status).toBe(500);
+    });
+  });
+
+  describe('DELETE /api/clients (bulk delete)', () => {
+    test('should delete all clients for authenticated user', async () => {
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.changes = 3;
+        callback.call(this, null);
+      });
+
+      const response = await request(app).delete('/api/clients');
+
+      expect(response.status).toBe(200);
+      expect(response.body.message).toBe('All clients deleted successfully');
+      expect(response.body.deletedCount).toBe(3);
+    });
+
+    test('should return zero deletedCount when no clients exist', async () => {
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.changes = 0;
+        callback.call(this, null);
+      });
+
+      const response = await request(app).delete('/api/clients');
+
+      expect(response.status).toBe(200);
+      expect(response.body.message).toBe('All clients deleted successfully');
+      expect(response.body.deletedCount).toBe(0);
+    });
+
+    test('should handle database error on bulk delete', async () => {
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(new Error('Delete failed'));
+      });
+
+      const response = await request(app).delete('/api/clients');
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Failed to delete clients' });
+    });
+
+    test('should scope bulk delete by user_email', async () => {
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.changes = 0;
+        callback.call(this, null);
+      });
+
+      await request(app).delete('/api/clients');
+
+      expect(mockDb.run).toHaveBeenCalledWith(
+        expect.stringContaining('user_email'),
+        ['test@example.com'],
+        expect.any(Function)
+      );
+    });
+  });
+
+  describe('POST /api/clients - Unexpected Error', () => {
+    test('should handle unexpected error in POST try-catch block', async () => {
+      getDatabase.mockImplementation(() => {
+        throw new Error('Unexpected error');
+      });
+
+      const response = await request(app)
+        .post('/api/clients')
+        .send({ name: 'Test Client' });
+
+      expect(response.status).toBe(500);
+    });
+  });
+
+  describe('Invalid Input', () => {
+    test('should return 400 for name exceeding max length', async () => {
+      const response = await request(app)
+        .post('/api/clients')
+        .send({ name: 'A'.repeat(256) });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for whitespace-only name', async () => {
+      const response = await request(app)
+        .post('/api/clients')
+        .send({ name: '   ' });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for invalid email format in client', async () => {
+      const response = await request(app)
+        .post('/api/clients')
+        .send({ name: 'Test', email: 'not-an-email' });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for description exceeding max length', async () => {
+      const response = await request(app)
+        .post('/api/clients')
+        .send({ name: 'Test', description: 'D'.repeat(1001) });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for non-numeric client ID', async () => {
+      const response = await request(app).get('/api/clients/abc');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Invalid client ID' });
+    });
+
+    test('should return 400 for special characters in client ID', async () => {
+      const response = await request(app).get('/api/clients/!@#');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Invalid client ID' });
+    });
+
+    test('should handle zero client ID as valid parse but return 404', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, null);
+      });
+
+      const response = await request(app).get('/api/clients/0');
+
+      expect(response.status).toBe(404);
+    });
+
+    test('should handle negative client ID as valid parse but return 404', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, null);
+      });
+
+      const response = await request(app).get('/api/clients/-1');
+
+      expect(response.status).toBe(404);
+    });
+
+    test('should return 400 for update with invalid email format', async () => {
+      const response = await request(app)
+        .put('/api/clients/1')
+        .send({ email: 'not-valid' });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for update with name exceeding max length', async () => {
+      const response = await request(app)
+        .put('/api/clients/1')
+        .send({ name: 'N'.repeat(256) });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for delete with non-numeric client ID', async () => {
+      const response = await request(app).delete('/api/clients/abc');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Invalid client ID' });
+    });
+  });
+
+  describe('Empty Results', () => {
+    test('should return empty array when user has no clients', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, []);
+      });
+
+      const response = await request(app).get('/api/clients');
+
+      expect(response.status).toBe(200);
+      expect(response.body.clients).toEqual([]);
+      expect(response.body.clients).toHaveLength(0);
+    });
+
+    test('should return 404 for non-existent client ID', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, null);
+      });
+
+      const response = await request(app).get('/api/clients/99999');
+
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({ error: 'Client not found' });
+    });
+
+    test('should return zero deletedCount when bulk deleting with no clients', async () => {
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.changes = 0;
+        callback.call(this, null);
+      });
+
+      const response = await request(app).delete('/api/clients');
+
+      expect(response.status).toBe(200);
+      expect(response.body.deletedCount).toBe(0);
+    });
+
+    test('should return 404 when updating non-existent client', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, null);
+      });
+
+      const response = await request(app)
+        .put('/api/clients/99999')
+        .send({ name: 'Updated' });
+
+      expect(response.status).toBe(404);
+    });
+
+    test('should return 404 when deleting non-existent client', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, null);
+      });
+
+      const response = await request(app).delete('/api/clients/99999');
+
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe('Cross-User Isolation', () => {
+    test('should include user_email in GET all clients query', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, []);
+      });
+
+      await request(app).get('/api/clients');
+
+      expect(mockDb.all).toHaveBeenCalledWith(
+        expect.stringContaining('user_email = ?'),
+        ['test@example.com'],
+        expect.any(Function)
+      );
+    });
+
+    test('should include user_email in GET single client query', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { id: 1, name: 'Client' });
+      });
+
+      await request(app).get('/api/clients/1');
+
+      expect(mockDb.get).toHaveBeenCalledWith(
+        expect.stringContaining('user_email = ?'),
+        [1, 'test@example.com'],
+        expect.any(Function)
+      );
+    });
+
+    test('should include user_email in POST client query', async () => {
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.lastID = 1;
+        callback.call(this, null);
+      });
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { id: 1, name: 'Test' });
+      });
+
+      await request(app)
+        .post('/api/clients')
+        .send({ name: 'Test' });
+
+      expect(mockDb.run).toHaveBeenCalledWith(
+        expect.stringContaining('user_email'),
+        expect.arrayContaining(['test@example.com']),
+        expect.any(Function)
+      );
+    });
+
+    test('should include user_email in PUT client ownership check', async () => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1, name: 'Updated' });
+      });
+
+      await request(app)
+        .put('/api/clients/1')
+        .send({ name: 'Updated' });
+
+      expect(mockDb.get).toHaveBeenCalledWith(
+        expect.stringContaining('user_email = ?'),
+        [1, 'test@example.com'],
+        expect.any(Function)
+      );
+    });
+
+    test('should include user_email in DELETE client ownership check', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+
+      await request(app).delete('/api/clients/1');
+
+      expect(mockDb.get).toHaveBeenCalledWith(
+        expect.stringContaining('user_email = ?'),
+        [1, 'test@example.com'],
+        expect.any(Function)
+      );
+    });
+
+    test('should scope DELETE all to authenticated user only', async () => {
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.changes = 0;
+        callback.call(this, null);
+      });
+
+      await request(app).delete('/api/clients');
+
+      expect(mockDb.run).toHaveBeenCalledWith(
+        expect.stringContaining('WHERE user_email = ?'),
+        ['test@example.com'],
+        expect.any(Function)
+      );
+    });
+  });
 });

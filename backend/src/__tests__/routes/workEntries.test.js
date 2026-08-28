@@ -585,4 +585,358 @@ describe('Work Entry Routes', () => {
       expect(response.body.message).toBe('Work entry updated successfully');
     });
   });
+
+  describe('POST /api/work-entries - Unexpected Error', () => {
+    test('should handle unexpected error in POST try-catch block', async () => {
+      getDatabase.mockImplementation(() => {
+        throw new Error('Unexpected error');
+      });
+
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({
+          clientId: 1,
+          hours: 5,
+          date: '2024-01-15'
+        });
+
+      expect(response.status).toBe(500);
+    });
+  });
+
+  describe('PUT /api/work-entries/:id - Unexpected Error', () => {
+    test('should handle unexpected error in PUT try-catch block', async () => {
+      getDatabase.mockImplementation(() => {
+        throw new Error('Unexpected error');
+      });
+
+      const response = await request(app)
+        .put('/api/work-entries/1')
+        .send({ hours: 8 });
+
+      expect(response.status).toBe(500);
+    });
+  });
+
+  describe('Invalid Input', () => {
+    test('should return 400 for zero hours', async () => {
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: 0, date: '2024-01-15' });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for negative hours', async () => {
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: -3, date: '2024-01-15' });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for hours exceeding 24', async () => {
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: 25, date: '2024-01-15' });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for invalid date format', async () => {
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: 5, date: '15-01-2024' });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for non-ISO date string', async () => {
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: 5, date: 'not-a-date' });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for missing clientId', async () => {
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ hours: 5, date: '2024-01-15' });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for missing date', async () => {
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: 5 });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for missing hours', async () => {
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, date: '2024-01-15' });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for negative client ID in POST', async () => {
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: -1, hours: 5, date: '2024-01-15' });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for float client ID in POST', async () => {
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1.5, hours: 5, date: '2024-01-15' });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for description exceeding max length', async () => {
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: 5, date: '2024-01-15', description: 'D'.repeat(1001) });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for non-numeric work entry ID in GET', async () => {
+      const response = await request(app).get('/api/work-entries/abc');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Invalid work entry ID' });
+    });
+
+    test('should return 400 for special characters in work entry ID', async () => {
+      const response = await request(app).get('/api/work-entries/!@#');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Invalid work entry ID' });
+    });
+
+    test('should handle zero work entry ID as valid parse but return 404', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, null);
+      });
+
+      const response = await request(app).get('/api/work-entries/0');
+
+      expect(response.status).toBe(404);
+    });
+
+    test('should handle negative work entry ID as valid parse but return 404', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, null);
+      });
+
+      const response = await request(app)
+        .put('/api/work-entries/-1')
+        .send({ hours: 5 });
+
+      expect(response.status).toBe(404);
+    });
+
+    test('should return 400 for update with invalid hours', async () => {
+      const response = await request(app)
+        .put('/api/work-entries/1')
+        .send({ hours: -5 });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for update with hours exceeding 24', async () => {
+      const response = await request(app)
+        .put('/api/work-entries/1')
+        .send({ hours: 30 });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for update with invalid date format', async () => {
+      const response = await request(app)
+        .put('/api/work-entries/1')
+        .send({ date: 'invalid-date' });
+
+      expect(response.status).toBe(400);
+    });
+  });
+
+  describe('Empty Results', () => {
+    test('should return empty array when user has no work entries', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, []);
+      });
+
+      const response = await request(app).get('/api/work-entries');
+
+      expect(response.status).toBe(200);
+      expect(response.body.workEntries).toEqual([]);
+      expect(response.body.workEntries).toHaveLength(0);
+    });
+
+    test('should return empty array when filtering by client with no entries', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, []);
+      });
+
+      const response = await request(app).get('/api/work-entries?clientId=999');
+
+      expect(response.status).toBe(200);
+      expect(response.body.workEntries).toEqual([]);
+    });
+
+    test('should return 404 for non-existent work entry ID', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, null);
+      });
+
+      const response = await request(app).get('/api/work-entries/99999');
+
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({ error: 'Work entry not found' });
+    });
+
+    test('should return 404 when updating non-existent work entry', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, null);
+      });
+
+      const response = await request(app)
+        .put('/api/work-entries/99999')
+        .send({ hours: 5 });
+
+      expect(response.status).toBe(404);
+    });
+
+    test('should return 404 when deleting non-existent work entry', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, null);
+      });
+
+      const response = await request(app).delete('/api/work-entries/99999');
+
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe('Cross-User Isolation', () => {
+    test('should include user_email in GET all work entries query', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, []);
+      });
+
+      await request(app).get('/api/work-entries');
+
+      expect(mockDb.all).toHaveBeenCalledWith(
+        expect.stringContaining('we.user_email = ?'),
+        ['test@example.com'],
+        expect.any(Function)
+      );
+    });
+
+    test('should include user_email in GET single work entry query', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { id: 1, hours: 5, client_name: 'Client A' });
+      });
+
+      await request(app).get('/api/work-entries/1');
+
+      expect(mockDb.get).toHaveBeenCalledWith(
+        expect.stringContaining('we.user_email = ?'),
+        [1, 'test@example.com'],
+        expect.any(Function)
+      );
+    });
+
+    test('should include user_email in POST work entry client verification', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.lastID = 1;
+        callback.call(this, null);
+      });
+
+      await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: 5, date: '2024-01-15' });
+
+      expect(mockDb.get).toHaveBeenCalledWith(
+        expect.stringContaining('user_email = ?'),
+        [1, 'test@example.com'],
+        expect.any(Function)
+      );
+    });
+
+    test('should include user_email in PUT work entry ownership check', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        if (query.includes('work_entries we')) {
+          callback(null, { id: 1, hours: 8, client_name: 'Client A' });
+        } else {
+          callback(null, { id: 1 });
+        }
+      });
+
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+
+      await request(app)
+        .put('/api/work-entries/1')
+        .send({ hours: 8 });
+
+      expect(mockDb.get).toHaveBeenCalledWith(
+        expect.stringContaining('user_email = ?'),
+        [1, 'test@example.com'],
+        expect.any(Function)
+      );
+    });
+
+    test('should include user_email in DELETE work entry ownership check', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+
+      await request(app).delete('/api/work-entries/1');
+
+      expect(mockDb.get).toHaveBeenCalledWith(
+        expect.stringContaining('user_email = ?'),
+        [1, 'test@example.com'],
+        expect.any(Function)
+      );
+    });
+
+    test('should include user_email in work entry INSERT query', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.lastID = 1;
+        callback.call(this, null);
+      });
+
+      await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: 5, date: '2024-01-15' });
+
+      expect(mockDb.run).toHaveBeenCalledWith(
+        expect.stringContaining('user_email'),
+        expect.arrayContaining(['test@example.com']),
+        expect.any(Function)
+      );
+    });
+  });
 });
