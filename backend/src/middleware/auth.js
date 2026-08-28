@@ -1,10 +1,11 @@
 const { getDatabase } = require('../database/init');
+const logger = require('../logger');
 
-// Simple email-based authentication middleware
 function authenticateUser(req, res, next) {
   const userEmail = req.headers['x-user-email'];
   
   if (!userEmail) {
+    logger.warn({ ip: req.ip, path: req.path, event: 'auth_missing_header' }, 'Authentication failed: missing x-user-email header');
     return res.status(401).json({ error: 'User email required in x-user-email header' });
   }
 

@@ -4,6 +4,11 @@ const authRoutes = require('../../routes/auth');
 const { getDatabase } = require('../../database/init');
 
 jest.mock('../../database/init');
+jest.mock('../../logger', () => ({
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn()
+}));
 
 const app = express();
 app.use(express.json());

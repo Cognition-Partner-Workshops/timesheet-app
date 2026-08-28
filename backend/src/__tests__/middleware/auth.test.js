@@ -2,6 +2,11 @@ const { authenticateUser } = require('../../middleware/auth');
 const { getDatabase } = require('../../database/init');
 
 jest.mock('../../database/init');
+jest.mock('../../logger', () => ({
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn()
+}));
 
 describe('Authentication Middleware', () => {
   let req, res, next, mockDb;

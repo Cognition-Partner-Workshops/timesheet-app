@@ -4,6 +4,11 @@ const clientRoutes = require('../../routes/clients');
 const { getDatabase } = require('../../database/init');
 
 jest.mock('../../database/init');
+jest.mock('../../logger', () => ({
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn()
+}));
 jest.mock('../../middleware/auth', () => ({
   authenticateUser: (req, res, next) => {
     req.userEmail = 'test@example.com';

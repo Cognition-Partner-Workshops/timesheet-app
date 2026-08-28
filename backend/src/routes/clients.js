@@ -2,6 +2,7 @@ const express = require('express');
 const { getDatabase } = require('../database/init');
 const { authenticateUser } = require('../middleware/auth');
 const { clientSchema, updateClientSchema } = require('../validation/schemas');
+const logger = require('../logger');
 
 const router = express.Router();
 
@@ -190,6 +191,7 @@ router.put('/:id', (req, res, next) => {
 router.delete('/', (req, res) => {
   const db = getDatabase();
   
+  logger.warn({ email: req.userEmail, ip: req.ip, event: 'mass_delete_clients' }, 'Mass-delete clients requested');
   db.run(
     'DELETE FROM clients WHERE user_email = ?',
     [req.userEmail],
@@ -199,6 +201,7 @@ router.delete('/', (req, res) => {
         return res.status(500).json({ error: 'Failed to delete clients' });
       }
       
+      logger.warn({ email: req.userEmail, deletedCount: this.changes, event: 'mass_delete_clients_completed' }, 'Mass-delete clients completed');
       res.json({ 
         message: 'All clients deleted successfully',
         deletedCount: this.changes
