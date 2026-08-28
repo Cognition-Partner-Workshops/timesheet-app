@@ -44,6 +44,58 @@ router.get('/', (req, res) => {
   });
 });
 
+// Get weekly summary grouped by client per day
+router.get('/weekly-summary', (req, res) => {
+  const { weekStart } = req.query;
+
+  if (!weekStart || !/^\d{4}-\d{2}-\d{2}$/.test(weekStart)) {
+    return res.status(400).json({ error: 'weekStart query parameter is required in YYYY-MM-DD format' });
+  }
+
+  const db = getDatabase();
+
+  const startDate = weekStart;
+  const endDate = new Date(weekStart);
+  endDate.setDate(endDate.getDate() + 6);
+  const endDateStr = endDate.toISOString().split('T')[0];
+
+  db.all(
+    `SELECT we.date, we.client_id, c.name as client_name, SUM(we.hours) as total_hours
+     FROM work_entries we
+     JOIN clients c ON we.client_id = c.id
+     WHERE we.user_email = ? AND we.date >= ? AND we.date <= ?
+     GROUP BY we.date, we.client_id
+     ORDER BY we.date ASC`,
+    [req.userEmail, startDate, endDateStr],
+    (err, rows) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      const days = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(weekStart);
+        d.setDate(d.getDate() + i);
+        days.push(d.toISOString().split('T')[0]);
+      }
+
+      const summary = days.map((date) => {
+        const dayEntries = rows.filter((r) => r.date === date);
+        const clients = {};
+        dayEntries.forEach((entry) => {
+          clients[entry.client_name] = entry.total_hours;
+        });
+        return { date, ...clients };
+      });
+
+      const clientNames = [...new Set(rows.map((r) => r.client_name))];
+
+      res.json({ summary, clientNames });
+    }
+  );
+});
+
 // Get specific work entry
 router.get('/:id', (req, res) => {
   const workEntryId = parseInt(req.params.id);

@@ -17,6 +17,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
+import WeeklySummaryChart from '../components/WeeklySummaryChart';
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -108,6 +109,8 @@ const DashboardPage: React.FC = () => {
           </Grid>
         ))}
       </Grid>
+
+      <WeeklySummaryChart />
 
       <Grid container spacing={3}>
         {/* @ts-expect-error - MUI Grid item prop type issue */}
