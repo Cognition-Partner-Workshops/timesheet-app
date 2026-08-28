@@ -8,8 +8,10 @@ const authRoutes = require('./routes/auth');
 const clientRoutes = require('./routes/clients');
 const workEntryRoutes = require('./routes/workEntries');
 const reportRoutes = require('./routes/reports');
+const noteRoutes = require('./routes/notes');
 
 const { initializeDatabase } = require('./database/init');
+const { initializeNotesDatabase } = require('./database/notesDb');
 const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
@@ -46,6 +48,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/work-entries', workEntryRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/notes', noteRoutes);
 
 // Error handling
 app.use(errorHandler);
@@ -59,6 +62,7 @@ app.use('*', (req, res) => {
 async function startServer() {
   try {
     await initializeDatabase();
+    await initializeNotesDatabase();
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       console.log(`Health check: http://localhost:${PORT}/health`);
