@@ -11,17 +11,18 @@ class ApiClient {
     this.client = axios.create({
       baseURL: API_BASE_URL,
       timeout: 10000,
+      withCredentials: true,
       headers: {
         'Content-Type': 'application/json',
       },
     });
 
-    // Request interceptor to add email header
+    // Request interceptor to add CSRF token header
     this.client.interceptors.request.use(
       (config) => {
-        const userEmail = localStorage.getItem('userEmail');
-        if (userEmail) {
-          config.headers['x-user-email'] = userEmail;
+        const csrfToken = this.getCookie('csrfToken');
+        if (csrfToken) {
+          config.headers['x-csrf-token'] = csrfToken;
         }
         return config;
       },
@@ -35,8 +36,6 @@ class ApiClient {
       (response: AxiosResponse) => response,
       (error) => {
         if (error.response?.status === 401) {
-          // Clear stored email on auth error
-          localStorage.removeItem('userEmail');
           window.location.href = '/login';
         }
         return Promise.reject(error);
@@ -44,9 +43,19 @@ class ApiClient {
     );
   }
 
+  private getCookie(name: string): string | null {
+    const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    return match ? match[2] : null;
+  }
+
   // Auth endpoints
   async login(email: string) {
     const response = await this.client.post('/api/auth/login', { email });
+    return response.data;
+  }
+
+  async logout() {
+    const response = await this.client.post('/api/auth/logout');
     return response.data;
   }
 
@@ -78,11 +87,6 @@ class ApiClient {
 
   async deleteClient(id: number) {
     const response = await this.client.delete(`/api/clients/${id}`);
-    return response.data;
-  }
-
-  async deleteAllClients() {
-    const response = await this.client.delete('/api/clients');
     return response.data;
   }
 
