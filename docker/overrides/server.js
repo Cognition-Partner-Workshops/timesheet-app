@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 
@@ -22,7 +23,7 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:"],
@@ -35,11 +36,12 @@ app.use(helmet({
   strictTransportSecurity: false,
 }));
 
-// CORS configuration - in production, same origin so allow all
+// CORS configuration
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' ? true : (process.env.FRONTEND_URL || 'http://localhost:5173'),
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true
 }));
+app.use(cookieParser());
 
 // Rate limiting
 const limiter = rateLimit({

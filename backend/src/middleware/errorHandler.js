@@ -18,9 +18,13 @@ function errorHandler(err, req, res, next) {
   }
 
   // Default error
-  res.status(err.status || 500).json({
-    error: err.message || 'Internal server error'
-  });
+  if (process.env.NODE_ENV === 'production') {
+    res.status(err.status || 500).json({ error: 'Internal server error' });
+  } else {
+    res.status(err.status || 500).json({
+      error: err.message || 'Internal server error'
+    });
+  }
 }
 
 module.exports = {
