@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Cognition-Partner-Workshops/timesheet-app/blob/main/docs/automations/remediation-queue.schema.json",
+  "title": "Drift scan document",
+  "description": "Output of every per-repository drift scanner (scripts/drift_scan.py in timesheet-app, petclinic-microservices and timesheet-infra). The weekly drift report concatenates these documents, sorts by rank_score, and publishes the result as the remediation queue that a Track 2 fan-out consumes.",
+  "type": "object",
+  "required": ["repo", "generated_at", "scanner", "items", "errors"],
+  "additionalProperties": false,
+  "properties": {
+    "repo": {
+      "type": "string",
+      "description": "owner/name of the scanned repository"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp of the scan"
+    },
+    "scanner": {
+      "type": "string",
+      "description": "path of the scanner inside the scanned repository"
+    },
+    "advisory_coverage": {
+      "type": "string",
+      "description": "set when the ecosystem has no advisory feed, so an empty advisories array is not read as 'no known vulnerabilities'"
+    },
+    "terraform_roots": {
+      "type": "array",
+      "description": "timesheet-infra only: the Terraform roots that were scanned",
+      "items": {"type": "string"}
+    },
+    "items": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/item"}
+    },
+    "errors": {
+      "type": "array",
+      "description": "every failed lookup, unparseable manifest and degraded fallback. A non-empty array means the scan is incomplete and MUST be reported as such rather than treated as clean.",
+      "items": {"type": "string"}
+    }
+  },
+  "$defs": {
+    "item": {
+      "type": "object",
+      "required": [
+        "component", "ecosystem", "kind", "location", "current", "latest",
+        "exposure", "gap", "advisories", "advisory_count", "rank_score", "size"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "component": {
+          "type": "string",
+          "description": "package name (npm), group:artifact (maven), provider/module source (terraform), or 'java'/'terraform' for a runtime"
+        },
+        "ecosystem": {"enum": ["npm", "maven", "terraform"]},
+        "kind": {"enum": ["dependency", "plugin", "provider", "module", "runtime"]},
+        "location": {
+          "type": "string",
+          "description": "manifest or Terraform root the finding was read from, relative to the repository root"
+        },
+        "current": {"type": "string"},
+        "latest": {"type": "string"},
+        "constraint": {
+          "type": "string",
+          "description": "terraform only: the declared version constraint"
+        },
+        "constraint_allows_latest": {
+          "type": "boolean",
+          "description": "terraform only: false means the constraint itself must be widened before the upgrade is possible"
+        },
+        "pinned_by_lockfile": {
+          "type": "boolean",
+          "description": "terraform only: whether current came from .terraform.lock.hcl rather than from the constraint"
+        },
+        "exposure": {
+          "enum": ["runtime", "dev", "test", "transitive", "plugin", "build_parent", "provider", "module", "runtime_platform"],
+          "description": "how the component is reachable; feeds rank_score"
+        },
+        "gap": {
+          "type": "object",
+          "required": ["major", "minor", "patch"],
+          "additionalProperties": false,
+          "properties": {
+            "major": {"type": "integer", "minimum": 0},
+            "minor": {"type": "integer", "minimum": 0},
+            "patch": {"type": "integer", "minimum": 0}
+          }
+        },
+        "advisories": {
+          "type": "array",
+          "description": "highest severity first, truncated to --max-advisories; advisory_count keeps the untruncated total",
+          "items": {
+            "type": "object",
+            "required": ["id", "severity", "summary", "url"],
+            "additionalProperties": false,
+            "properties": {
+              "id": {"type": "string"},
+              "severity": {"enum": ["CRITICAL", "HIGH", "MODERATE", "MEDIUM", "LOW", "INFO"]},
+              "summary": {"type": "string"},
+              "url": {"type": "string"}
+            }
+          }
+        },
+        "advisory_count": {"type": "integer", "minimum": 0},
+        "rank_score": {
+          "type": "integer",
+          "description": "worst advisory severity + advisory volume + version staleness + exposure. Higher ranks first."
+        },
+        "size": {
+          "enum": ["XS", "S", "M", "L"],
+          "description": "remediation effort: XS lockfile-only, S single manifest bump, M breaking major in one component, L high blast radius / cross-module"
+        }
+      }
+    }
+  }
+}
