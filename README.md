@@ -277,6 +277,18 @@ See `backend/DEPLOYMENT.md` for detailed production deployment instructions.
 4. **Single-server architecture** - Not designed for horizontal scaling
 5. **No real-time updates** - Changes require page refresh
 
+## Contributing
+
+Contributions are welcome! To get started:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/your-feature`)
+3. Commit your changes (`git commit -m 'Add your feature'`)
+4. Push to the branch (`git push origin feature/your-feature`)
+5. Open a Pull Request
+
+Please ensure all existing tests pass before submitting a PR.
+
 ## Future Enhancements
 
 - Persistent database storage
@@ -287,6 +299,7 @@ See `backend/DEPLOYMENT.md` for detailed production deployment instructions.
 - Email notifications
 - Mobile app
 - Integration with calendar systems
+- Dark mode support
 
 ## License
 
