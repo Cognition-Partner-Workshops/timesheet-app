@@ -178,7 +178,7 @@ const WorkEntriesPage: React.FC = () => {
 
   if (entriesLoading || clientsLoading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
         <CircularProgress />
       </Box>
     );
@@ -187,7 +187,7 @@ const WorkEntriesPage: React.FC = () => {
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <Box>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
           <Typography variant="h4">Work Entries</Typography>
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpen()}>
             Add Work Entry
@@ -227,7 +227,7 @@ const WorkEntriesPage: React.FC = () => {
                     workEntries.map((entry: WorkEntry) => (
                       <TableRow key={entry.id}>
                         <TableCell>
-                          <Typography variant="subtitle1" fontWeight="medium">
+                          <Typography variant="subtitle1" sx={{ fontWeight: "medium" }}>
                             {entry.client_name}
                           </Typography>
                         </TableCell>
@@ -312,7 +312,7 @@ const WorkEntriesPage: React.FC = () => {
                 type="number"
                 fullWidth
                 required
-                inputProps={{ min: 0.01, max: 24, step: 0.01 }}
+                slotProps={{ htmlInput: { min: 0.01, max: 24, step: 0.01 } }}
                 value={formData.hours}
                 onChange={(e) => setFormData({ ...formData, hours: e.target.value })}
                 disabled={createMutation.isPending || updateMutation.isPending}

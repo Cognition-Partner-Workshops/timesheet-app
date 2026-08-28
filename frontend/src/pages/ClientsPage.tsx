@@ -160,7 +160,7 @@ const ClientsPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
         <CircularProgress />
       </Box>
     );
@@ -168,9 +168,9 @@ const ClientsPage: React.FC = () => {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
         <Typography variant="h4">Clients</Typography>
-        <Box display="flex" gap={2}>
+        <Box sx={{ display: "flex", gap: 2 }}>
           {clients.length > 0 && (
             <Button
               variant="outlined"
@@ -212,7 +212,7 @@ const ClientsPage: React.FC = () => {
                 clients.map((client: Client) => (
                   <TableRow key={client.id}>
                     <TableCell>
-                      <Typography variant="subtitle1" fontWeight="medium">
+                      <Typography variant="subtitle1" sx={{ fontWeight: "medium" }}>
                         {client.name}
                       </Typography>
                     </TableCell>

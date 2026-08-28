@@ -93,7 +93,7 @@ const ReportsPage: React.FC = () => {
 
   if (clientsLoading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
         <CircularProgress />
       </Box>
     );
@@ -123,7 +123,7 @@ const ReportsPage: React.FC = () => {
       ) : (
         <>
           <Paper sx={{ p: 3, mb: 3 }}>
-            <Grid container spacing={3} alignItems="center">
+            <Grid container spacing={3} sx={{ alignItems: "center" }}>
               <Grid size={{ xs: 12, md: 6 }}>
                 <FormControl fullWidth>
                   <InputLabel>Select Client</InputLabel>
@@ -142,7 +142,7 @@ const ReportsPage: React.FC = () => {
                 </FormControl>
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
-                <Box display="flex" gap={2}>
+                <Box sx={{ display: "flex", gap: 2 }}>
                   <Tooltip title="Export as CSV">
                     <IconButton
                       onClick={handleExportCsv}
@@ -169,7 +169,7 @@ const ReportsPage: React.FC = () => {
           </Paper>
 
           {selectedClient && reportLoading && (
-            <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+            <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "200px" }}>
               <CircularProgress />
             </Box>
           )}
