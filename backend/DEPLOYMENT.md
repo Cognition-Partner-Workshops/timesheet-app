@@ -2,11 +2,11 @@
 
 ## ⚠️ Important Security & Data Considerations
 
-### Data Persistence Warning
-**This application uses SQLite in-memory database as specified in requirements.** 
-- All data will be lost when the server restarts
-- Not suitable for production use without modification
-- For production, consider switching to file-based SQLite or a proper database
+### Data Persistence
+**This application uses MySQL for data storage.**
+- A running MySQL server is required
+- Data persists across server restarts
+- Configure connection details via environment variables
 
 ### Authentication Security
 - Email-only authentication assumes trusted network environment
@@ -33,6 +33,13 @@ NODE_ENV=production
 PORT=3001
 FRONTEND_URL=https://your-frontend-domain.com
 JWT_SECRET=your-generated-secret-key-here
+
+# MySQL Database Configuration
+DB_HOST=your-mysql-host
+DB_PORT=3306
+DB_USER=your-db-user
+DB_PASSWORD=your-db-password
+DB_NAME=timesheet
 ```
 
 ## Production Deployment Steps
@@ -105,11 +112,15 @@ WantedBy=multi-user.target
 
 ## Scaling Considerations
 
-- In-memory database cannot be scaled horizontally
+- MySQL supports horizontal scaling via read replicas
 - Consider load balancer for multiple frontend instances
-- Database persistence required for horizontal scaling
+- Connection pooling is configured (default: 10 connections)
 
 ## Backup Strategy
 
-**Not applicable for in-memory database** - data is ephemeral.
-For production with persistent storage, implement regular database backups.
+Implement regular MySQL database backups:
+```bash
+# Example daily backup
+mysqldump -u $DB_USER -p$DB_PASSWORD $DB_NAME > backup_$(date +%Y%m%d).sql
+```
+Consider setting up automated backups and point-in-time recovery.

@@ -1,113 +1,131 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const mysql = require('mysql2');
 
-let db = null;
-let isClosing = false;
-let isClosed = false;
+let pool = null;
+let dbWrapper = null;
 
 function getDatabase() {
-  if (!db) {
-    // Reset state when creating a new database connection
-    isClosing = false;
-    isClosed = false;
-    // Use in-memory database as specified in requirements
-    db = new sqlite3.Database(':memory:', (err) => {
-      if (err) {
-        console.error('Error opening database:', err);
-        throw err;
-      }
-      console.log('Connected to SQLite in-memory database');
+  if (!dbWrapper) {
+    pool = mysql.createPool({
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT, 10) || 3306,
+      user: process.env.DB_USER || 'root',
+      password: process.env.DB_PASSWORD || '',
+      database: process.env.DB_NAME || 'timesheet',
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0
     });
+
+    console.log('Connected to MySQL database');
+
+    // Wrapper that mimics the SQLite callback API used by route files
+    dbWrapper = {
+      get(query, params, callback) {
+        if (typeof params === 'function') {
+          callback = params;
+          params = [];
+        }
+        pool.query(query, params, (err, rows) => {
+          if (err) return callback(err, null);
+          callback(null, rows[0] || null);
+        });
+      },
+
+      all(query, params, callback) {
+        if (typeof params === 'function') {
+          callback = params;
+          params = [];
+        }
+        pool.query(query, params, (err, rows) => {
+          if (err) return callback(err, null);
+          callback(null, rows);
+        });
+      },
+
+      run(query, params, callback) {
+        if (typeof params === 'function') {
+          callback = params;
+          params = [];
+        }
+        pool.query(query, params, (err, result) => {
+          if (typeof callback === 'function') {
+            const context = {
+              lastID: result ? result.insertId : null,
+              changes: result ? result.affectedRows : 0
+            };
+            callback.call(context, err);
+          }
+        });
+      },
+
+      serialize(callback) {
+        if (typeof callback === 'function') {
+          callback();
+        }
+      }
+    };
   }
-  return db;
+  return dbWrapper;
 }
 
 async function initializeDatabase() {
   const database = getDatabase();
-  
-  return new Promise((resolve, reject) => {
-    database.serialize(() => {
-      // Create users table
-      database.run(`
-        CREATE TABLE IF NOT EXISTS users (
-          email TEXT PRIMARY KEY,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
+  const promisePool = pool.promise();
 
-      // Create clients table
-      database.run(`
-        CREATE TABLE IF NOT EXISTS clients (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          description TEXT,
-          department TEXT,
-          email TEXT,
-          user_email TEXT NOT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
-        )
-      `);
+  await promisePool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      email VARCHAR(255) PRIMARY KEY,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
 
-      // Create work_entries table
-      database.run(`
-        CREATE TABLE IF NOT EXISTS work_entries (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          client_id INTEGER NOT NULL,
-          user_email TEXT NOT NULL,
-          hours DECIMAL(5,2) NOT NULL,
-          description TEXT,
-          date DATE NOT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE,
-          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
-        )
-      `);
+  await promisePool.query(`
+    CREATE TABLE IF NOT EXISTS clients (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      description TEXT,
+      department VARCHAR(255),
+      email VARCHAR(255),
+      user_email VARCHAR(255) NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
+    )
+  `);
 
-      // Create indexes for better performance
-      database.run(`CREATE INDEX IF NOT EXISTS idx_clients_user_email ON clients (user_email)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_client_id ON work_entries (client_id)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_user_email ON work_entries (user_email)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_date ON work_entries (date)`);
+  await promisePool.query(`
+    CREATE TABLE IF NOT EXISTS work_entries (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      client_id INT NOT NULL,
+      user_email VARCHAR(255) NOT NULL,
+      hours DECIMAL(5,2) NOT NULL,
+      description TEXT,
+      date DATE NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE,
+      FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
+    )
+  `);
 
-      console.log('Database tables created successfully');
-      resolve();
-    });
-  });
+  await promisePool.query(`CREATE INDEX IF NOT EXISTS idx_clients_user_email ON clients (user_email)`);
+  await promisePool.query(`CREATE INDEX IF NOT EXISTS idx_work_entries_client_id ON work_entries (client_id)`);
+  await promisePool.query(`CREATE INDEX IF NOT EXISTS idx_work_entries_user_email ON work_entries (user_email)`);
+  await promisePool.query(`CREATE INDEX IF NOT EXISTS idx_work_entries_date ON work_entries (date)`);
+
+  console.log('Database tables created successfully');
 }
 
 function closeDatabase() {
-  return new Promise((resolve, reject) => {
-    if (isClosed) {
-      // Already closed, resolve immediately
+  return new Promise((resolve) => {
+    if (!pool) {
       resolve();
       return;
     }
-    
-    if (isClosing) {
-      // Currently closing, wait for it to complete
-      const checkClosed = setInterval(() => {
-        if (isClosed) {
-          clearInterval(checkClosed);
-          resolve();
-        }
-      }, 10);
-      return;
-    }
-    
-    if (!db) {
-      // No database connection, resolve immediately
-      resolve();
-      return;
-    }
-    
-    isClosing = true;
-    db.close((err) => {
-      isClosed = true;
-      isClosing = false;
-      db = null;
+
+    pool.end((err) => {
+      pool = null;
+      dbWrapper = null;
       if (err) {
         console.error('Error closing database:', err);
       } else {

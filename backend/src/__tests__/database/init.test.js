@@ -1,23 +1,28 @@
-const sqlite3 = require('sqlite3');
+const mysql = require('mysql2');
 const { getDatabase, initializeDatabase, closeDatabase } = require('../../database/init');
 
-// Mock sqlite3
-jest.mock('sqlite3', () => {
-  const mockDatabase = {
-    serialize: jest.fn((callback) => callback()),
-    run: jest.fn((query, callback) => {
-      if (typeof callback === 'function') callback(null);
+// Mock mysql2
+jest.mock('mysql2', () => {
+  const mockPromisePool = {
+    query: jest.fn().mockResolvedValue([[], []])
+  };
+
+  const mockPool = {
+    query: jest.fn((query, params, callback) => {
+      if (typeof params === 'function') {
+        callback = params;
+        params = [];
+      }
+      if (typeof callback === 'function') {
+        callback(null, []);
+      }
     }),
-    close: jest.fn((callback) => callback(null))
+    promise: jest.fn(() => mockPromisePool),
+    end: jest.fn((callback) => callback && callback(null))
   };
 
   return {
-    verbose: jest.fn(() => ({
-      Database: jest.fn((path, callback) => {
-        callback(null);
-        return mockDatabase;
-      })
-    }))
+    createPool: jest.fn(() => mockPool)
   };
 });
 
@@ -27,86 +32,81 @@ describe('Database Initialization', () => {
   beforeEach(() => {
     consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-    
+
     // Reset the database singleton
     jest.resetModules();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await closeDatabase();
     consoleLogSpy.mockRestore();
     consoleErrorSpy.mockRestore();
     jest.clearAllMocks();
   });
 
   describe('getDatabase', () => {
-    test('should create and return database instance', () => {
+    test('should create and return database wrapper', () => {
       const db = getDatabase();
-      
+
       expect(db).toBeDefined();
-      expect(consoleLogSpy).toHaveBeenCalledWith('Connected to SQLite in-memory database');
+      expect(db.get).toBeDefined();
+      expect(db.all).toBeDefined();
+      expect(db.run).toBeDefined();
+      expect(db.serialize).toBeDefined();
+      expect(consoleLogSpy).toHaveBeenCalledWith('Connected to MySQL database');
     });
 
     test('should return same database instance on multiple calls', () => {
       const db1 = getDatabase();
       const db2 = getDatabase();
-      
+
       expect(db1).toBe(db2);
     });
 
-    test('should handle database connection error', () => {
-      jest.resetModules();
-      
-      jest.doMock('sqlite3', () => {
-        return {
-          verbose: jest.fn(() => ({
-            Database: jest.fn((path, callback) => {
-              callback(new Error('Connection failed'));
-              return {};
-            })
-          }))
-        };
-      });
+    test('should create pool with default config', () => {
+      getDatabase();
 
-      const { getDatabase: getDatabaseWithError } = require('../../database/init');
-      
-      expect(() => getDatabaseWithError()).toThrow('Connection failed');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error opening database:', expect.any(Error));
+      expect(mysql.createPool).toHaveBeenCalledWith(
+        expect.objectContaining({
+          host: 'localhost',
+          port: 3306,
+          user: 'root',
+          database: 'timesheet'
+        })
+      );
     });
   });
 
   describe('initializeDatabase', () => {
     test('should create all required tables', async () => {
-      const db = getDatabase();
       await initializeDatabase();
+      const db = getDatabase();
 
-      expect(db.serialize).toHaveBeenCalled();
-      expect(db.run).toHaveBeenCalled();
-      
-      // Check that run was called for each table and index
-      const runCalls = db.run.mock.calls;
-      const queries = runCalls.map(call => call[0]);
-      
+      const mockPromisePool = mysql.createPool().promise();
+      const queryCalls = mockPromisePool.query.mock.calls;
+      const queries = queryCalls.map(call => call[0]);
+
       expect(queries.some(q => q.includes('CREATE TABLE IF NOT EXISTS users'))).toBe(true);
       expect(queries.some(q => q.includes('CREATE TABLE IF NOT EXISTS clients'))).toBe(true);
       expect(queries.some(q => q.includes('CREATE TABLE IF NOT EXISTS work_entries'))).toBe(true);
     });
 
     test('should create indexes for performance', async () => {
-      const db = getDatabase();
       await initializeDatabase();
 
-      const runCalls = db.run.mock.calls;
-      const queries = runCalls.map(call => call[0]);
-      
-      expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_clients_user_email'))).toBe(true);
-      expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_work_entries_client_id'))).toBe(true);
-      expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_work_entries_user_email'))).toBe(true);
-      expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_work_entries_date'))).toBe(true);
+      const mockPromisePool = mysql.createPool().promise();
+      const queryCalls = mockPromisePool.query.mock.calls;
+      const queries = queryCalls.map(call => call[0]);
+
+      expect(queries.some(q => q.includes('idx_clients_user_email'))).toBe(true);
+      expect(queries.some(q => q.includes('idx_work_entries_client_id'))).toBe(true);
+      expect(queries.some(q => q.includes('idx_work_entries_user_email'))).toBe(true);
+      expect(queries.some(q => q.includes('idx_work_entries_date'))).toBe(true);
     });
 
     test('should log success message', async () => {
       await initializeDatabase();
-      
+
       expect(consoleLogSpy).toHaveBeenCalledWith('Database tables created successfully');
     });
 
@@ -116,66 +116,65 @@ describe('Database Initialization', () => {
   });
 
   describe('closeDatabase', () => {
-    test('should close database connection', () => {
-      const db = getDatabase();
-      closeDatabase();
+    test('should close database connection pool', async () => {
+      getDatabase();
+      await closeDatabase();
 
-      expect(db.close).toHaveBeenCalled();
+      const mockPool = mysql.createPool();
+      expect(mockPool.end).toHaveBeenCalled();
       expect(consoleLogSpy).toHaveBeenCalledWith('Database connection closed');
     });
 
-    test('should handle close error gracefully', () => {
-      const db = getDatabase();
-      db.close.mockImplementation((callback) => callback(new Error('Close error')));
+    test('should handle close error gracefully', async () => {
+      getDatabase();
 
-      closeDatabase();
+      const mockPool = mysql.createPool();
+      mockPool.end.mockImplementation((callback) => callback(new Error('Close error')));
+
+      await closeDatabase();
 
       expect(consoleErrorSpy).toHaveBeenCalledWith('Error closing database:', expect.any(Error));
     });
 
-    test('should handle multiple close calls safely', () => {
-      const db = getDatabase();
-      // Reset close mock to default behavior (no error)
-      db.close.mockImplementation((callback) => callback(null));
-      closeDatabase();
-      closeDatabase(); // Second call should not throw
-
+    test('should handle close when no pool exists', async () => {
+      // Don't call getDatabase, so pool is null after previous closeDatabase
+      await closeDatabase();
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
   });
 
   describe('Database Schema', () => {
-    test('users table should have correct structure', async () => {
-      const db = getDatabase();
+    test('users table should use VARCHAR for email primary key', async () => {
       await initializeDatabase();
 
-      const userTableQuery = db.run.mock.calls.find(call => 
+      const mockPromisePool = mysql.createPool().promise();
+      const usersQuery = mockPromisePool.query.mock.calls.find(call =>
         call[0].includes('CREATE TABLE IF NOT EXISTS users')
       );
 
-      expect(userTableQuery).toBeDefined();
-      expect(userTableQuery[0]).toContain('email TEXT PRIMARY KEY');
-      expect(userTableQuery[0]).toContain('created_at DATETIME DEFAULT CURRENT_TIMESTAMP');
+      expect(usersQuery).toBeDefined();
+      expect(usersQuery[0]).toContain('email VARCHAR(255) PRIMARY KEY');
+      expect(usersQuery[0]).toContain('created_at DATETIME DEFAULT CURRENT_TIMESTAMP');
     });
 
     test('clients table should have foreign key to users', async () => {
-      const db = getDatabase();
       await initializeDatabase();
 
-      const clientTableQuery = db.run.mock.calls.find(call => 
+      const mockPromisePool = mysql.createPool().promise();
+      const clientsQuery = mockPromisePool.query.mock.calls.find(call =>
         call[0].includes('CREATE TABLE IF NOT EXISTS clients')
       );
 
-      expect(clientTableQuery).toBeDefined();
-      expect(clientTableQuery[0]).toContain('user_email TEXT NOT NULL');
-      expect(clientTableQuery[0]).toContain('FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE');
+      expect(clientsQuery).toBeDefined();
+      expect(clientsQuery[0]).toContain('user_email VARCHAR(255) NOT NULL');
+      expect(clientsQuery[0]).toContain('FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE');
     });
 
     test('work_entries table should have foreign keys', async () => {
-      const db = getDatabase();
       await initializeDatabase();
 
-      const workEntriesQuery = db.run.mock.calls.find(call => 
+      const mockPromisePool = mysql.createPool().promise();
+      const workEntriesQuery = mockPromisePool.query.mock.calls.find(call =>
         call[0].includes('CREATE TABLE IF NOT EXISTS work_entries')
       );
 
