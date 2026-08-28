@@ -5,6 +5,28 @@ const { workEntrySchema, updateWorkEntrySchema } = require('../validation/schema
 
 const router = express.Router();
 
+function fetchUpdatedWorkEntry(db, workEntryId, res) {
+  db.get(
+    `SELECT we.id, we.client_id, we.hours, we.description, we.date, 
+            we.created_at, we.updated_at, c.name as client_name
+     FROM work_entries we
+     JOIN clients c ON we.client_id = c.id
+     WHERE we.id = ?`,
+    [workEntryId],
+    (err, row) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'Work entry updated but failed to retrieve' });
+      }
+
+      res.json({
+        message: 'Work entry updated successfully',
+        workEntry: row
+      });
+    }
+  );
+}
+
 // All routes require authentication
 router.use(authenticateUser);
 
@@ -228,26 +250,7 @@ router.put('/:id', (req, res, next) => {
               return res.status(500).json({ error: 'Failed to update work entry' });
             }
 
-            // Return updated work entry with client name
-            db.get(
-              `SELECT we.id, we.client_id, we.hours, we.description, we.date, 
-                      we.created_at, we.updated_at, c.name as client_name
-               FROM work_entries we
-               JOIN clients c ON we.client_id = c.id
-               WHERE we.id = ?`,
-              [workEntryId],
-              (err, row) => {
-                if (err) {
-                  console.error('Database error:', err);
-                  return res.status(500).json({ error: 'Work entry updated but failed to retrieve' });
-                }
-
-                res.json({
-                  message: 'Work entry updated successfully',
-                  workEntry: row
-                });
-              }
-            );
+            fetchUpdatedWorkEntry(db, workEntryId, res);
           });
         }
       }
