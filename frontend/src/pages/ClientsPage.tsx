@@ -30,6 +30,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
 import { type Client } from '../types/api';
 
+const getSubmitLabel = (editingClient: Client | null): string =>
+  editingClient ? 'Update' : 'Create';
+
 const ClientsPage: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -147,13 +150,13 @@ const ClientsPage: React.FC = () => {
   };
 
   const handleDelete = (client: Client) => {
-    if (window.confirm(`Are you sure you want to delete "${client.name}"?`)) {
+    if (globalThis.confirm(`Are you sure you want to delete "${client.name}"?`)) {
       deleteMutation.mutate(client.id);
     }
   };
 
   const handleDeleteAll = () => {
-    if (window.confirm('Are you sure you want to delete ALL clients? This action cannot be undone.')) {
+    if (globalThis.confirm('Are you sure you want to delete ALL clients? This action cannot be undone.')) {
       deleteAllMutation.mutate();
     }
   };
@@ -336,7 +339,7 @@ const ClientsPage: React.FC = () => {
               {createMutation.isPending || updateMutation.isPending ? (
                 <CircularProgress size={24} />
               ) : (
-                editingClient ? 'Update' : 'Create'
+                getSubmitLabel(editingClient)
               )}
             </Button>
           </DialogActions>
