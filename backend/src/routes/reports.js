@@ -8,6 +8,17 @@ const fs = require('fs');
 
 const router = express.Router();
 
+// Sanitize a value to prevent CSV formula injection
+// Prefixes cells starting with dangerous characters with a single quote
+function sanitizeCsvValue(value) {
+  if (typeof value !== 'string') return value;
+  const dangerousChars = ['=', '+', '-', '@', '\t', '\r'];
+  if (dangerousChars.some(ch => value.startsWith(ch))) {
+    return "'" + value;
+  }
+  return value;
+}
+
 // All routes require authentication
 router.use(authenticateUser);
 
@@ -121,7 +132,15 @@ router.get('/export/csv/:clientId', (req, res) => {
             ]
           });
           
-          csvWriter.writeRecords(workEntries)
+          // Sanitize work entry values to prevent CSV formula injection
+          const sanitizedEntries = workEntries.map(entry => ({
+            ...entry,
+            description: sanitizeCsvValue(entry.description),
+            date: sanitizeCsvValue(entry.date),
+            created_at: sanitizeCsvValue(entry.created_at)
+          }));
+          
+          csvWriter.writeRecords(sanitizedEntries)
             .then(() => {
               // Send file and clean up
               res.download(tempPath, filename, (err) => {

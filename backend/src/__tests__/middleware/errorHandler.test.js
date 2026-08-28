@@ -101,7 +101,10 @@ describe('Error Handler Middleware', () => {
       });
     });
 
-    test('should default to 500 status if not specified', () => {
+    test('should default to 500 status if not specified (development)', () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
+      
       const genericError = {
         message: 'Something went wrong'
       };
@@ -112,6 +115,45 @@ describe('Error Handler Middleware', () => {
       expect(res.json).toHaveBeenCalledWith({
         error: 'Something went wrong'
       });
+      
+      process.env.NODE_ENV = originalEnv;
+    });
+
+    test('should hide internal error details in production for 500 errors', () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      
+      const genericError = {
+        message: 'Sensitive database path: /var/db/secret.sqlite'
+      };
+
+      errorHandler(genericError, req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Internal server error'
+      });
+      
+      process.env.NODE_ENV = originalEnv;
+    });
+
+    test('should show error message for non-500 errors in production', () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      
+      const clientError = {
+        status: 403,
+        message: 'Forbidden access'
+      };
+
+      errorHandler(clientError, req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Forbidden access'
+      });
+      
+      process.env.NODE_ENV = originalEnv;
     });
 
     test('should use default message if none provided', () => {
