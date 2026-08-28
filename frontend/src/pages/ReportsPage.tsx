@@ -29,10 +29,12 @@ import {
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
-import { type ClientReport } from '../types/api';
+import LoadingState from '../components/LoadingState';
+import { type ClientReport, type Project } from '../types/api';
 
 const ReportsPage: React.FC = () => {
   const [selectedClientId, setSelectedClientId] = useState<number>(0);
+  const [selectedProjectId, setSelectedProjectId] = useState<number>(0);
   const [error, setError] = useState('');
 
   const { data: clientsData, isLoading: clientsLoading } = useQuery({
@@ -40,20 +42,27 @@ const ReportsPage: React.FC = () => {
     queryFn: () => apiClient.getClients(),
   });
 
+  const { data: projectsData } = useQuery({
+    queryKey: ['projects', selectedClientId],
+    queryFn: () => apiClient.getProjects(selectedClientId),
+    enabled: selectedClientId > 0,
+  });
+
   const { data: reportData, isLoading: reportLoading } = useQuery({
-    queryKey: ['clientReport', selectedClientId],
-    queryFn: () => apiClient.getClientReport(selectedClientId),
+    queryKey: ['clientReport', selectedClientId, selectedProjectId],
+    queryFn: () => apiClient.getClientReport(selectedClientId, selectedProjectId || undefined),
     enabled: selectedClientId > 0,
   });
 
   const clients = clientsData?.clients || [];
+  const projects: Project[] = projectsData?.projects || [];
   const report = reportData as ClientReport | undefined;
 
   const handleExportCsv = async () => {
     if (!selectedClientId) return;
     
     try {
-      const blob = await apiClient.exportClientReportCsv(selectedClientId);
+      const blob = await apiClient.exportClientReportCsv(selectedClientId, selectedProjectId || undefined);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -73,7 +82,7 @@ const ReportsPage: React.FC = () => {
     if (!selectedClientId) return;
 
     try {
-      const blob = await apiClient.exportClientReportPdf(selectedClientId);
+      const blob = await apiClient.exportClientReportPdf(selectedClientId, selectedProjectId || undefined);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -92,11 +101,7 @@ const ReportsPage: React.FC = () => {
   const selectedClient = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
 
   if (clientsLoading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
-      </Box>
-    );
+    return <LoadingState />;
   }
 
   return (
@@ -124,12 +129,15 @@ const ReportsPage: React.FC = () => {
         <>
           <Paper sx={{ p: 3, mb: 3 }}>
             <Grid container spacing={3} alignItems="center">
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <FormControl fullWidth>
                   <InputLabel>Select Client</InputLabel>
                   <Select
                     value={selectedClientId}
-                    onChange={(e) => setSelectedClientId(Number(e.target.value))}
+                    onChange={(e) => {
+                      setSelectedClientId(Number(e.target.value));
+                      setSelectedProjectId(0);
+                    }}
                     label="Select Client"
                   >
                     <MenuItem value={0}>Choose a client...</MenuItem>
@@ -141,7 +149,24 @@ const ReportsPage: React.FC = () => {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <FormControl fullWidth disabled={!selectedClientId}>
+                  <InputLabel>Filter by Project</InputLabel>
+                  <Select
+                    value={selectedProjectId}
+                    onChange={(e) => setSelectedProjectId(Number(e.target.value))}
+                    label="Filter by Project"
+                  >
+                    <MenuItem value={0}>All projects</MenuItem>
+                    {projects.map((project) => (
+                      <MenuItem key={project.id} value={project.id}>
+                        {project.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <Box display="flex" gap={2}>
                   <Tooltip title="Export as CSV">
                     <IconButton
