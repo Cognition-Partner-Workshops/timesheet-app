@@ -1,6 +1,7 @@
 const express = require('express');
 const { getDatabase } = require('../database/init');
 const { authenticateUser } = require('../middleware/auth');
+const { summaryQuerySchema } = require('../validation/schemas');
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 const PDFDocument = require('pdfkit');
 const path = require('path');
@@ -10,6 +11,52 @@ const router = express.Router();
 
 // All routes require authentication
 router.use(authenticateUser);
+
+// Get aggregated hours summary grouped by client over a time window
+router.get('/summary', (req, res) => {
+  const { error, value } = summaryQuerySchema.validate(req.query);
+
+  if (error) {
+    return res.status(400).json({ error: error.details[0].message });
+  }
+
+  const days = value.days;
+  const db = getDatabase();
+
+  db.all(
+    `SELECT c.id AS client_id, c.name AS client_name,
+            SUM(we.hours) AS total_hours, COUNT(we.id) AS entry_count
+     FROM work_entries we
+     JOIN clients c ON we.client_id = c.id
+     WHERE we.user_email = ?
+       AND (CASE WHEN typeof(we.date) IN ('integer', 'real')
+                 THEN date(we.date / 1000, 'unixepoch')
+                 ELSE date(we.date) END) >= date('now', '-' || ? || ' days')
+     GROUP BY c.id, c.name
+     ORDER BY total_hours DESC`,
+    [req.userEmail, days],
+    (err, rows) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      const summary = rows.map((row) => ({
+        client_id: row.client_id,
+        client_name: row.client_name,
+        total_hours: parseFloat(row.total_hours),
+        entry_count: row.entry_count
+      }));
+
+      const totalHours = summary.reduce((sum, item) => sum + item.total_hours, 0);
+
+      res.json({
+        summary: summary,
+        total_hours: totalHours
+      });
+    }
+  );
+});
 
 // Get hourly report for specific client
 router.get('/client/:clientId', (req, res) => {

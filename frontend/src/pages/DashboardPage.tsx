@@ -31,8 +31,17 @@ const DashboardPage: React.FC = () => {
     queryFn: () => apiClient.getWorkEntries(),
   });
 
+  const { data: summaryData } = useQuery({
+    queryKey: ['reports', 'summary', 30],
+    queryFn: () => apiClient.getSummaryReport(30),
+  });
+
   const clients = clientsData?.clients || [];
   const workEntries = workEntriesData?.workEntries || [];
+
+  const summary = summaryData?.summary || [];
+  const summaryTotalHours = summaryData?.total_hours || 0;
+  const maxClientHours = summary.reduce((max, row) => Math.max(max, row.total_hours), 0);
 
   const totalHours = workEntries.reduce((sum: number, entry: { hours: number }) => sum + entry.hours, 0);
   const recentEntries = workEntries.slice(0, 5);
@@ -108,6 +117,40 @@ const DashboardPage: React.FC = () => {
           </Grid>
         ))}
       </Grid>
+
+      <Paper sx={{ p: 3, mb: 4 }}>
+        <Typography variant="h6" mb={2}>
+          Hours by Client (Last 30 Days)
+        </Typography>
+        {summary.length > 0 ? (
+          summary.map((row) => {
+            const percentage = summaryTotalHours > 0 ? (row.total_hours / summaryTotalHours) * 100 : 0;
+            const barWidth = maxClientHours > 0 ? (row.total_hours / maxClientHours) * 100 : 0;
+            return (
+              <Box key={row.client_id} sx={{ mb: 2 }}>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
+                  <Typography variant="subtitle2">{row.client_name}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {row.total_hours.toFixed(2)} hrs ({percentage.toFixed(1)}%)
+                  </Typography>
+                </Box>
+                <Box sx={{ backgroundColor: '#eee', borderRadius: 1, height: 10 }}>
+                  <Box
+                    sx={{
+                      width: `${barWidth}%`,
+                      backgroundColor: '#1976d2',
+                      borderRadius: 1,
+                      height: '100%',
+                    }}
+                  />
+                </Box>
+              </Box>
+            );
+          })
+        ) : (
+          <Typography color="text.secondary">No hours recorded yet</Typography>
+        )}
+      </Paper>
 
       <Grid container spacing={3}>
         {/* @ts-expect-error - MUI Grid item prop type issue */}
