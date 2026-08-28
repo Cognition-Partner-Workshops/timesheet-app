@@ -3,7 +3,8 @@ const {
   workEntrySchema,
   updateWorkEntrySchema,
   updateClientSchema,
-  emailSchema
+  emailSchema,
+  registerSchema
 } = require('../../validation/schemas');
 
 describe('Validation Schemas', () => {
@@ -291,9 +292,10 @@ describe('Validation Schemas', () => {
   });
 
   describe('emailSchema', () => {
-    test('should validate valid email', () => {
+    test('should validate valid email and password', () => {
       const data = {
-        email: 'test@example.com'
+        email: 'test@example.com',
+        password: 'password123'
       };
 
       const { error } = emailSchema.validate(data);
@@ -302,7 +304,8 @@ describe('Validation Schemas', () => {
 
     test('should reject invalid email', () => {
       const data = {
-        email: 'not-an-email'
+        email: 'not-an-email',
+        password: 'password123'
       };
 
       const { error } = emailSchema.validate(data);
@@ -310,7 +313,38 @@ describe('Validation Schemas', () => {
     });
 
     test('should reject missing email', () => {
-      const data = {};
+      const data = {
+        password: 'password123'
+      };
+
+      const { error } = emailSchema.validate(data);
+      expect(error).toBeDefined();
+    });
+
+    test('should reject missing password', () => {
+      const data = {
+        email: 'test@example.com'
+      };
+
+      const { error } = emailSchema.validate(data);
+      expect(error).toBeDefined();
+    });
+
+    test('should reject short password', () => {
+      const data = {
+        email: 'test@example.com',
+        password: 'short'
+      };
+
+      const { error } = emailSchema.validate(data);
+      expect(error).toBeDefined();
+    });
+
+    test('should reject password longer than 128 characters', () => {
+      const data = {
+        email: 'test@example.com',
+        password: 'a'.repeat(129)
+      };
 
       const { error } = emailSchema.validate(data);
       expect(error).toBeDefined();
@@ -318,11 +352,62 @@ describe('Validation Schemas', () => {
 
     test('should accept email with subdomain', () => {
       const data = {
-        email: 'user@mail.example.com'
+        email: 'user@mail.example.com',
+        password: 'password123'
       };
 
       const { error } = emailSchema.validate(data);
       expect(error).toBeUndefined();
+    });
+  });
+
+  describe('registerSchema', () => {
+    test('should validate valid registration data', () => {
+      const data = {
+        email: 'newuser@example.com',
+        password: 'securepassword'
+      };
+
+      const { error } = registerSchema.validate(data);
+      expect(error).toBeUndefined();
+    });
+
+    test('should reject missing email', () => {
+      const data = {
+        password: 'securepassword'
+      };
+
+      const { error } = registerSchema.validate(data);
+      expect(error).toBeDefined();
+    });
+
+    test('should reject missing password', () => {
+      const data = {
+        email: 'newuser@example.com'
+      };
+
+      const { error } = registerSchema.validate(data);
+      expect(error).toBeDefined();
+    });
+
+    test('should reject password shorter than 8 characters', () => {
+      const data = {
+        email: 'newuser@example.com',
+        password: 'short'
+      };
+
+      const { error } = registerSchema.validate(data);
+      expect(error).toBeDefined();
+    });
+
+    test('should reject password longer than 128 characters', () => {
+      const data = {
+        email: 'newuser@example.com',
+        password: 'a'.repeat(129)
+      };
+
+      const { error } = registerSchema.validate(data);
+      expect(error).toBeDefined();
     });
   });
 });

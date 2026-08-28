@@ -29,7 +29,13 @@ const updateClientSchema = Joi.object({
 }).min(1); // At least one field must be provided
 
 const emailSchema = Joi.object({
-  email: Joi.string().email().required()
+  email: Joi.string().email().required(),
+  password: Joi.string().min(8).max(128).required()
+});
+
+const registerSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().min(8).max(128).required()
 });
 
 module.exports = {
@@ -37,5 +43,6 @@ module.exports = {
   workEntrySchema,
   updateWorkEntrySchema,
   updateClientSchema,
-  emailSchema
+  emailSchema,
+  registerSchema
 };
