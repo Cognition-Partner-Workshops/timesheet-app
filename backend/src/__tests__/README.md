@@ -52,11 +52,11 @@ __tests__/
 
 | Module | Coverage | Tests |
 |--------|----------|-------|
-| Database | 93.1% | 8 |
+| Database | 89.8% | 10 |
 | Middleware | 100% | 19 |
-| Routes | 75.9% | 76 |
+| Routes | 99.5% | 113 |
 | Validation | 100% | 38 |
-| **Total** | **79.2%** | **134** |
+| **Total** | **98.5%** | **180** |
 
 ## Test Categories
 
@@ -66,9 +66,11 @@ __tests__/
 - Header-based authentication
 - Database error handling
 
-### CRUD Operation Tests (48 tests)
-- Client management (24 tests)
-- Work entry management (24 tests)
+### CRUD Operation Tests (62 tests)
+- Client management (34 tests)
+  - Bulk delete, department/email fields, all-fields update
+- Work entry management (28 tests)
+  - Try-catch error paths, creation without description
 - Input validation
 - Authorization checks
 - Error scenarios
@@ -80,11 +82,17 @@ __tests__/
 - Email schema validation
 - Edge cases and boundary conditions
 
-### Report Tests (17 tests)
+### Report Tests (29 tests)
 - Report generation
 - Hours aggregation
 - Data isolation
-- Export validation (CSV/PDF)
+- CSV export (headers, records, unlink error handling)
+- PDF export (generation, pagination, separator lines, empty entries)
+
+### Database Tests (10 tests)
+- Database initialization and schema creation
+- Close when null, close when already closed
+- Connection error handling
 
 ### Error Handling Tests (19 tests)
 - Joi validation errors
@@ -276,10 +284,10 @@ Add to `.vscode/launch.json`:
 
 ## Coverage Goals
 
-- **Statements**: > 60% (Current: 79.2%)
-- **Branches**: > 60% (Current: 80.3%)
-- **Functions**: > 65% (Current: 89.1%)
-- **Lines**: > 60% (Current: 79.3%)
+- **Statements**: > 85% (Current: 98.5%)
+- **Branches**: > 85% (Current: 96.5%)
+- **Functions**: > 85% (Current: 98.5%)
+- **Lines**: > 85% (Current: 98.5%)
 
 ## CI/CD Integration
 

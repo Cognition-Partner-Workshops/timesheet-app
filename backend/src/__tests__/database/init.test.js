@@ -144,6 +144,40 @@ describe('Database Initialization', () => {
     });
   });
 
+  // Edge cases for closeDatabase that require fresh module state (via jest.resetModules
+  // in beforeEach) to isolate the internal `db` singleton from other tests.
+  describe('closeDatabase - edge cases', () => {
+    // When getDatabase() was never called, the internal `db` variable is null.
+    // closeDatabase should resolve immediately without attempting db.close().
+    test('should resolve when db is null (never initialized)', async () => {
+      const { closeDatabase: freshCloseDatabase } = require('../../database/init');
+      await expect(freshCloseDatabase()).resolves.toBeUndefined();
+    });
+
+    // After the first closeDatabase(), the internal `isClosed` flag is set to true.
+    // A second call should resolve without error and not call db.close() again.
+    // We use jest.doMock to re-register a clean sqlite3 mock because the prior
+    // "connection error" test (above) poisoned the module-level mock with an error callback.
+    test('should handle being called twice in sequence (isClosed = true)', async () => {
+      jest.doMock('sqlite3', () => {
+        const mockDb = {
+          serialize: jest.fn((cb) => cb()),
+          run: jest.fn((query, cb) => { if (typeof cb === 'function') cb(null); }),
+          close: jest.fn((cb) => cb(null))
+        };
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, cb) => { cb(null); return mockDb; })
+          }))
+        };
+      });
+      const { getDatabase: freshGetDatabase, closeDatabase: freshCloseDatabase } = require('../../database/init');
+      freshGetDatabase();
+      await freshCloseDatabase();
+      await expect(freshCloseDatabase()).resolves.toBeUndefined();
+    });
+  });
+
   describe('Database Schema', () => {
     test('users table should have correct structure', async () => {
       const db = getDatabase();
