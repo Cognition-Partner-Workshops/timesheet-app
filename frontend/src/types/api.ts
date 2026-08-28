@@ -72,6 +72,35 @@ export interface LoginResponse {
   user: User;
 }
 
+export interface Project {
+  id: number;
+  name: string;
+  description: string | null;
+  client_id: number;
+  client_name?: string;
+  user_email: string;
+  start_date: string;
+  status: 'active' | 'completed' | 'on-hold';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateProjectRequest {
+  name: string;
+  description?: string;
+  clientId: number;
+  startDate: string;
+  status: 'active' | 'completed' | 'on-hold';
+}
+
+export interface UpdateProjectRequest {
+  name?: string;
+  description?: string;
+  clientId?: number;
+  startDate?: string;
+  status?: 'active' | 'completed' | 'on-hold';
+}
+
 export interface ApiResponse<T> {
   data?: T;
   error?: string;
