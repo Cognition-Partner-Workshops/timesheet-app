@@ -454,4 +454,101 @@ describe('Client Routes', () => {
       expect(response.status).toBe(200);
     });
   });
+
+  describe('Cross-user client visibility', () => {
+    test('should not return clients belonging to another user when listing', async () => {
+      const userAClients = [
+        { id: 1, name: 'Client A', description: 'Belongs to test@example.com' }
+      ];
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        if (params[0] === 'test@example.com') {
+          callback(null, userAClients);
+        } else {
+          callback(null, []);
+        }
+      });
+
+      const responseUserA = await request(app).get('/api/clients');
+      expect(responseUserA.status).toBe(200);
+      expect(responseUserA.body.clients).toEqual(userAClients);
+
+      expect(mockDb.all).toHaveBeenCalledWith(
+        expect.stringContaining('WHERE user_email'),
+        ['test@example.com'],
+        expect.any(Function)
+      );
+    });
+
+    test('should not return a client owned by a different user when fetching by ID', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        const [clientId, userEmail] = params;
+        if (clientId === 1 && userEmail === 'test@example.com') {
+          callback(null, { id: 1, name: 'Client A' });
+        } else {
+          callback(null, null);
+        }
+      });
+
+      const response = await request(app).get('/api/clients/1');
+
+      expect(response.status).toBe(200);
+      expect(response.body.client).toEqual({ id: 1, name: 'Client A' });
+      expect(mockDb.get).toHaveBeenCalledWith(
+        expect.stringContaining('AND user_email'),
+        [1, 'test@example.com'],
+        expect.any(Function)
+      );
+    });
+
+    test('should scope all queries by user_email so other users cannot access clients', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        const userEmail = params[params.length - 1];
+        if (userEmail !== 'test@example.com') {
+          callback(null, null);
+        } else {
+          callback(null, { id: 1 });
+        }
+      });
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        expect(query).toContain('user_email');
+        callback(null, []);
+      });
+
+      const listResponse = await request(app).get('/api/clients');
+      expect(listResponse.status).toBe(200);
+      expect(mockDb.all).toHaveBeenCalledWith(
+        expect.stringContaining('user_email'),
+        ['test@example.com'],
+        expect.any(Function)
+      );
+
+      const getResponse = await request(app).get('/api/clients/1');
+      expect(getResponse.status).toBe(200);
+      expect(mockDb.get).toHaveBeenCalledWith(
+        expect.stringContaining('user_email'),
+        [1, 'test@example.com'],
+        expect.any(Function)
+      );
+    });
+
+    test('should filter delete operations by user_email', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        expect(query).toContain('user_email');
+        expect(params).toContain('test@example.com');
+        callback(null, { id: 1 });
+      });
+
+      mockDb.run.mockImplementation((query, params, callback) => {
+        expect(query).toContain('user_email');
+        expect(params).toContain('test@example.com');
+        callback(null);
+      });
+
+      const response = await request(app).delete('/api/clients/1');
+
+      expect(response.status).toBe(200);
+    });
+  });
 });
