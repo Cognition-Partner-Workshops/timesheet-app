@@ -93,11 +93,6 @@ class ApiClient {
     return response.data;
   }
 
-  async getWorkEntry(id: number) {
-    const response = await this.client.get(`/api/work-entries/${id}`);
-    return response.data;
-  }
-
   async createWorkEntry(entryData: { clientId: number; hours: number; description?: string; date: string }) {
     const response = await this.client.post('/api/work-entries', entryData);
     return response.data;
@@ -130,12 +125,6 @@ class ApiClient {
     const response = await this.client.get(`/api/reports/export/pdf/${clientId}`, {
       responseType: 'blob',
     });
-    return response.data;
-  }
-
-  // Health check
-  async healthCheck() {
-    const response = await this.client.get('/health');
     return response.data;
   }
 }
