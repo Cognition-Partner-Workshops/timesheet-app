@@ -65,8 +65,7 @@ describe('Error Handler Middleware', () => {
 
       expect(res.status).toHaveBeenCalledWith(500);
       expect(res.json).toHaveBeenCalledWith({
-        error: 'Database error',
-        message: 'An error occurred while processing your request'
+        error: 'An error occurred while processing your request.'
       });
     });
 
@@ -80,8 +79,7 @@ describe('Error Handler Middleware', () => {
 
       expect(res.status).toHaveBeenCalledWith(500);
       expect(res.json).toHaveBeenCalledWith({
-        error: 'Database error',
-        message: 'An error occurred while processing your request'
+        error: 'An error occurred while processing your request.'
       });
     });
   });
@@ -127,12 +125,40 @@ describe('Error Handler Middleware', () => {
   });
 
   describe('Console Logging', () => {
-    test('should log error to console', () => {
-      const error = new Error('Test error');
+    test('should log full error in development mode', () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
       
+      const error = new Error('Test error');
       errorHandler(error, req, res, next);
 
       expect(console.error).toHaveBeenCalledWith('Error:', error);
+      process.env.NODE_ENV = originalEnv;
+    });
+
+    test('should log only error message in production mode', () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      
+      const error = new Error('Test error');
+      errorHandler(error, req, res, next);
+
+      expect(console.error).toHaveBeenCalledWith('Error:', 'Test error');
+      process.env.NODE_ENV = originalEnv;
+    });
+
+    test('should return generic message for 500 errors in production', () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      
+      const error = { message: 'Sensitive internal details' };
+      errorHandler(error, req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'An internal error occurred. Please try again later.'
+      });
+      process.env.NODE_ENV = originalEnv;
     });
   });
 });

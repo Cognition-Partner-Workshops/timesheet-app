@@ -32,7 +32,7 @@ describe('Auth Routes', () => {
   });
 
   describe('POST /api/auth/login', () => {
-    test('should login existing user', async () => {
+    test('should login existing user and return JWT token', async () => {
       const existingUser = {
         email: 'existing@example.com',
         created_at: '2024-01-01T00:00:00.000Z'
@@ -49,9 +49,11 @@ describe('Auth Routes', () => {
       expect(response.status).toBe(200);
       expect(response.body.message).toBe('Login successful');
       expect(response.body.user.email).toBe('existing@example.com');
+      expect(response.body.token).toBeDefined();
+      expect(typeof response.body.token).toBe('string');
     });
 
-    test('should create new user on first login', async () => {
+    test('should create new user on first login and return JWT token', async () => {
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(null, null); // User doesn't exist
       });
@@ -67,6 +69,8 @@ describe('Auth Routes', () => {
       expect(response.status).toBe(201);
       expect(response.body.message).toBe('User created and logged in successfully');
       expect(response.body.user.email).toBe('newuser@example.com');
+      expect(response.body.token).toBeDefined();
+      expect(typeof response.body.token).toBe('string');
       expect(mockDb.run).toHaveBeenCalledWith(
         'INSERT INTO users (email) VALUES (?)',
         ['newuser@example.com'],
@@ -137,7 +141,14 @@ describe('Auth Routes', () => {
   });
 
   describe('GET /api/auth/me', () => {
-    test('should return current user info', async () => {
+    // Helper to get a valid token for tests
+    function getTestToken() {
+      const jwt = require('jsonwebtoken');
+      const secret = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production-min-32-chars';
+      return jwt.sign({ email: 'test@example.com' }, secret, { expiresIn: '24h' });
+    }
+
+    test('should return current user info with valid token', async () => {
       const user = {
         email: 'test@example.com',
         created_at: '2024-01-01T00:00:00.000Z'
@@ -147,53 +158,60 @@ describe('Auth Routes', () => {
         callback(null, user);
       });
 
+      const token = getTestToken();
       const response = await request(app)
         .get('/api/auth/me')
-        .set('x-user-email', 'test@example.com');
+        .set('Authorization', `Bearer ${token}`);
 
       expect(response.status).toBe(200);
       expect(response.body.user.email).toBe('test@example.com');
       expect(response.body.user.createdAt).toBe('2024-01-01T00:00:00.000Z');
     });
 
-    test('should return 401 if no email header provided', async () => {
+    test('should return 401 if no Authorization header provided', async () => {
       const response = await request(app).get('/api/auth/me');
 
       expect(response.status).toBe(401);
-      expect(response.body).toEqual({ error: 'User email required in x-user-email header' });
+      expect(response.body).toEqual({ error: 'Authentication required. Please provide a valid Bearer token.' });
     });
 
     test('should return 404 if user not found', async () => {
+      let callCount = 0;
       mockDb.get.mockImplementation((query, params, callback) => {
-        if (query.includes('SELECT email FROM users WHERE email = ?')) {
-          // Auth middleware check
+        callCount++;
+        if (callCount === 1) {
+          // Auth middleware check - user exists for token validation
           callback(null, { email: 'test@example.com' });
         } else {
-          // /me endpoint check
+          // /me endpoint check - user not found
           callback(null, null);
         }
       });
 
+      const token = getTestToken();
       const response = await request(app)
         .get('/api/auth/me')
-        .set('x-user-email', 'test@example.com');
+        .set('Authorization', `Bearer ${token}`);
 
       expect(response.status).toBe(404);
       expect(response.body).toEqual({ error: 'User not found' });
     });
 
     test('should handle database error', async () => {
+      let callCount = 0;
       mockDb.get.mockImplementation((query, params, callback) => {
-        if (query.includes('SELECT email FROM users WHERE email = ?')) {
+        callCount++;
+        if (callCount === 1) {
           callback(null, { email: 'test@example.com' });
         } else {
           callback(new Error('Database error'), null);
         }
       });
 
+      const token = getTestToken();
       const response = await request(app)
         .get('/api/auth/me')
-        .set('x-user-email', 'test@example.com');
+        .set('Authorization', `Bearer ${token}`);
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ error: 'Internal server error' });

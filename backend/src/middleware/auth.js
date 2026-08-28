@@ -1,22 +1,36 @@
+const jwt = require('jsonwebtoken');
 const { getDatabase } = require('../database/init');
 
-// Simple email-based authentication middleware
+const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production-min-32-chars';
+
+// JWT-based authentication middleware
 function authenticateUser(req, res, next) {
-  const userEmail = req.headers['x-user-email'];
+  const authHeader = req.headers['authorization'];
   
-  if (!userEmail) {
-    return res.status(401).json({ error: 'User email required in x-user-email header' });
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required. Please provide a valid Bearer token.' });
   }
 
-  // Validate email format
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(userEmail)) {
-    return res.status(400).json({ error: 'Invalid email format' });
+  const token = authHeader.split(' ')[1];
+
+  let decoded;
+  try {
+    decoded = jwt.verify(token, JWT_SECRET);
+  } catch (err) {
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Token has expired. Please log in again.' });
+    }
+    return res.status(401).json({ error: 'Invalid authentication token.' });
+  }
+
+  const userEmail = decoded.email;
+  if (!userEmail) {
+    return res.status(401).json({ error: 'Invalid token payload.' });
   }
 
   const db = getDatabase();
   
-  // Check if user exists, create if not
+  // Verify user exists in database
   db.get('SELECT email FROM users WHERE email = ?', [userEmail], (err, row) => {
     if (err) {
       console.error('Database error:', err);
@@ -24,20 +38,11 @@ function authenticateUser(req, res, next) {
     }
     
     if (!row) {
-      // Create new user
-      db.run('INSERT INTO users (email) VALUES (?)', [userEmail], (err) => {
-        if (err) {
-          console.error('Error creating user:', err);
-          return res.status(500).json({ error: 'Failed to create user' });
-        }
-        
-        req.userEmail = userEmail;
-        next();
-      });
-    } else {
-      req.userEmail = userEmail;
-      next();
+      return res.status(401).json({ error: 'User not found. Please log in again.' });
     }
+
+    req.userEmail = userEmail;
+    next();
   });
 }
 
