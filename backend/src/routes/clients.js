@@ -1,7 +1,7 @@
 const express = require('express');
 const { getDatabase } = require('../database/init');
 const { authenticateUser } = require('../middleware/auth');
-const { clientSchema, updateClientSchema } = require('../validation/schemas');
+const { clientSchema, updateClientSchema, bulkDeleteSchema } = require('../validation/schemas');
 
 const router = express.Router();
 
@@ -186,8 +186,13 @@ router.put('/:id', (req, res, next) => {
   }
 });
 
-// Delete all clients for authenticated user
-router.delete('/', (req, res) => {
+// Delete all clients for authenticated user (requires confirmation)
+router.delete('/', (req, res, next) => {
+  const { error } = bulkDeleteSchema.validate(req.body);
+  if (error) {
+    return next(error);
+  }
+
   const db = getDatabase();
   
   db.run(

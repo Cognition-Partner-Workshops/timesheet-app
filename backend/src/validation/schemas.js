@@ -32,10 +32,15 @@ const emailSchema = Joi.object({
   email: Joi.string().email().required()
 });
 
+const bulkDeleteSchema = Joi.object({
+  confirmDeleteAll: Joi.boolean().valid(true).required()
+});
+
 module.exports = {
   clientSchema,
   workEntrySchema,
   updateWorkEntrySchema,
   updateClientSchema,
-  emailSchema
+  emailSchema,
+  bulkDeleteSchema
 };

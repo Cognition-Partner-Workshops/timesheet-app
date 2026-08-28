@@ -16,7 +16,7 @@ function authenticateUser(req, res, next) {
 
   const db = getDatabase();
   
-  // Check if user exists, create if not
+  // Verify user exists — do NOT auto-create users
   db.get('SELECT email FROM users WHERE email = ?', [userEmail], (err, row) => {
     if (err) {
       console.error('Database error:', err);
@@ -24,20 +24,11 @@ function authenticateUser(req, res, next) {
     }
     
     if (!row) {
-      // Create new user
-      db.run('INSERT INTO users (email) VALUES (?)', [userEmail], (err) => {
-        if (err) {
-          console.error('Error creating user:', err);
-          return res.status(500).json({ error: 'Failed to create user' });
-        }
-        
-        req.userEmail = userEmail;
-        next();
-      });
-    } else {
-      req.userEmail = userEmail;
-      next();
+      return res.status(401).json({ error: 'Unauthorized' });
     }
+
+    req.userEmail = userEmail;
+    next();
   });
 }
 
