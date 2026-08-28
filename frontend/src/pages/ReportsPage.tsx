@@ -22,18 +22,22 @@ import {
   Chip,
   IconButton,
   Tooltip,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import {
   PictureAsPdf as PdfIcon,
   Description as CsvIcon,
+  CalendarMonth as WeeklyIcon,
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
-import { type ClientReport } from '../types/api';
+import { type ClientReport, type WeeklyReportWeek } from '../types/api';
 
 const ReportsPage: React.FC = () => {
   const [selectedClientId, setSelectedClientId] = useState<number>(0);
   const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState(0);
 
   const { data: clientsData, isLoading: clientsLoading } = useQuery({
     queryKey: ['clients'],
@@ -46,8 +50,14 @@ const ReportsPage: React.FC = () => {
     enabled: selectedClientId > 0,
   });
 
+  const { data: weeklyData, isLoading: weeklyLoading } = useQuery({
+    queryKey: ['weeklyReport'],
+    queryFn: () => apiClient.getWeeklyReport(),
+  });
+
   const clients = clientsData?.clients || [];
   const report = reportData as ClientReport | undefined;
+  const weeks = (weeklyData?.weeks || []) as WeeklyReportWeek[];
 
   const handleExportCsv = async () => {
     if (!selectedClientId) return;
@@ -89,6 +99,40 @@ const ReportsPage: React.FC = () => {
     }
   };
 
+  const handleExportWeeklyCsv = async () => {
+    try {
+      const blob = await apiClient.exportWeeklyReportCsv();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `weekly_report_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err: unknown) {
+      setError('Failed to export weekly CSV report');
+      console.error('Export error:', err);
+    }
+  };
+
+  const handleExportWeeklyPdf = async () => {
+    try {
+      const blob = await apiClient.exportWeeklyReportPdf();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `weekly_report_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err: unknown) {
+      setError('Failed to export weekly PDF report');
+      console.error('Export error:', err);
+    }
+  };
+
   const selectedClient = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
 
   if (clientsLoading) {
@@ -111,7 +155,93 @@ const ReportsPage: React.FC = () => {
         </Alert>
       )}
 
-      {clients.length === 0 ? (
+      <Paper sx={{ mb: 3 }}>
+        <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)}>
+          <Tab label="Client Report" />
+          <Tab icon={<WeeklyIcon />} iconPosition="start" label="Weekly Report" />
+        </Tabs>
+      </Paper>
+
+      {activeTab === 1 && (
+        <Box>
+          <Paper sx={{ p: 3, mb: 3 }}>
+            <Box display="flex" justifyContent="space-between" alignItems="center">
+              <Typography variant="h6">Weekly Work Entries Report</Typography>
+              <Box display="flex" gap={1}>
+                <Tooltip title="Export Weekly Report as CSV">
+                  <IconButton onClick={handleExportWeeklyCsv} disabled={weeklyLoading || weeks.length === 0} color="primary" size="large">
+                    <CsvIcon />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Export Weekly Report as PDF">
+                  <IconButton onClick={handleExportWeeklyPdf} disabled={weeklyLoading || weeks.length === 0} color="error" size="large">
+                    <PdfIcon />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            </Box>
+          </Paper>
+
+          {weeklyLoading && (
+            <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+              <CircularProgress />
+            </Box>
+          )}
+
+          {!weeklyLoading && weeks.length === 0 && (
+            <Paper sx={{ p: 3, textAlign: 'center' }}>
+              <Typography color="text.secondary">
+                No work entries found. Add some work entries to see the weekly report.
+              </Typography>
+            </Paper>
+          )}
+
+          {!weeklyLoading && weeks.map((week: WeeklyReportWeek) => (
+            <Paper key={week.weekStartDate} sx={{ mb: 3 }}>
+              <Box sx={{ p: 2, backgroundColor: '#f5f5f5', borderBottom: '1px solid #e0e0e0' }}>
+                <Box display="flex" justifyContent="space-between" alignItems="center">
+                  <Typography variant="h6">
+                    Week of {new Date(week.weekStartDate + 'T00:00:00Z').toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' })}
+                  </Typography>
+                  <Chip label={`${week.totalHours.toFixed(2)} hours`} color="primary" />
+                </Box>
+              </Box>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Logged Date</TableCell>
+                      <TableCell>Client Name</TableCell>
+                      <TableCell>Hours</TableCell>
+                      <TableCell>Logged By</TableCell>
+                      <TableCell>Description</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {week.entries.map((entry, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell>{new Date(entry.date + 'T00:00:00Z').toLocaleDateString('en-US', { timeZone: 'UTC' })}</TableCell>
+                        <TableCell><Chip label={entry.client_name} size="small" variant="outlined" /></TableCell>
+                        <TableCell><Chip label={`${entry.hours} hrs`} color="primary" variant="outlined" size="small" /></TableCell>
+                        <TableCell><Typography variant="body2" color="text.secondary">{entry.user_email}</Typography></TableCell>
+                        <TableCell>
+                          {entry.description ? (
+                            <Typography variant="body2" color="text.secondary">{entry.description}</Typography>
+                          ) : (
+                            <Chip label="No description" size="small" variant="outlined" />
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          ))}
+        </Box>
+      )}
+
+      {activeTab === 0 && clients.length === 0 ? (
         <Paper sx={{ p: 3, textAlign: 'center' }}>
           <Typography color="text.secondary" sx={{ mb: 2 }}>
             You need to create at least one client before generating reports.
@@ -120,7 +250,7 @@ const ReportsPage: React.FC = () => {
             Create Client
           </Button>
         </Paper>
-      ) : (
+      ) : activeTab === 0 ? (
         <>
           <Paper sx={{ p: 3, mb: 3 }}>
             <Grid container spacing={3} alignItems="center">
@@ -282,7 +412,7 @@ const ReportsPage: React.FC = () => {
             </Paper>
           )}
         </>
-      )}
+      ) : null}
     </Box>
   );
 };
