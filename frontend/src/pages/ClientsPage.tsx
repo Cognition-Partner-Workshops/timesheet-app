@@ -147,13 +147,13 @@ const ClientsPage: React.FC = () => {
   };
 
   const handleDelete = (client: Client) => {
-    if (window.confirm(`Are you sure you want to delete "${client.name}"?`)) {
+    if (globalThis.confirm(`Are you sure you want to delete "${client.name}"?`)) {
       deleteMutation.mutate(client.id);
     }
   };
 
   const handleDeleteAll = () => {
-    if (window.confirm('Are you sure you want to delete ALL clients? This action cannot be undone.')) {
+    if (globalThis.confirm('Are you sure you want to delete ALL clients? This action cannot be undone.')) {
       deleteAllMutation.mutate();
     }
   };
@@ -333,11 +333,12 @@ const ClientsPage: React.FC = () => {
               variant="contained"
               disabled={createMutation.isPending || updateMutation.isPending}
             >
-              {createMutation.isPending || updateMutation.isPending ? (
-                <CircularProgress size={24} />
-              ) : (
-                editingClient ? 'Update' : 'Create'
-              )}
+              {(() => {
+                if (createMutation.isPending || updateMutation.isPending) {
+                  return <CircularProgress size={24} />;
+                }
+                return editingClient ? 'Update' : 'Create';
+              })()}
             </Button>
           </DialogActions>
         </form>
