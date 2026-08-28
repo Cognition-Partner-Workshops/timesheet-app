@@ -1,0 +1,84 @@
+name: Security SAST Scan
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  semgrep-sast:
+    name: Semgrep SAST
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Semgrep
+        run: semgrep scan --config auto --error --severity WARNING --json --output semgrep-results.json backend/ frontend/src/ || true
+      - name: Display results
+        if: always()
+        run: |
+          if [ -f semgrep-results.json ]; then
+            echo "=== Semgrep SAST Results ==="
+            python3 -c "
+          import json
+          with open('semgrep-results.json') as f:
+              data = json.load(f)
+          results = data.get('results', [])
+          if not results:
+              print('No findings.')
+          else:
+              print(f'Found {len(results)} issue(s):')
+              for r in results:
+                  sev = r.get('extra', {}).get('severity', '?')
+                  rule = r.get('check_id', '')
+                  path = r.get('path', '')
+                  line = r.get('start', {}).get('line', '')
+                  msg = r.get('extra', {}).get('message', '')[:120]
+                  print(f'  [{sev}] {rule}')
+                  print(f'    {path}:{line} — {msg}')
+          "
+          fi
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-results
+          path: semgrep-results.json
+
+  backend-audit:
+    name: Backend Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+      - name: Run backend npm audit
+        working-directory: backend
+        run: |
+          set +e
+          AUDIT_OUTPUT=$(npm audit --json 2>&1)
+          HIGH=$(echo "$AUDIT_OUTPUT" | jq -r '.metadata.vulnerabilities.high // 0')
+          CRITICAL=$(echo "$AUDIT_OUTPUT" | jq -r '.metadata.vulnerabilities.critical // 0')
+          echo "High: $HIGH, Critical: $CRITICAL"
+          if [ "$CRITICAL" -gt 0 ]; then
+            echo "::error::Found $CRITICAL critical vulnerabilities in backend dependencies"
+            npm audit
+            exit 1
+          elif [ "$HIGH" -gt 0 ]; then
+            echo "::warning::Found $HIGH high vulnerabilities in backend dependencies (non-blocking)"
+            npm audit || true
+          else
+            echo "No high/critical vulnerabilities found in backend."
+          fi
+
