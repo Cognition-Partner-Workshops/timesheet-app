@@ -1,0 +1,28 @@
+.movie-grid {
+  padding: 0 4%;
+  margin-top: 24px;
+}
+
+.movie-grid__title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin-bottom: 20px;
+  color: #fff;
+}
+
+.movie-grid__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.movie-grid__list .movie-card {
+  width: 100%;
+}
+
+.movie-grid__empty {
+  text-align: center;
+  color: #888;
+  font-size: 1.2rem;
+  padding: 60px 0;
+}
