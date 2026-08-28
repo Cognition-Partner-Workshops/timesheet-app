@@ -65,9 +65,20 @@ export interface UpdateWorkEntryRequest {
 
 export interface LoginRequest {
   email: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
 }
 
 export interface LoginResponse {
+  message: string;
+  user: User;
+}
+
+export interface RegisterResponse {
   message: string;
   user: User;
 }
