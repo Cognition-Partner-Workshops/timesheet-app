@@ -404,7 +404,139 @@ describe('Report Routes', () => {
   });
 
 
+  // Helpers to reduce mock setup duplication in export tests
+  function setupClientAndEntries(client, entries) {
+    mockDb.get.mockImplementation((query, params, callback) => {
+      callback(null, client);
+    });
+    mockDb.all.mockImplementation((query, params, callback) => {
+      callback(null, entries);
+    });
+  }
+
+  function setupPdfMock(yPosition = 100) {
+    const PDFDocument = require('pdfkit');
+    let pipedStream = null;
+    PDFDocument.mockImplementation(() => ({
+      fontSize: jest.fn().mockReturnThis(),
+      text: jest.fn().mockReturnThis(),
+      moveDown: jest.fn().mockReturnThis(),
+      moveTo: jest.fn().mockReturnThis(),
+      lineTo: jest.fn().mockReturnThis(),
+      stroke: jest.fn().mockReturnThis(),
+      addPage: jest.fn().mockReturnThis(),
+      pipe: jest.fn((stream) => { pipedStream = stream; }),
+      end: jest.fn(() => { if (pipedStream) pipedStream.end(); }),
+      y: yPosition
+    }));
+    return PDFDocument;
+  }
+
+  function setupCsvMock() {
+    const csvWriter = require('csv-writer');
+    const mockWriteRecords = jest.fn().mockRejectedValue(new Error('Write failed'));
+    csvWriter.createObjectCsvWriter.mockReturnValue({ writeRecords: mockWriteRecords });
+    return { csvWriter, mockWriteRecords };
+  }
+
+  async function requestPdfAndGetMock(client, entries, yPosition = 100) {
+    setupClientAndEntries(client, entries);
+    const PDFDocument = setupPdfMock(yPosition);
+    const response = await request(app).get('/api/reports/export/pdf/1');
+    return { pdf: PDFDocument.mock.results[PDFDocument.mock.results.length - 1].value, response };
+  }
+
+  describe('CSV Export Success - Download and Cleanup', () => {
+    test('should call writeRecords with correct work entries data', async () => {
+      const mockWorkEntries = [
+        { date: '2024-01-01', hours: 5, description: 'Work 1', created_at: '2024-01-01' },
+        { date: '2024-01-02', hours: 3, description: 'Work 2', created_at: '2024-01-02' }
+      ];
+      setupClientAndEntries({ id: 1, name: 'Test Client' }, mockWorkEntries);
+      const { mockWriteRecords } = setupCsvMock();
+
+      await request(app).get('/api/reports/export/csv/1');
+
+      expect(mockWriteRecords).toHaveBeenCalledWith(mockWorkEntries);
+    });
+
+    test('should configure CSV writer with correct headers and filename pattern', async () => {
+      setupClientAndEntries({ id: 1, name: 'Acme Corp' }, []);
+      const { csvWriter } = setupCsvMock();
+
+      await request(app).get('/api/reports/export/csv/1');
+
+      expect(csvWriter.createObjectCsvWriter).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: expect.stringContaining('Acme_Corp_report_'),
+          header: [
+            { id: 'date', title: 'Date' },
+            { id: 'hours', title: 'Hours' },
+            { id: 'description', title: 'Description' },
+            { id: 'created_at', title: 'Created At' }
+          ]
+        })
+      );
+    });
+  });
+
   describe('PDF Export Success Path', () => {
+    test('should generate PDF with correct content for client with entries', async () => {
+      const { pdf, response } = await requestPdfAndGetMock(
+        { id: 1, name: 'Test Client' },
+        [
+          { date: '2024-01-01', hours: 5.5, description: 'Development', created_at: '2024-01-01' },
+          { date: '2024-01-02', hours: 3.0, description: null, created_at: '2024-01-02' }
+        ]
+      );
+
+      expect(pdf.pipe).toHaveBeenCalled();
+      expect(pdf.end).toHaveBeenCalled();
+      expect(pdf.fontSize).toHaveBeenCalled();
+      expect(pdf.text).toHaveBeenCalledWith(
+        expect.stringContaining('Time Report for Test Client'),
+        expect.any(Object)
+      );
+      expect(response.headers['content-type']).toContain('application/pdf');
+    });
+
+    test('should generate PDF with no entries and zero total hours', async () => {
+      const { pdf } = await requestPdfAndGetMock({ id: 1, name: 'Empty Client' }, []);
+
+      expect(pdf.text).toHaveBeenCalledWith('Total Hours: 0.00');
+      expect(pdf.text).toHaveBeenCalledWith('Total Entries: 0');
+    });
+
+    test('should add new page when y position exceeds 700', async () => {
+      const { pdf } = await requestPdfAndGetMock(
+        { id: 1, name: 'Test Client' },
+        [{ date: '2024-01-01', hours: 5, description: 'Work', created_at: '2024-01-01' }],
+        750
+      );
+
+      expect(pdf.addPage).toHaveBeenCalled();
+    });
+
+    test('should render separator line every 5 entries', async () => {
+      const entries = Array.from({ length: 6 }, (_, i) => ({
+        date: `2024-01-0${i + 1}`, hours: 2,
+        description: `Entry ${i + 1}`, created_at: `2024-01-0${i + 1}`
+      }));
+      const { pdf } = await requestPdfAndGetMock({ id: 1, name: 'Test Client' }, entries);
+
+      // Header line + separator after entry 5 = at least 2 stroke calls
+      expect(pdf.stroke.mock.calls.length).toBeGreaterThanOrEqual(2);
+    });
+
+    test('should handle null descriptions in PDF entries', async () => {
+      const { pdf } = await requestPdfAndGetMock(
+        { id: 1, name: 'Test Client' },
+        [{ date: '2024-01-01', hours: 4, description: null, created_at: '2024-01-01' }]
+      );
+
+      expect(pdf.text).toHaveBeenCalledWith('No description', 230, 100, { width: 300 });
+    });
+
     test('should handle database error when fetching work entries for PDF', async () => {
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(null, { id: 1, name: 'Test Client' });

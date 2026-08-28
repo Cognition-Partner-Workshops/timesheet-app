@@ -28,7 +28,7 @@ import {
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
-import { type Client } from '../types/api';
+import { type Client, getApiErrorMessage } from '../types/api';
 
 const ClientsPage: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -51,8 +51,7 @@ const ClientsPage: React.FC = () => {
       handleClose();
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to create client');
+      setError(getApiErrorMessage(err, 'Failed to create client'));
     },
   });
 
@@ -64,8 +63,7 @@ const ClientsPage: React.FC = () => {
       handleClose();
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to update client');
+      setError(getApiErrorMessage(err, 'Failed to update client'));
     },
   });
 
@@ -75,8 +73,7 @@ const ClientsPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to delete client');
+      setError(getApiErrorMessage(err, 'Failed to delete client'));
     },
   });
 
@@ -86,8 +83,7 @@ const ClientsPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to delete all clients');
+      setError(getApiErrorMessage(err, 'Failed to delete all clients'));
     },
   });
 
