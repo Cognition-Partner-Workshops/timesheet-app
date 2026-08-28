@@ -1,5 +1,6 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const { createProjectsTable, createProjectsIndexes } = require('./schema');
 
 let db = null;
 let isClosing = false;
@@ -27,7 +28,6 @@ async function initializeDatabase() {
   
   return new Promise((resolve, reject) => {
     database.serialize(() => {
-      // Create users table
       database.run(`
         CREATE TABLE IF NOT EXISTS users (
           email TEXT PRIMARY KEY,
@@ -35,7 +35,6 @@ async function initializeDatabase() {
         )
       `);
 
-      // Create clients table
       database.run(`
         CREATE TABLE IF NOT EXISTS clients (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,7 +49,6 @@ async function initializeDatabase() {
         )
       `);
 
-      // Create work_entries table
       database.run(`
         CREATE TABLE IF NOT EXISTS work_entries (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -66,11 +64,13 @@ async function initializeDatabase() {
         )
       `);
 
-      // Create indexes for better performance
+      createProjectsTable(database);
+
       database.run(`CREATE INDEX IF NOT EXISTS idx_clients_user_email ON clients (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_client_id ON work_entries (client_id)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_user_email ON work_entries (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_date ON work_entries (date)`);
+      createProjectsIndexes(database);
 
       console.log('Database tables created successfully');
       resolve();
