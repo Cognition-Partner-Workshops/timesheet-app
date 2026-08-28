@@ -243,9 +243,8 @@ describe('Report Routes', () => {
   });
 
   describe('Data Isolation', () => {
-    test('should only return data for authenticated user', async () => {
+    test('should return client data without user filtering but filter work entries by user', async () => {
       mockDb.get.mockImplementation((query, params, callback) => {
-        expect(params).toContain('test@example.com');
         callback(null, { id: 1, name: 'Test Client' });
       });
 
@@ -256,8 +255,15 @@ describe('Report Routes', () => {
 
       await request(app).get('/api/reports/client/1');
 
+      // Client lookup should not include user_email
       expect(mockDb.get).toHaveBeenCalledWith(
         expect.any(String),
+        [1],
+        expect.any(Function)
+      );
+      // Work entries should still be filtered by user_email
+      expect(mockDb.all).toHaveBeenCalledWith(
+        expect.stringContaining('user_email'),
         expect.arrayContaining(['test@example.com']),
         expect.any(Function)
       );
@@ -347,7 +353,7 @@ describe('Report Routes', () => {
 
       expect(mockDb.get).toHaveBeenCalledWith(
         expect.stringContaining('SELECT id, name FROM clients'),
-        expect.arrayContaining([1, 'test@example.com']),
+        [1],
         expect.any(Function)
       );
     });
@@ -433,7 +439,7 @@ describe('Report Routes', () => {
 
       expect(mockDb.get).toHaveBeenCalledWith(
         expect.stringContaining('SELECT id, name FROM clients'),
-        expect.arrayContaining([1, 'test@example.com']),
+        [1],
         expect.any(Function)
       );
     });

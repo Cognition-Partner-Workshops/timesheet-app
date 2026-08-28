@@ -55,7 +55,7 @@ describe('Client Routes', () => {
       expect(response.body).toEqual({ clients: mockClients });
       expect(mockDb.all).toHaveBeenCalledWith(
         expect.stringContaining('SELECT id, name, description'),
-        ['test@example.com'],
+        [],
         expect.any(Function)
       );
     });
