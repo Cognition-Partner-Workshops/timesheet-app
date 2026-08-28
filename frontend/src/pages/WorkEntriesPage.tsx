@@ -233,7 +233,7 @@ const WorkEntriesPage: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2">
-                            {new Date(entry.date).toLocaleDateString()}
+                            {entry.date}
                           </Typography>
                         </TableCell>
                         <TableCell>

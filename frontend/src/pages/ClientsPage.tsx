@@ -153,7 +153,7 @@ const ClientsPage: React.FC = () => {
   };
 
   const handleDeleteAll = () => {
-    if (window.confirm('Are you sure you want to delete ALL clients? This action cannot be undone.')) {
+    if (window.confirm('Are you sure you want to delete ALL clients and their associated work entries? This action cannot be undone.')) {
       deleteAllMutation.mutate();
     }
   };
