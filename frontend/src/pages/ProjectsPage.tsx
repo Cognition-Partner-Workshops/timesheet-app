@@ -28,30 +28,32 @@ import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  DeleteSweep as DeleteSweepIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import apiClient from '../api/client';
-import { type WorkEntry } from '../types/api';
+import { type Project, type Client } from '../types/api';
 
-const WorkEntriesPage: React.FC = () => {
+const ProjectsPage: React.FC = () => {
   const [open, setOpen] = useState(false);
-  const [editingEntry, setEditingEntry] = useState<WorkEntry | null>(null);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [formData, setFormData] = useState({
-    clientId: 0,
-    hours: '',
+    name: '',
     description: '',
-    date: new Date(),
+    clientId: 0,
+    startDate: null as Date | null,
+    status: 'active' as string,
   });
   const [error, setError] = useState('');
 
   const queryClient = useQueryClient();
 
-  const { data: workEntriesData, isLoading: entriesLoading } = useQuery({
-    queryKey: ['workEntries'],
-    queryFn: () => apiClient.getWorkEntries(),
+  const { data: projectsData, isLoading: projectsLoading } = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => apiClient.getProjects(),
   });
 
   const { data: clientsData, isLoading: clientsLoading } = useQuery({
@@ -60,61 +62,74 @@ const WorkEntriesPage: React.FC = () => {
   });
 
   const createMutation = useMutation({
-    mutationFn: (entryData: { clientId: number; hours: number; description?: string; date: string }) =>
-      apiClient.createWorkEntry(entryData),
+    mutationFn: (projectData: { name: string; description?: string; clientId: number; startDate: string; status: string }) =>
+      apiClient.createProject(projectData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workEntries'] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
       handleClose();
     },
     onError: (err: unknown) => {
       const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to create work entry');
+      setError(error.response?.data?.error || 'Failed to create project');
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { clientId?: number; hours?: number; description?: string; date?: string } }) =>
-      apiClient.updateWorkEntry(id, data),
+    mutationFn: ({ id, data }: { id: number; data: { name?: string; description?: string; clientId?: number; startDate?: string; status?: string } }) =>
+      apiClient.updateProject(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workEntries'] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
       handleClose();
     },
     onError: (err: unknown) => {
       const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to update work entry');
+      setError(error.response?.data?.error || 'Failed to update project');
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiClient.deleteWorkEntry(id),
+    mutationFn: (id: number) => apiClient.deleteProject(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workEntries'] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
     },
     onError: (err: unknown) => {
       const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to delete work entry');
+      setError(error.response?.data?.error || 'Failed to delete project');
     },
   });
 
-  const workEntries = workEntriesData?.workEntries || [];
+  const deleteAllMutation = useMutation({
+    mutationFn: () => apiClient.deleteAllProjects(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+    onError: (err: unknown) => {
+      const error = err as { response?: { data?: { error?: string } } };
+      setError(error.response?.data?.error || 'Failed to delete all projects');
+    },
+  });
+
+  const projects = projectsData?.projects || [];
   const clients = clientsData?.clients || [];
 
-  const handleOpen = (entry?: WorkEntry) => {
-    if (entry) {
-      setEditingEntry(entry);
+  const handleOpen = (project?: Project) => {
+    if (project) {
+      setEditingProject(project);
       setFormData({
-        clientId: entry.client_id,
-        hours: entry.hours.toString(),
-        description: entry.description || '',
-        date: new Date(entry.date),
+        name: project.name,
+        description: project.description || '',
+        clientId: project.client_id,
+        startDate: new Date(project.start_date),
+        status: project.status,
       });
     } else {
-      setEditingEntry(null);
+      setEditingProject(null);
       setFormData({
-        clientId: 0,
-        hours: '',
+        name: '',
         description: '',
-        date: new Date(),
+        clientId: 0,
+        startDate: null,
+        status: 'active',
       });
     }
     setError('');
@@ -123,12 +138,13 @@ const WorkEntriesPage: React.FC = () => {
 
   const handleClose = () => {
     setOpen(false);
-    setEditingEntry(null);
+    setEditingProject(null);
     setFormData({
-      clientId: 0,
-      hours: '',
+      name: '',
       description: '',
-      date: new Date(),
+      clientId: 0,
+      startDate: null,
+      status: 'active',
     });
     setError('');
   };
@@ -137,46 +153,83 @@ const WorkEntriesPage: React.FC = () => {
     e.preventDefault();
     setError('');
 
+    if (!formData.name.trim()) {
+      setError('Project name is required');
+      return;
+    }
+
     if (!formData.clientId) {
       setError('Please select a client');
       return;
     }
 
-    const hours = parseFloat(formData.hours);
-    if (!hours || hours <= 0 || hours > 24) {
-      setError('Hours must be between 0 and 24');
+    if (!formData.startDate) {
+      setError('Please select a start date');
       return;
     }
 
-    if (!formData.date) {
-      setError('Please select a date');
+    if (!formData.status) {
+      setError('Please select a status');
       return;
     }
 
-    const entryData = {
-      clientId: formData.clientId,
-      hours,
+    const projectData = {
+      name: formData.name,
       description: formData.description || undefined,
-      date: `${formData.date.getFullYear()}-${String(formData.date.getMonth() + 1).padStart(2, '0')}-${String(formData.date.getDate()).padStart(2, '0')}`,
+      clientId: formData.clientId,
+      startDate: `${formData.startDate.getFullYear()}-${String(formData.startDate.getMonth() + 1).padStart(2, '0')}-${String(formData.startDate.getDate()).padStart(2, '0')}`,
+      status: formData.status,
     };
 
-    if (editingEntry) {
+    if (editingProject) {
       updateMutation.mutate({
-        id: editingEntry.id,
-        data: entryData,
+        id: editingProject.id,
+        data: projectData,
       });
     } else {
-      createMutation.mutate(entryData);
+      createMutation.mutate(projectData);
     }
   };
 
-  const handleDelete = (entry: WorkEntry) => {
-    if (window.confirm(`Are you sure you want to delete this ${entry.hours} hour entry for ${entry.client_name}?`)) {
-      deleteMutation.mutate(entry.id);
+  const handleDelete = (project: Project) => {
+    if (window.confirm(`Are you sure you want to delete "${project.name}"?`)) {
+      deleteMutation.mutate(project.id);
     }
   };
 
-  if (entriesLoading || clientsLoading) {
+  const handleDeleteAll = () => {
+    if (window.confirm('Are you sure you want to delete ALL projects? This action cannot be undone.')) {
+      deleteAllMutation.mutate();
+    }
+  };
+
+  const getStatusColor = (status: string): 'success' | 'default' | 'warning' => {
+    switch (status) {
+      case 'active':
+        return 'success';
+      case 'completed':
+        return 'default';
+      case 'on-hold':
+        return 'warning';
+      default:
+        return 'default';
+    }
+  };
+
+  const getStatusLabel = (status: string): string => {
+    switch (status) {
+      case 'active':
+        return 'Active';
+      case 'completed':
+        return 'Completed';
+      case 'on-hold':
+        return 'On Hold';
+      default:
+        return status;
+    }
+  };
+
+  if (projectsLoading || clientsLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
         <CircularProgress />
@@ -188,10 +241,23 @@ const WorkEntriesPage: React.FC = () => {
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <Box>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-          <Typography variant="h4">Work Entries</Typography>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpen()}>
-            Add Work Entry
-          </Button>
+          <Typography variant="h4">Projects</Typography>
+          <Box display="flex" gap={2}>
+            {projects.length > 0 && (
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteSweepIcon />}
+                onClick={handleDeleteAll}
+                disabled={deleteAllMutation.isPending}
+              >
+                {deleteAllMutation.isPending ? 'Clearing...' : 'Clear All'}
+              </Button>
+            )}
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpen()}>
+              Add Project
+            </Button>
+          </Box>
         </Box>
 
         {error && (
@@ -203,7 +269,7 @@ const WorkEntriesPage: React.FC = () => {
         {clients.length === 0 ? (
           <Paper sx={{ p: 3, textAlign: 'center' }}>
             <Typography color="text.secondary" sx={{ mb: 2 }}>
-              You need to create at least one client before adding work entries.
+              You need to create at least one client before adding projects.
             </Typography>
             <Button variant="contained" href="/clients">
               Create Client
@@ -215,38 +281,44 @@ const WorkEntriesPage: React.FC = () => {
               <Table>
                 <TableHead>
                   <TableRow>
+                    <TableCell>Name</TableCell>
                     <TableCell>Client</TableCell>
-                    <TableCell>Date</TableCell>
-                    <TableCell>Hours</TableCell>
+                    <TableCell>Start Date</TableCell>
+                    <TableCell>Status</TableCell>
                     <TableCell>Description</TableCell>
                     <TableCell align="right">Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {workEntries.length > 0 ? (
-                    workEntries.map((entry: WorkEntry) => (
-                      <TableRow key={entry.id}>
+                  {projects.length > 0 ? (
+                    projects.map((project: Project) => (
+                      <TableRow key={project.id}>
                         <TableCell>
                           <Typography variant="subtitle1" fontWeight="medium">
-                            {entry.client_name}
+                            {project.name}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" color="text.secondary">
+                            {project.client_name}
                           </Typography>
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2">
-                            {new Date(entry.date).toLocaleDateString()}
+                            {new Date(project.start_date).toLocaleDateString()}
                           </Typography>
                         </TableCell>
                         <TableCell>
-                          <Chip 
-                            label={`${entry.hours} hours`} 
-                            color="primary" 
-                            variant="outlined" 
+                          <Chip
+                            label={getStatusLabel(project.status)}
+                            color={getStatusColor(project.status)}
+                            size="small"
                           />
                         </TableCell>
                         <TableCell>
-                          {entry.description ? (
+                          {project.description ? (
                             <Typography variant="body2" color="text.secondary">
-                              {entry.description}
+                              {project.description}
                             </Typography>
                           ) : (
                             <Chip label="No description" size="small" variant="outlined" />
@@ -254,14 +326,14 @@ const WorkEntriesPage: React.FC = () => {
                         </TableCell>
                         <TableCell align="right">
                           <IconButton
-                            onClick={() => handleOpen(entry)}
+                            onClick={() => handleOpen(project)}
                             color="primary"
                             size="small"
                           >
                             <EditIcon />
                           </IconButton>
                           <IconButton
-                            onClick={() => handleDelete(entry)}
+                            onClick={() => handleDelete(project)}
                             color="error"
                             size="small"
                           >
@@ -272,9 +344,9 @@ const WorkEntriesPage: React.FC = () => {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={5} align="center">
+                      <TableCell colSpan={6} align="center">
                         <Typography color="text.secondary" sx={{ py: 3 }}>
-                          No work entries found. Add your first work entry to get started.
+                          No projects found. Create your first project to get started.
                         </Typography>
                       </TableCell>
                     </TableRow>
@@ -287,10 +359,21 @@ const WorkEntriesPage: React.FC = () => {
 
         <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
           <DialogTitle>
-            {editingEntry ? 'Edit Work Entry' : 'Add New Work Entry'}
+            {editingProject ? 'Edit Project' : 'Add New Project'}
           </DialogTitle>
           <form onSubmit={handleSubmit}>
             <DialogContent>
+              <TextField
+                autoFocus
+                margin="dense"
+                label="Project Name"
+                fullWidth
+                required
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                disabled={createMutation.isPending || updateMutation.isPending}
+              />
+
               <FormControl fullWidth margin="dense" required>
                 <InputLabel>Client</InputLabel>
                 <Select
@@ -299,7 +382,7 @@ const WorkEntriesPage: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, clientId: Number(e.target.value) })}
                   disabled={createMutation.isPending || updateMutation.isPending}
                 >
-                  {clients.map((client: { id: number; name: string }) => (
+                  {clients.map((client: Client) => (
                     <MenuItem key={client.id} value={client.id}>
                       {client.name}
                     </MenuItem>
@@ -307,22 +390,10 @@ const WorkEntriesPage: React.FC = () => {
                 </Select>
               </FormControl>
 
-              <TextField
-                margin="dense"
-                label="Hours"
-                type="number"
-                fullWidth
-                required
-                inputProps={{ min: 0.01, max: 24, step: 0.01 }}
-                value={formData.hours}
-                onChange={(e) => setFormData({ ...formData, hours: e.target.value })}
-                disabled={createMutation.isPending || updateMutation.isPending}
-              />
-
               <DatePicker
-                label="Date"
-                value={formData.date}
-                onChange={(date) => date && setFormData({ ...formData, date })}
+                label="Start Date"
+                value={formData.startDate}
+                onChange={(date) => date && setFormData({ ...formData, startDate: date })}
                 slotProps={{
                   textField: {
                     fullWidth: true,
@@ -332,6 +403,20 @@ const WorkEntriesPage: React.FC = () => {
                   },
                 }}
               />
+
+              <FormControl fullWidth margin="dense" required>
+                <InputLabel>Status</InputLabel>
+                <Select
+                  label="Status"
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                >
+                  <MenuItem value="active">Active</MenuItem>
+                  <MenuItem value="completed">Completed</MenuItem>
+                  <MenuItem value="on-hold">On Hold</MenuItem>
+                </Select>
+              </FormControl>
 
               <TextField
                 margin="dense"
@@ -356,7 +441,7 @@ const WorkEntriesPage: React.FC = () => {
                 {createMutation.isPending || updateMutation.isPending ? (
                   <CircularProgress size={24} />
                 ) : (
-                  editingEntry ? 'Update' : 'Create'
+                  editingProject ? 'Update' : 'Create'
                 )}
               </Button>
             </DialogActions>
@@ -367,4 +452,4 @@ const WorkEntriesPage: React.FC = () => {
   );
 };
 
-export default WorkEntriesPage;
+export default ProjectsPage;
