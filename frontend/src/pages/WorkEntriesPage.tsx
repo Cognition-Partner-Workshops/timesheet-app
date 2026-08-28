@@ -294,6 +294,7 @@ const WorkEntriesPage: React.FC = () => {
               <FormControl fullWidth margin="dense" required>
                 <InputLabel>Client</InputLabel>
                 <Select
+                  label="Client"
                   value={formData.clientId}
                   onChange={(e) => setFormData({ ...formData, clientId: Number(e.target.value) })}
                   disabled={createMutation.isPending || updateMutation.isPending}
