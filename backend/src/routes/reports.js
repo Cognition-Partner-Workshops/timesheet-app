@@ -3,8 +3,8 @@ const { getDatabase } = require('../database/init');
 const { authenticateUser } = require('../middleware/auth');
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 const PDFDocument = require('pdfkit');
-const path = require('path');
-const fs = require('fs');
+const path = require('node:path');
+const fs = require('node:fs');
 
 const router = express.Router();
 
