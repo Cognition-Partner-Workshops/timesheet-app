@@ -29,7 +29,6 @@ import {
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
-import { type ClientReport } from '../types/api';
 
 const ReportsPage: React.FC = () => {
   const [selectedClientId, setSelectedClientId] = useState<number>(0);
@@ -47,7 +46,7 @@ const ReportsPage: React.FC = () => {
   });
 
   const clients = clientsData?.clients || [];
-  const report = reportData as ClientReport | undefined;
+  const report = reportData;
 
   const handleExportCsv = async () => {
     if (!selectedClientId) return;
@@ -57,13 +56,13 @@ const ReportsPage: React.FC = () => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      const client = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
+      const client = clients.find((c) => c.id === selectedClientId);
       a.download = `${client?.name?.replace(/[^a-zA-Z0-9]/g, '_')}_report_${new Date().toISOString().split('T')[0]}.csv`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-    } catch (err: unknown) {
+    } catch (err) {
       setError('Failed to export CSV report');
       console.error('Export error:', err);
     }
@@ -77,19 +76,19 @@ const ReportsPage: React.FC = () => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      const client = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
+      const client = clients.find((c) => c.id === selectedClientId);
       a.download = `${client?.name?.replace(/[^a-zA-Z0-9]/g, '_')}_report_${new Date().toISOString().split('T')[0]}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-    } catch (err: unknown) {
+    } catch (err) {
       setError('Failed to export PDF report');
       console.error('Export error:', err);
     }
   };
 
-  const selectedClient = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
+  const selectedClient = clients.find((c) => c.id === selectedClientId);
 
   if (clientsLoading) {
     return (
@@ -133,7 +132,7 @@ const ReportsPage: React.FC = () => {
                     label="Select Client"
                   >
                     <MenuItem value={0}>Choose a client...</MenuItem>
-                    {clients.map((c: { id: number; name: string }) => (
+                    {clients.map((c) => (
                       <MenuItem key={c.id} value={c.id}>
                         {c.name}
                       </MenuItem>
