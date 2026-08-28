@@ -43,6 +43,7 @@ async function initializeDatabase() {
           description TEXT,
           department TEXT,
           email TEXT,
+          hourly_rate DECIMAL(10,2) DEFAULT NULL,
           user_email TEXT NOT NULL,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -66,11 +67,60 @@ async function initializeDatabase() {
         )
       `);
 
+      // Create timesheet_submissions table
+      database.run(`
+        CREATE TABLE IF NOT EXISTS timesheet_submissions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_email TEXT NOT NULL,
+          week_start DATE NOT NULL,
+          week_end DATE NOT NULL,
+          total_hours DECIMAL(7,2) NOT NULL DEFAULT 0,
+          status TEXT NOT NULL DEFAULT 'submitted',
+          submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
+        )
+      `);
+
+      // Create recurring_templates table
+      database.run(`
+        CREATE TABLE IF NOT EXISTS recurring_templates (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_email TEXT NOT NULL,
+          client_id INTEGER NOT NULL,
+          hours DECIMAL(5,2) NOT NULL,
+          description TEXT,
+          frequency TEXT NOT NULL CHECK(frequency IN ('daily','weekly','biweekly','monthly')),
+          days_of_week INTEGER NOT NULL DEFAULT 31,
+          start_date DATE NOT NULL,
+          end_date DATE,
+          active INTEGER NOT NULL DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE,
+          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
+        )
+      `);
+
+      // Create active_timers table (one running timer per user)
+      database.run(`
+        CREATE TABLE IF NOT EXISTS active_timers (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_email TEXT NOT NULL UNIQUE,
+          client_id INTEGER NOT NULL,
+          description TEXT,
+          started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE,
+          FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE
+        )
+      `);
       // Create indexes for better performance
       database.run(`CREATE INDEX IF NOT EXISTS idx_clients_user_email ON clients (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_client_id ON work_entries (client_id)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_user_email ON work_entries (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_date ON work_entries (date)`);
+      database.run(`CREATE INDEX IF NOT EXISTS idx_timesheet_submissions_user_week ON timesheet_submissions (user_email, week_start)`);
+      database.run(`CREATE INDEX IF NOT EXISTS idx_recurring_templates_user_email ON recurring_templates (user_email)`);
 
       console.log('Database tables created successfully');
       resolve();

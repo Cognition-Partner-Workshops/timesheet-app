@@ -4,7 +4,8 @@ const clientSchema = Joi.object({
   name: Joi.string().trim().min(1).max(255).required(),
   description: Joi.string().trim().max(1000).optional().allow(''),
   department: Joi.string().trim().max(255).optional().allow(''),
-  email: Joi.string().trim().email().max(255).optional().allow('')
+  email: Joi.string().trim().email().max(255).optional().allow(''),
+  hourlyRate: Joi.number().min(0).precision(2).optional().allow(null)
 });
 
 const workEntrySchema = Joi.object({
@@ -25,11 +26,38 @@ const updateClientSchema = Joi.object({
   name: Joi.string().trim().min(1).max(255).optional(),
   description: Joi.string().trim().max(1000).optional().allow(''),
   department: Joi.string().trim().max(255).optional().allow(''),
-  email: Joi.string().trim().email().max(255).optional().allow('')
+  email: Joi.string().trim().email().max(255).optional().allow(''),
+  hourlyRate: Joi.number().min(0).precision(2).optional().allow(null)
 }).min(1); // At least one field must be provided
 
 const emailSchema = Joi.object({
   email: Joi.string().email().required()
+});
+
+const recurringTemplateSchema = Joi.object({
+  clientId: Joi.number().integer().positive().required(),
+  hours: Joi.number().positive().max(24).precision(2).required(),
+  description: Joi.string().trim().max(1000).optional().allow(''),
+  frequency: Joi.string().valid('daily', 'weekly', 'biweekly', 'monthly').required(),
+  daysOfWeek: Joi.number().integer().min(0).max(127).required(),
+  startDate: Joi.date().iso().required(),
+  endDate: Joi.date().iso().optional().allow(null)
+});
+
+const updateRecurringTemplateSchema = Joi.object({
+  clientId: Joi.number().integer().positive().optional(),
+  hours: Joi.number().positive().max(24).precision(2).optional(),
+  description: Joi.string().trim().max(1000).optional().allow(''),
+  frequency: Joi.string().valid('daily', 'weekly', 'biweekly', 'monthly').optional(),
+  daysOfWeek: Joi.number().integer().min(0).max(127).optional(),
+  startDate: Joi.date().iso().optional(),
+  endDate: Joi.date().iso().optional().allow(null),
+  active: Joi.boolean().optional()
+}).min(1);
+
+const generateEntriesSchema = Joi.object({
+  from: Joi.date().iso().required(),
+  to: Joi.date().iso().required()
 });
 
 module.exports = {
@@ -37,5 +65,8 @@ module.exports = {
   workEntrySchema,
   updateWorkEntrySchema,
   updateClientSchema,
-  emailSchema
+  emailSchema,
+  recurringTemplateSchema,
+  updateRecurringTemplateSchema,
+  generateEntriesSchema
 };

@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AuthProvider } from './contexts/AuthContext';
+import { TimerProvider } from './contexts/TimerContext';
 import { useAuth } from './hooks/useAuth';
 import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
@@ -11,6 +12,8 @@ import DashboardPage from './pages/DashboardPage';
 import ClientsPage from './pages/ClientsPage';
 import WorkEntriesPage from './pages/WorkEntriesPage';
 import ReportsPage from './pages/ReportsPage';
+import TimesheetPage from './pages/TimesheetPage';
+import RecurringPage from './pages/RecurringPage';
 
 const theme = createTheme({
   palette: {
@@ -53,6 +56,8 @@ const AppContent: React.FC = () => {
                   <Route path="/clients" element={<ClientsPage />} />
                   <Route path="/work-entries" element={<WorkEntriesPage />} />
                   <Route path="/reports" element={<ReportsPage />} />
+                  <Route path="/timesheet" element={<TimesheetPage />} />
+                  <Route path="/recurring" element={<RecurringPage />} />
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />
                 </Routes>
@@ -73,7 +78,9 @@ const App: React.FC = () => {
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <AuthProvider>
-          <AppContent />
+          <TimerProvider>
+            <AppContent />
+          </TimerProvider>
         </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>

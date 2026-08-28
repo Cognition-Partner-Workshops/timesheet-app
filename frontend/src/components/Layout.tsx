@@ -21,10 +21,13 @@ import {
   Business as BusinessIcon,
   Assignment as AssignmentIcon,
   Assessment as AssessmentIcon,
+  CalendarMonth as CalendarMonthIcon,
   Logout as LogoutIcon,
+  Repeat as RepeatIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import TimerFAB from './TimerFAB';
 
 const drawerWidth = 240;
 
@@ -47,6 +50,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { text: 'Clients', icon: <BusinessIcon />, path: '/clients' },
     { text: 'Work Entries', icon: <AssignmentIcon />, path: '/work-entries' },
     { text: 'Reports', icon: <AssessmentIcon />, path: '/reports' },
+    { text: 'Timesheet', icon: <CalendarMonthIcon />, path: '/timesheet' },
+    { text: 'Templates', icon: <RepeatIcon />, path: '/recurring' },
   ];
 
   const drawer = (
@@ -152,6 +157,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <Toolbar />
         {children}
       </Box>
+      <TimerFAB />
     </Box>
   );
 };
