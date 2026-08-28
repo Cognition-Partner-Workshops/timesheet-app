@@ -438,4 +438,171 @@ describe('Report Routes', () => {
       );
     });
   });
+
+  describe('CSV Download Success Path', () => {
+    let csvSuccessApp;
+
+    function createDownloadApp(downloadFn) {
+      const testApp = express();
+      testApp.use(express.json());
+      testApp.use((req, res, next) => {
+        res.download = downloadFn;
+        next();
+      });
+      testApp.use('/api/reports', reportRoutes);
+      return testApp;
+    }
+
+    beforeEach(() => {
+      csvSuccessApp = createDownloadApp(function(filePath, fileName, cb) {
+        this.set('Content-Disposition', `attachment; filename="${fileName}"`);
+        this.status(200).send('csv content');
+        if (cb) cb(null);
+      });
+
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { id: 1, name: 'Test Client' });
+      });
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, [
+          { date: '2024-01-01', hours: 5, description: 'Work', created_at: '2024-01-01' }
+        ]);
+      });
+
+      const csvWriter = require('csv-writer');
+      csvWriter.createObjectCsvWriter.mockReturnValue({
+        writeRecords: jest.fn().mockResolvedValue(undefined)
+      });
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    test('should download CSV and clean up temp file', async () => {
+      const response = await request(csvSuccessApp).get('/api/reports/export/csv/1');
+      expect(response.status).toBe(200);
+      expect(fs.unlink).toHaveBeenCalled();
+    });
+
+    test('should log error when download fails and still clean up', async () => {
+      const errApp = createDownloadApp(function(filePath, fileName, cb) {
+        this.status(200).send('');
+        if (cb) cb(new Error('Send failed'));
+      });
+
+      await request(errApp).get('/api/reports/export/csv/1');
+      expect(console.error).toHaveBeenCalledWith('Error sending file:', expect.any(Error));
+      expect(fs.unlink).toHaveBeenCalled();
+    });
+
+    test('should log error when temp file cleanup fails', async () => {
+      fs.unlink = jest.fn((p, cb) => cb(new Error('Unlink failed')));
+
+      await request(csvSuccessApp).get('/api/reports/export/csv/1');
+      expect(console.error).toHaveBeenCalledWith('Error deleting temp file:', expect.any(Error));
+    });
+  });
+
+  describe('PDF Export Generation Path', () => {
+    let mockPdf;
+
+    function createPdfMock(yValue = 100) {
+      let _res = null;
+      return {
+        fontSize: jest.fn().mockReturnThis(),
+        text: jest.fn().mockReturnThis(),
+        moveDown: jest.fn().mockReturnThis(),
+        moveTo: jest.fn().mockReturnThis(),
+        lineTo: jest.fn().mockReturnThis(),
+        stroke: jest.fn().mockReturnThis(),
+        addPage: jest.fn().mockReturnThis(),
+        pipe: jest.fn((target) => { _res = target; }),
+        end: jest.fn(() => { if (_res) _res.end(Buffer.from('fake pdf')); }),
+        y: yValue
+      };
+    }
+
+    function setupPdfTest(clientName, entries, yValue) {
+      mockPdf = createPdfMock(yValue);
+      const PDFDocument = require('pdfkit');
+      PDFDocument.mockImplementation(() => mockPdf);
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { id: 1, name: clientName });
+      });
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, entries);
+      });
+    }
+
+    test('should generate and stream PDF with work entries', async () => {
+      setupPdfTest('Test Client', [
+        { hours: 5.5, description: 'Dev work', date: '2024-01-01', created_at: '2024-01-01' },
+        { hours: 3.0, description: 'Testing', date: '2024-01-02', created_at: '2024-01-02' }
+      ]);
+
+      const response = await request(app).get('/api/reports/export/pdf/1');
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toContain('application/pdf');
+      expect(mockPdf.pipe).toHaveBeenCalled();
+      expect(mockPdf.end).toHaveBeenCalled();
+    });
+
+    test('should generate PDF with empty entries list', async () => {
+      setupPdfTest('Empty Client', []);
+
+      const response = await request(app).get('/api/reports/export/pdf/1');
+
+      expect(response.status).toBe(200);
+      expect(mockPdf.text).toHaveBeenCalledWith('Total Hours: 0.00');
+      expect(mockPdf.text).toHaveBeenCalledWith('Total Entries: 0');
+    });
+
+    test('should trigger page break when y exceeds 700', async () => {
+      setupPdfTest('Test Client', [
+        { hours: 2, description: 'Work', date: '2024-01-01', created_at: '2024-01-01' }
+      ], 750);
+
+      const response = await request(app).get('/api/reports/export/pdf/1');
+
+      expect(response.status).toBe(200);
+      expect(mockPdf.addPage).toHaveBeenCalled();
+    });
+
+    test('should use fallback text for null description', async () => {
+      setupPdfTest('Test Client', [
+        { hours: 2, description: null, date: '2024-01-01', created_at: '2024-01-01' }
+      ]);
+
+      const response = await request(app).get('/api/reports/export/pdf/1');
+
+      expect(response.status).toBe(200);
+      expect(mockPdf.text).toHaveBeenCalledWith('No description', 230, 100, { width: 300 });
+    });
+
+    test('should add separator line every 5 entries', async () => {
+      const entries = Array.from({ length: 6 }, (_, i) => ({
+        hours: 1, description: `Work ${i + 1}`,
+        date: `2024-01-0${i + 1}`, created_at: `2024-01-0${i + 1}`
+      }));
+      setupPdfTest('Test Client', entries);
+
+      const response = await request(app).get('/api/reports/export/pdf/1');
+
+      expect(response.status).toBe(200);
+      expect(mockPdf.moveTo.mock.calls.length).toBeGreaterThanOrEqual(2);
+    });
+
+    test('should set Content-Disposition header with sanitized client name', async () => {
+      setupPdfTest('Acme Corp', []);
+
+      const response = await request(app).get('/api/reports/export/pdf/1');
+
+      expect(response.headers['content-disposition']).toContain('attachment');
+      expect(response.headers['content-disposition']).toContain('Acme_Corp');
+    });
+  });
 });
