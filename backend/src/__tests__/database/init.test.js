@@ -144,6 +144,48 @@ describe('Database Initialization', () => {
     });
   });
 
+  describe('closeDatabase - Edge Cases', () => {
+    test('should resolve immediately when no database connection exists', async () => {
+      jest.resetModules();
+      
+      jest.doMock('sqlite3', () => {
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, callback) => {
+              callback(null);
+              return {
+                serialize: jest.fn((cb) => cb()),
+                run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
+                close: jest.fn((cb) => cb(null))
+              };
+            })
+          }))
+        };
+      });
+
+      const { closeDatabase: closeFresh } = require('../../database/init');
+      await expect(closeFresh()).resolves.toBeUndefined();
+    });
+
+    test('should handle concurrent close calls via isClosing polling', async () => {
+      const db = getDatabase();
+      
+      let closeCallback;
+      db.close.mockImplementation((callback) => {
+        closeCallback = callback;
+      });
+
+      const closePromise1 = closeDatabase();
+      const closePromise2 = closeDatabase();
+
+      setTimeout(() => {
+        if (closeCallback) closeCallback(null);
+      }, 50);
+
+      await Promise.all([closePromise1, closePromise2]);
+    });
+  });
+
   describe('Database Schema', () => {
     test('users table should have correct structure', async () => {
       const db = getDatabase();
