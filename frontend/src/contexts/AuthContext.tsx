@@ -1,6 +1,6 @@
 import React, { useState, useEffect, type ReactNode } from 'react';
 import { type User } from '../types/api';
-import apiClient from '../api/client';
+import apiClient, { setAuthToken } from '../api/client';
 import { AuthContext, type AuthContextType } from './AuthContextValue';
 
 interface AuthProviderProps {
@@ -13,15 +13,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const storedEmail = localStorage.getItem('userEmail');
-      
-      if (storedEmail) {
+      const storedToken = sessionStorage.getItem('authToken');
+
+      if (storedToken) {
+        setAuthToken(storedToken);
         try {
           const response = await apiClient.getCurrentUser();
           setUser(response.user);
         } catch (error) {
           console.error('Auth check failed:', error);
-          localStorage.removeItem('userEmail');
+          setAuthToken(null);
+          sessionStorage.removeItem('authToken');
         }
       }
       setIsLoading(false);
@@ -30,25 +32,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkAuth();
   }, []);
 
-  const login = async (email: string) => {
+  const login = async (email: string, password: string) => {
     try {
-      const response = await apiClient.login(email);
+      const response = await apiClient.login(email, password);
+      setAuthToken(response.token);
+      sessionStorage.setItem('authToken', response.token);
       setUser(response.user);
-      localStorage.setItem('userEmail', email);
     } catch (error) {
       console.error('Login failed:', error);
       throw error;
     }
   };
 
+  const register = async (email: string, password: string) => {
+    try {
+      const response = await apiClient.register(email, password);
+      setAuthToken(response.token);
+      sessionStorage.setItem('authToken', response.token);
+      setUser(response.user);
+    } catch (error) {
+      console.error('Registration failed:', error);
+      throw error;
+    }
+  };
+
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('userEmail');
+    setAuthToken(null);
+    sessionStorage.removeItem('authToken');
   };
 
   const value: AuthContextType = {
     user,
     login,
+    register,
     logout,
     isLoading,
     isAuthenticated: !!user,
