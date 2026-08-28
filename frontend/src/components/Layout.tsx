@@ -43,10 +43,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   const menuItems = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-    { text: 'Clients', icon: <BusinessIcon />, path: '/clients' },
-    { text: 'Work Entries', icon: <AssignmentIcon />, path: '/work-entries' },
-    { text: 'Reports', icon: <AssessmentIcon />, path: '/reports' },
+    { text: 'Analytics', icon: <AssessmentIcon />, path: '/reports' },
+    { text: 'Organizations', icon: <BusinessIcon />, path: '/clients' },
+    { text: 'Activity Log', icon: <AssignmentIcon />, path: '/work-entries' },
+    { text: 'Overview', icon: <DashboardIcon />, path: '/dashboard' },
   ];
 
   const drawer = (
