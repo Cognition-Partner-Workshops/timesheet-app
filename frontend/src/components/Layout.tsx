@@ -22,6 +22,7 @@ import {
   Assignment as AssignmentIcon,
   Assessment as AssessmentIcon,
   Logout as LogoutIcon,
+  AdminPanelSettings as AdminIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -96,9 +97,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             {menuItems.find(item => item.path === location.pathname)?.text || 'Time Tracker'}
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="body2">{user?.email}</Typography>
+            <Box sx={{ textAlign: 'right' }}>
+              <Typography variant="body2">{user?.name || user?.email}</Typography>
+              {user?.role === 'admin' && (
+                <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'flex-end' }}>
+                  <AdminIcon sx={{ fontSize: 14 }} /> Admin
+                </Typography>
+              )}
+            </Box>
             <Avatar sx={{ width: 32, height: 32 }}>
-              {user?.email?.charAt(0).toUpperCase()}
+              {(user?.name || user?.email)?.charAt(0).toUpperCase()}
             </Avatar>
             <Button
               color="inherit"
