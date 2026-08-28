@@ -113,6 +113,16 @@ describe('Database Initialization', () => {
     test('should resolve promise on success', async () => {
       await expect(initializeDatabase()).resolves.toBeUndefined();
     });
+
+    test('should reject when a schema statement fails', async () => {
+      const db = getDatabase();
+      db.run.mockImplementationOnce((query, callback) => {
+        if (typeof callback === 'function') callback(new Error('SQL error'));
+      });
+
+      await expect(initializeDatabase()).rejects.toThrow('SQL error');
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error creating database schema:', expect.any(Error));
+    });
   });
 
   describe('closeDatabase', () => {
