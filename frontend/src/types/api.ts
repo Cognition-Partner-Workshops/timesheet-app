@@ -63,6 +63,15 @@ export interface UpdateWorkEntryRequest {
   date?: string;
 }
 
+export interface ActiveTimer {
+  id: number;
+  client_id: number;
+  description: string | null;
+  started_at: string;
+  created_at: string;
+  client_name: string;
+}
+
 export interface LoginRequest {
   email: string;
 }

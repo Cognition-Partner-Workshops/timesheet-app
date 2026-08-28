@@ -66,6 +66,20 @@ async function initializeDatabase() {
         )
       `);
 
+      // Create active_timers table (one running timer per user)
+      database.run(`
+        CREATE TABLE IF NOT EXISTS active_timers (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_email TEXT NOT NULL UNIQUE,
+          client_id INTEGER NOT NULL,
+          description TEXT,
+          started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE,
+          FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE
+        )
+      `);
+
       // Create indexes for better performance
       database.run(`CREATE INDEX IF NOT EXISTS idx_clients_user_email ON clients (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_client_id ON work_entries (client_id)`);
