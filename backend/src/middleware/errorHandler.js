@@ -17,9 +17,10 @@ function errorHandler(err, req, res, next) {
     });
   }
 
-  // Default error
+  // Default error - never expose error details in production
+  const message = process.env.NODE_ENV === 'production' ? 'Internal server error' : (err.message || 'Internal server error');
   res.status(err.status || 500).json({
-    error: err.message || 'Internal server error'
+    error: message
   });
 }
 

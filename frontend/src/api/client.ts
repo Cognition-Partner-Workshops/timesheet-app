@@ -6,6 +6,7 @@ const API_BASE_URL = '';
 
 class ApiClient {
   private client: AxiosInstance;
+  private csrfToken: string | null = null;
 
   constructor() {
     this.client = axios.create({
@@ -16,13 +17,20 @@ class ApiClient {
       },
     });
 
-    // Request interceptor to add email header
+    // Request interceptor to add auth header and CSRF token
     this.client.interceptors.request.use(
       (config) => {
         const userEmail = localStorage.getItem('userEmail');
         if (userEmail) {
           config.headers['x-user-email'] = userEmail;
         }
+
+        // Include CSRF token for state-changing requests
+        const method = (config.method || '').toUpperCase();
+        if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method) && this.csrfToken) {
+          config.headers['x-csrf-token'] = this.csrfToken;
+        }
+
         return config;
       },
       (error) => {
@@ -42,6 +50,13 @@ class ApiClient {
         return Promise.reject(error);
       }
     );
+  }
+
+  // Fetch and store CSRF token from the server
+  async fetchCsrfToken() {
+    const response = await this.client.get('/api/csrf-token');
+    this.csrfToken = response.data.csrfToken;
+    return this.csrfToken;
   }
 
   // Auth endpoints
@@ -82,7 +97,7 @@ class ApiClient {
   }
 
   async deleteAllClients() {
-    const response = await this.client.delete('/api/clients');
+    const response = await this.client.delete('/api/clients', { data: { confirm: true } });
     return response.data;
   }
 
