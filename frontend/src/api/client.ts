@@ -86,6 +86,33 @@ class ApiClient {
     return response.data;
   }
 
+  // Project endpoints
+  async getProjects(clientId?: number) {
+    const params = clientId ? { clientId } : {};
+    const response = await this.client.get('/api/projects', { params });
+    return response.data;
+  }
+
+  async getProject(id: number) {
+    const response = await this.client.get(`/api/projects/${id}`);
+    return response.data;
+  }
+
+  async createProject(projectData: { name: string; description?: string; clientId?: number; startDate?: string; status?: string }) {
+    const response = await this.client.post('/api/projects', projectData);
+    return response.data;
+  }
+
+  async updateProject(id: number, projectData: { name?: string; description?: string; clientId?: number | null; startDate?: string; status?: string }) {
+    const response = await this.client.put(`/api/projects/${id}`, projectData);
+    return response.data;
+  }
+
+  async deleteProject(id: number) {
+    const response = await this.client.delete(`/api/projects/${id}`);
+    return response.data;
+  }
+
   // Work entry endpoints
   async getWorkEntries(clientId?: number) {
     const params = clientId ? { clientId } : {};
