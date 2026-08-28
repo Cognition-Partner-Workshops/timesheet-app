@@ -110,6 +110,19 @@ describe('Validation Schemas', () => {
       expect(error).toBeUndefined();
     });
 
+    test('should keep date as the original string (not a coerced Date)', () => {
+      const entry = {
+        clientId: 1,
+        hours: 5,
+        date: '2024-01-15'
+      };
+
+      const { error, value } = workEntrySchema.validate(entry);
+      expect(error).toBeUndefined();
+      expect(typeof value.date).toBe('string');
+      expect(value.date).toBe('2024-01-15');
+    });
+
     test('should reject missing clientId', () => {
       const entry = {
         hours: 5,

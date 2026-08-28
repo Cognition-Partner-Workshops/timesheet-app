@@ -11,14 +11,17 @@ const workEntrySchema = Joi.object({
   clientId: Joi.number().integer().positive().required(),
   hours: Joi.number().positive().max(24).precision(2).required(),
   description: Joi.string().trim().max(1000).optional().allow(''),
-  date: Joi.date().iso().required()
+  // Validate as an ISO date but keep the original string so it is stored as
+  // a 'YYYY-MM-DD' value rather than a coerced Date (which sqlite3 persists
+  // as an epoch millisecond number).
+  date: Joi.date().iso().required().raw()
 });
 
 const updateWorkEntrySchema = Joi.object({
   clientId: Joi.number().integer().positive().optional(),
   hours: Joi.number().positive().max(24).precision(2).optional(),
   description: Joi.string().trim().max(1000).optional().allow(''),
-  date: Joi.date().iso().optional()
+  date: Joi.date().iso().optional().raw()
 }).min(1); // At least one field must be provided
 
 const updateClientSchema = Joi.object({
