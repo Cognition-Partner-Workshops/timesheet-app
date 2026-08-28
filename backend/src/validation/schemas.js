@@ -1,5 +1,15 @@
 const Joi = require('joi');
 
+const isoDateString = (schema) =>
+  schema.custom((value, helpers) => {
+    const [y, m, d] = value.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) {
+      return helpers.error('any.invalid');
+    }
+    return value;
+  }, 'calendar date validation');
+
 const clientSchema = Joi.object({
   name: Joi.string().trim().min(1).max(255).required(),
   description: Joi.string().trim().max(1000).optional().allow(''),
@@ -11,14 +21,18 @@ const workEntrySchema = Joi.object({
   clientId: Joi.number().integer().positive().required(),
   hours: Joi.number().positive().max(24).precision(2).required(),
   description: Joi.string().trim().max(1000).optional().allow(''),
-  date: Joi.date().iso().required()
+  date: isoDateString(Joi.string().pattern(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/).required().messages({
+    'string.pattern.base': 'Date must be in YYYY-MM-DD format'
+  }))
 });
 
 const updateWorkEntrySchema = Joi.object({
   clientId: Joi.number().integer().positive().optional(),
   hours: Joi.number().positive().max(24).precision(2).optional(),
   description: Joi.string().trim().max(1000).optional().allow(''),
-  date: Joi.date().iso().optional()
+  date: isoDateString(Joi.string().pattern(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/).optional().messages({
+    'string.pattern.base': 'Date must be in YYYY-MM-DD format'
+  }))
 }).min(1); // At least one field must be provided
 
 const updateClientSchema = Joi.object({
