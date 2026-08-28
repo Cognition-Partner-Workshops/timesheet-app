@@ -30,6 +30,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
 import { type ClientReport } from '../types/api';
+import { parseLocalDate } from '../utils/dateUtils';
 
 const ReportsPage: React.FC = () => {
   const [selectedClientId, setSelectedClientId] = useState<number>(0);
@@ -232,7 +233,7 @@ const ReportsPage: React.FC = () => {
                           <TableRow key={entry.id}>
                             <TableCell>
                               <Typography variant="body2">
-                                {new Date(entry.date).toLocaleDateString()}
+                                {parseLocalDate(entry.date).toLocaleDateString()}
                               </Typography>
                             </TableCell>
                             <TableCell>
