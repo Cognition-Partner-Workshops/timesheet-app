@@ -8,3 +8,9 @@ package-lock.json
 *.map
 .git/
 .husky/_/
+
+# Legacy duplicate pairs are excluded to avoid Sonar treating reformatting as new duplication.
+backend/src/database/init.js
+docker/overrides/database/init.js
+backend/src/server.js
+docker/overrides/server.js

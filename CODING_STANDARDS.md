@@ -47,6 +47,14 @@ npm run format
 npm run format:check
 ```
 
+The legacy near-duplicate pairs `backend/src/database/init.js`,
+`docker/overrides/database/init.js`, `backend/src/server.js`, and
+`docker/overrides/server.js` are excluded from Prettier. Reformatting these
+copies causes SonarCloud to classify their longstanding
+`backend/src`-to-`docker/overrides` duplication as new code and fail the
+`new_duplicated_lines_density` gate. Drop this exception once the duplication
+is genuinely resolved.
+
 ## Pre-commit hook
 
 After root dependencies are installed, the `prepare` script initializes Husky.

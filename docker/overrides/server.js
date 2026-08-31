@@ -18,40 +18,33 @@ const PORT = process.env.PORT || 3001;
 
 // Security middleware with CSP configured for React SPA
 // Note: HSTS and upgrade-insecure-requests disabled since we serve HTTP without SSL
-app.use(
-  helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-        fontSrc: ["'self'", 'https://fonts.gstatic.com'],
-        imgSrc: ["'self'", 'data:', 'blob:'],
-        connectSrc: ["'self'"],
-      },
-      useDefaults: false,
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      connectSrc: ["'self'"],
     },
-    crossOriginResourcePolicy: { policy: 'cross-origin' },
-    crossOriginOpenerPolicy: { policy: 'unsafe-none' },
-    strictTransportSecurity: false,
-  }),
-);
+    useDefaults: false,
+  },
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginOpenerPolicy: { policy: "unsafe-none" },
+  strictTransportSecurity: false,
+}));
 
 // CORS configuration - in production, same origin so allow all
-app.use(
-  cors({
-    origin:
-      process.env.NODE_ENV === 'production'
-        ? true
-        : process.env.FRONTEND_URL || 'http://localhost:5173',
-    credentials: true,
-  }),
-);
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' ? true : (process.env.FRONTEND_URL || 'http://localhost:5173'),
+  credentials: true
+}));
 
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 100 // limit each IP to 100 requests per windowMs
 });
 app.use(limiter);
 
@@ -80,7 +73,7 @@ app.use('/api', errorHandler);
 if (process.env.NODE_ENV === 'production') {
   const publicPath = path.join(__dirname, '..', 'public');
   app.use(express.static(publicPath));
-
+  
   // Handle React routing - serve index.html for all non-API routes
   app.get('*', (req, res) => {
     res.sendFile(path.join(publicPath, 'index.html'));
