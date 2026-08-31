@@ -275,21 +275,21 @@ describe('Client Routes', () => {
       expect(response.status).toBe(400);
     });
 
-    test('should update client department and email in a single request', async () => {
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1 });
-      });
+    // Helpers to mock the exists-check -> update -> re-fetch sequence in PUT /:id
+    const mockClientExists = () =>
+      mockDb.get.mockImplementationOnce((query, params, callback) => callback(null, { id: 1 }));
+    const mockRefetchResult = (err, row) =>
+      mockDb.get.mockImplementationOnce((query, params, callback) => callback(err, row));
 
+    test('should update client department and email in a single request', async () => {
+      mockClientExists();
       mockDb.run.mockImplementation((query, params, callback) => {
         expect(query).toContain('department = ?');
         expect(query).toContain('email = ?');
         expect(params).toEqual(['Engineering', 'client@example.com', 1, 'test@example.com']);
         callback(null);
       });
-
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1, name: 'Client', department: 'Engineering', email: 'client@example.com' });
-      });
+      mockRefetchResult(null, { id: 1, name: 'Client', department: 'Engineering', email: 'client@example.com' });
 
       const response = await request(app)
         .put('/api/clients/1')
@@ -301,18 +301,12 @@ describe('Client Routes', () => {
     });
 
     test('should clear department and email when empty strings provided', async () => {
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1 });
-      });
-
+      mockClientExists();
       mockDb.run.mockImplementation((query, params, callback) => {
         expect(params).toEqual([null, null, 1, 'test@example.com']);
         callback(null);
       });
-
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1, name: 'Client', department: null, email: null });
-      });
+      mockRefetchResult(null, { id: 1, name: 'Client', department: null, email: null });
 
       const response = await request(app)
         .put('/api/clients/1')
@@ -322,17 +316,9 @@ describe('Client Routes', () => {
     });
 
     test('should handle database error when retrieving updated client', async () => {
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1 });
-      });
-
-      mockDb.run.mockImplementation((query, params, callback) => {
-        callback(null);
-      });
-
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(new Error('Retrieve failed'), null);
-      });
+      mockClientExists();
+      mockDb.run.mockImplementation((query, params, callback) => callback(null));
+      mockRefetchResult(new Error('Retrieve failed'), null);
 
       const response = await request(app)
         .put('/api/clients/1')
@@ -344,11 +330,14 @@ describe('Client Routes', () => {
   });
 
   describe('DELETE /api/clients (all clients)', () => {
-    test('should delete all clients for authenticated user', async () => {
+    const mockDeleteAll = (err, changes) =>
       mockDb.run.mockImplementation(function(query, params, callback) {
-        this.changes = 3;
-        callback.call(this, null);
+        this.changes = changes;
+        callback.call(this, err);
       });
+
+    test('should delete all clients for authenticated user', async () => {
+      mockDeleteAll(null, 3);
 
       const response = await request(app).delete('/api/clients');
 
@@ -365,10 +354,7 @@ describe('Client Routes', () => {
     });
 
     test('should report zero deletions when user has no clients', async () => {
-      mockDb.run.mockImplementation(function(query, params, callback) {
-        this.changes = 0;
-        callback.call(this, null);
-      });
+      mockDeleteAll(null, 0);
 
       const response = await request(app).delete('/api/clients');
 
@@ -377,9 +363,7 @@ describe('Client Routes', () => {
     });
 
     test('should handle database error when deleting all clients', async () => {
-      mockDb.run.mockImplementation((query, params, callback) => {
-        callback(new Error('Delete failed'));
-      });
+      mockDeleteAll(new Error('Delete failed'), 0);
 
       const response = await request(app).delete('/api/clients');
 
