@@ -9,6 +9,7 @@ struct TimesheetApp: App {
             Group {
                 if session.isSignedIn {
                     RootTabView(session: session)
+                        .id(session.baseURLString)
                 } else {
                     LoginView(session: session)
                 }

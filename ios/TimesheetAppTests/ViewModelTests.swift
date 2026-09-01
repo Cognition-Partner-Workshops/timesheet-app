@@ -73,7 +73,7 @@ final class ViewModelTests: XCTestCase {
         XCTAssertNotNil(WorkEntryValidator.validate(clientID: 1, hours: 1.234))
     }
 
-    func testSessionStorePublishesBaseURLUpdates() {
+    func testSessionStorePublishesBaseURLUpdates() async {
         let defaults = UserDefaults.standard
         let previousBaseURL = defaults.string(forKey: "timesheet.baseURL")
         defer {
@@ -95,10 +95,23 @@ final class ViewModelTests: XCTestCase {
 
         session.updateBaseURL("http://example.test:3001")
 
-        wait(for: [expectation], timeout: 1)
+        await fulfillment(of: [expectation], timeout: 1)
         XCTAssertTrue(didPublish)
         XCTAssertEqual(session.baseURLString, "http://example.test:3001")
         XCTAssertEqual(defaults.string(forKey: "timesheet.baseURL"), "http://example.test:3001")
+        XCTAssertTrue(session.apiClient is LiveAPIClient)
+        if let client = session.apiClient as? LiveAPIClient {
+            let updatedURL = await client.baseURL.absoluteString
+            XCTAssertEqual(updatedURL, "http://example.test:3001")
+        }
+
+        session.updateBaseURL("http://localhost:3001")
+
+        XCTAssertTrue(session.apiClient is LiveAPIClient)
+        if let client = session.apiClient as? LiveAPIClient {
+            let restoredURL = await client.baseURL.absoluteString
+            XCTAssertEqual(restoredURL, "http://localhost:3001")
+        }
         _ = cancellable
     }
 }

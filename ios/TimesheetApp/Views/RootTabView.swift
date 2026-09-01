@@ -33,6 +33,5 @@ struct RootTabView: View {
             }
             .tabItem { Label("Settings", systemImage: "gearshape") }
         }
-        .id(session.baseURLString)
     }
 }
