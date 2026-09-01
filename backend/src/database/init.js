@@ -43,7 +43,7 @@ async function initializeDatabase() {
           description TEXT,
           department TEXT,
           email TEXT,
-          hourly_rate DECIMAL(10,2) NOT NULL DEFAULT 0,
+          billing_rate DECIMAL(10,2) NOT NULL DEFAULT 0,
           user_email TEXT NOT NULL,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
