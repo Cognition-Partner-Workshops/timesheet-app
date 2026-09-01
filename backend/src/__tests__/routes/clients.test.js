@@ -168,8 +168,8 @@ describe('Client Routes', () => {
       expect(response.body.client).toEqual(createdClient);
     });
 
-    test('should persist hourly rate and return it in the response', async () => {
-      const newClient = { name: 'Rate Client', hourlyRate: 125.50 };
+    test('should persist billing rate and return it in the response', async () => {
+      const newClient = { name: 'Rate Client', billingRate: 125.50 };
       const createdClient = { id: 1, ...newClient, created_at: '2024-01-01', updated_at: '2024-01-01' };
 
       mockClientCreation(createdClient);
@@ -179,9 +179,9 @@ describe('Client Routes', () => {
         .send(newClient);
 
       expect(response.status).toBe(201);
-      expect(response.body.client.hourlyRate).toBe(125.50);
+      expect(response.body.client.billingRate).toBe(125.50);
       expect(mockDb.run).toHaveBeenCalledWith(
-        'INSERT INTO clients (name, description, department, email, hourly_rate, user_email) VALUES (?, ?, ?, ?, ?, ?)',
+        'INSERT INTO clients (name, description, department, email, billing_rate, user_email) VALUES (?, ?, ?, ?, ?, ?)',
         ['Rate Client', null, null, null, 125.50, 'test@example.com'],
         expect.any(Function)
       );
@@ -262,22 +262,22 @@ describe('Client Routes', () => {
       expect(response.status).toBe(200);
     });
 
-    test('should update client hourly rate', async () => {
-      mockClientUpdate({ id: 1, name: 'Client', hourlyRate: 150 });
+    test('should update client billing rate', async () => {
+      mockClientUpdate({ id: 1, name: 'Client', billingRate: 150 });
 
       const response = await request(app)
         .put('/api/clients/1')
-        .send({ hourlyRate: 150 });
+        .send({ billingRate: 150 });
 
       expect(response.status).toBe(200);
       expect(mockDb.run).toHaveBeenCalledWith(
-        'UPDATE clients SET hourly_rate = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_email = ?',
+        'UPDATE clients SET billing_rate = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_email = ?',
         [150, 1, 'test@example.com'],
         expect.any(Function)
       );
     });
 
-    test('should not update hourly rate when it is omitted', async () => {
+    test('should not update billing rate when it is omitted', async () => {
       mockClientUpdate({ id: 1, name: 'Client' });
 
       const response = await request(app)
@@ -285,7 +285,7 @@ describe('Client Routes', () => {
         .send({ name: 'Client' });
 
       expect(response.status).toBe(200);
-      expect(mockDb.run.mock.calls[0][0]).not.toContain('hourly_rate = ?');
+      expect(mockDb.run.mock.calls[0][0]).not.toContain('billing_rate = ?');
     });
 
     test('should return 404 if client not found', async () => {

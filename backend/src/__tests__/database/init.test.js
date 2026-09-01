@@ -171,7 +171,7 @@ describe('Database Initialization', () => {
       expect(clientTableQuery[0]).toContain('FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE');
     });
 
-    test('clients table should define the default hourly rate', async () => {
+    test('clients table should define the default billing rate', async () => {
       const db = getDatabase();
       await initializeDatabase();
 
@@ -180,7 +180,7 @@ describe('Database Initialization', () => {
       );
 
       expect(clientTableQuery).toBeDefined();
-      expect(clientTableQuery[0]).toContain('hourly_rate DECIMAL(10,2) NOT NULL DEFAULT 0');
+      expect(clientTableQuery[0]).toContain('billing_rate DECIMAL(10,2) NOT NULL DEFAULT 0');
     });
 
     test('work_entries table should have foreign keys', async () => {

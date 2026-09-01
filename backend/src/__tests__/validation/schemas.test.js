@@ -84,30 +84,30 @@ describe('Validation Schemas', () => {
       expect(value.name).toBe('Test Client');
     });
 
-    test('should validate hourly rate', () => {
+    test('should validate billing rate', () => {
       const client = {
         name: 'Test Client',
-        hourlyRate: 125.50
+        billingRate: 125.50
       };
 
       const { error } = clientSchema.validate(client);
       expect(error).toBeUndefined();
     });
 
-    test('should default missing hourly rate to zero', () => {
+    test('should default missing billing rate to zero', () => {
       const client = {
         name: 'Test Client'
       };
 
       const { error, value } = clientSchema.validate(client);
       expect(error).toBeUndefined();
-      expect(value.hourlyRate).toBe(0);
+      expect(value.billingRate).toBe(0);
     });
 
-    test.each([-1, 100001, 'abc', 12.345])('should reject invalid hourly rate %p', (hourlyRate) => {
+    test.each([-1, 100001, 'abc', 12.345])('should reject invalid billing rate %p', (billingRate) => {
       const client = {
         name: 'Test Client',
-        hourlyRate
+        billingRate
       };
 
       const { error } = clientSchema.validate(client);
@@ -319,23 +319,23 @@ describe('Validation Schemas', () => {
       expect(error).toBeUndefined();
     });
 
-    test('should validate hourly rate update', () => {
+    test('should validate billing rate update', () => {
       const update = {
-        hourlyRate: 200
+        billingRate: 200
       };
 
       const { error } = updateClientSchema.validate(update);
       expect(error).toBeUndefined();
     });
 
-    test('should not default hourly rate on partial update', () => {
+    test('should not default billing rate on partial update', () => {
       const update = {
         name: 'X'
       };
 
       const { error, value } = updateClientSchema.validate(update);
       expect(error).toBeUndefined();
-      expect(value.hourlyRate).toBeUndefined();
+      expect(value.billingRate).toBeUndefined();
     });
   });
 
