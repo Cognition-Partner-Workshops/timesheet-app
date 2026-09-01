@@ -150,6 +150,32 @@ describe('Client Routes', () => {
       expect(response.body.client).toEqual(createdClient);
     });
 
+    test('should persist hourly rate and return it in the response', async () => {
+      const newClient = { name: 'Rate Client', hourlyRate: 125.50 };
+      const createdClient = { id: 1, ...newClient, created_at: '2024-01-01', updated_at: '2024-01-01' };
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.lastID = 1;
+        callback.call(this, null);
+      });
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, createdClient);
+      });
+
+      const response = await request(app)
+        .post('/api/clients')
+        .send(newClient);
+
+      expect(response.status).toBe(201);
+      expect(response.body.client.hourlyRate).toBe(125.50);
+      expect(mockDb.run).toHaveBeenCalledWith(
+        'INSERT INTO clients (name, description, department, email, hourly_rate, user_email) VALUES (?, ?, ?, ?, ?, ?)',
+        ['Rate Client', null, null, null, 125.50, 'test@example.com'],
+        expect.any(Function)
+      );
+    });
+
     test('should create client without description', async () => {
       const newClient = { name: 'Client Without Desc' };
       const createdClient = { id: 1, name: 'Client Without Desc', description: null };
@@ -243,6 +269,52 @@ describe('Client Routes', () => {
         .send({ description: 'New Description' });
 
       expect(response.status).toBe(200);
+    });
+
+    test('should update client hourly rate', async () => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1, name: 'Client', hourlyRate: 150 });
+      });
+
+      const response = await request(app)
+        .put('/api/clients/1')
+        .send({ hourlyRate: 150 });
+
+      expect(response.status).toBe(200);
+      expect(mockDb.run).toHaveBeenCalledWith(
+        'UPDATE clients SET hourly_rate = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_email = ?',
+        [150, 1, 'test@example.com'],
+        expect.any(Function)
+      );
+    });
+
+    test('should not update hourly rate when it is omitted', async () => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1, name: 'Client' });
+      });
+
+      const response = await request(app)
+        .put('/api/clients/1')
+        .send({ name: 'Client' });
+
+      expect(response.status).toBe(200);
+      expect(mockDb.run.mock.calls[0][0]).not.toContain('hourly_rate = ?');
     });
 
     test('should return 404 if client not found', async () => {

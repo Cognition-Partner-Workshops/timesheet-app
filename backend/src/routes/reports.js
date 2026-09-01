@@ -8,6 +8,14 @@ const fs = require('fs');
 
 const router = express.Router();
 
+function entryAmount(entry, hourlyRate) {
+  return entry.billable ? (parseFloat(entry.hours) || 0) * hourlyRate : 0;
+}
+
+function roundMoney(amount) {
+  return Math.round(amount * 100) / 100;
+}
+
 // All routes require authentication
 router.use(authenticateUser);
 
@@ -23,7 +31,7 @@ router.get('/client/:clientId', (req, res) => {
   
   // Verify client belongs to user
   db.get(
-    'SELECT id, name FROM clients WHERE id = ? AND user_email = ?',
+    'SELECT id, name, hourly_rate AS hourlyRate FROM clients WHERE id = ? AND user_email = ?',
     [clientId, req.userEmail],
     (err, client) => {
       if (err) {
@@ -35,9 +43,11 @@ router.get('/client/:clientId', (req, res) => {
         return res.status(404).json({ error: 'Client not found' });
       }
       
+      const hourlyRate = parseFloat(client.hourlyRate) || 0;
+
       // Get work entries for this client
       db.all(
-        `SELECT id, hours, description, date, created_at, updated_at
+        `SELECT id, hours, description, date, billable, created_at, updated_at
          FROM work_entries 
          WHERE client_id = ? AND user_email = ? 
          ORDER BY date DESC`,
@@ -48,13 +58,21 @@ router.get('/client/:clientId', (req, res) => {
             return res.status(500).json({ error: 'Internal server error' });
           }
           
-          // Calculate total hours
+          const workEntriesWithAmounts = workEntries.map(entry => ({
+            ...entry,
+            amount: roundMoney(entryAmount(entry, hourlyRate))
+          }));
+
           const totalHours = workEntries.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
+          const totalAmount = roundMoney(
+            workEntriesWithAmounts.reduce((sum, entry) => sum + entry.amount, 0)
+          );
           
           res.json({
             client: client,
-            workEntries: workEntries,
+            workEntries: workEntriesWithAmounts,
             totalHours: totalHours,
+            totalAmount: totalAmount,
             entryCount: workEntries.length
           });
         }
@@ -75,7 +93,7 @@ router.get('/export/csv/:clientId', (req, res) => {
   
   // Verify client belongs to user and get data
   db.get(
-    'SELECT id, name FROM clients WHERE id = ? AND user_email = ?',
+    'SELECT id, name, hourly_rate AS hourlyRate FROM clients WHERE id = ? AND user_email = ?',
     [clientId, req.userEmail],
     (err, client) => {
       if (err) {
@@ -87,9 +105,11 @@ router.get('/export/csv/:clientId', (req, res) => {
         return res.status(404).json({ error: 'Client not found' });
       }
       
+      const hourlyRate = parseFloat(client.hourlyRate) || 0;
+
       // Get work entries
       db.all(
-        `SELECT hours, description, date, created_at
+        `SELECT hours, description, date, billable, created_at
          FROM work_entries 
          WHERE client_id = ? AND user_email = ? 
          ORDER BY date DESC`,
@@ -116,12 +136,20 @@ router.get('/export/csv/:clientId', (req, res) => {
             header: [
               { id: 'date', title: 'Date' },
               { id: 'hours', title: 'Hours' },
+              { id: 'billable', title: 'Billable' },
+              { id: 'amount', title: 'Amount' },
               { id: 'description', title: 'Description' },
               { id: 'created_at', title: 'Created At' }
             ]
           });
-          
-          csvWriter.writeRecords(workEntries)
+
+          const records = workEntries.map(entry => ({
+            ...entry,
+            billable: entry.billable ? 'Yes' : 'No',
+            amount: roundMoney(entryAmount(entry, hourlyRate)).toFixed(2)
+          }));
+
+          csvWriter.writeRecords(records)
             .then(() => {
               // Send file and clean up
               res.download(tempPath, filename, (err) => {
@@ -158,7 +186,7 @@ router.get('/export/pdf/:clientId', (req, res) => {
   
   // Verify client belongs to user and get data
   db.get(
-    'SELECT id, name FROM clients WHERE id = ? AND user_email = ?',
+    'SELECT id, name, hourly_rate AS hourlyRate FROM clients WHERE id = ? AND user_email = ?',
     [clientId, req.userEmail],
     (err, client) => {
       if (err) {
@@ -170,9 +198,11 @@ router.get('/export/pdf/:clientId', (req, res) => {
         return res.status(404).json({ error: 'Client not found' });
       }
       
+      const hourlyRate = parseFloat(client.hourlyRate) || 0;
+
       // Get work entries
       db.all(
-        `SELECT hours, description, date, created_at
+        `SELECT hours, description, date, billable, created_at
          FROM work_entries 
          WHERE client_id = ? AND user_email = ? 
          ORDER BY date DESC`,
@@ -200,15 +230,20 @@ router.get('/export/pdf/:clientId', (req, res) => {
           doc.moveDown();
           
           const totalHours = workEntries.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
+          const totalAmount = roundMoney(
+            workEntries.reduce((sum, entry) => sum + entryAmount(entry, hourlyRate), 0)
+          );
           doc.fontSize(14).text(`Total Hours: ${totalHours.toFixed(2)}`);
+          doc.text(`Total Amount: ${totalAmount.toFixed(2)}`);
           doc.text(`Total Entries: ${workEntries.length}`);
           doc.text(`Generated: ${new Date().toLocaleString()}`);
           doc.moveDown();
           
           // Add table header
-          doc.fontSize(12).text('Date', 50, doc.y, { width: 100 });
-          doc.text('Hours', 150, doc.y - 15, { width: 80 });
-          doc.text('Description', 230, doc.y - 15, { width: 300 });
+          doc.fontSize(12).text('Date', 50, doc.y, { width: 90 });
+          doc.text('Hours', 140, doc.y - 15, { width: 60 });
+          doc.text('Amount', 200, doc.y - 15, { width: 80 });
+          doc.text('Description', 285, doc.y - 15, { width: 265 });
           doc.moveDown();
           
           // Add horizontal line
@@ -224,9 +259,10 @@ router.get('/export/pdf/:clientId', (req, res) => {
               doc.addPage();
             }
             
-            doc.text(entry.date, 50, doc.y, { width: 100 });
-            doc.text(entry.hours.toString(), 150, y, { width: 80 });
-            doc.text(entry.description || 'No description', 230, y, { width: 300 });
+            doc.text(entry.date, 50, doc.y, { width: 90 });
+            doc.text(entry.hours.toString(), 140, y, { width: 60 });
+            doc.text(roundMoney(entryAmount(entry, hourlyRate)).toFixed(2), 200, y, { width: 80 });
+            doc.text(entry.description || 'No description', 285, y, { width: 265 });
             doc.moveDown();
             
             // Add separator line every 5 entries
