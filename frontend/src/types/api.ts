@@ -9,7 +9,7 @@ export interface Client {
   description: string | null;
   department: string | null;
   email: string | null;
-  hourlyRate: number;
+  billingRate: number;
   created_at: string;
   updated_at: string;
 }
@@ -44,7 +44,7 @@ export interface CreateClientRequest {
   description?: string;
   department?: string;
   email?: string;
-  hourlyRate?: number;
+  billingRate?: number;
 }
 
 export interface UpdateClientRequest {
@@ -52,7 +52,7 @@ export interface UpdateClientRequest {
   description?: string;
   department?: string;
   email?: string;
-  hourlyRate?: number;
+  billingRate?: number;
 }
 
 export interface CreateWorkEntryRequest {
