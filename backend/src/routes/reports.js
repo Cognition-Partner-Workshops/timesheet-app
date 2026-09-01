@@ -9,7 +9,7 @@ const fs = require('fs');
 const router = express.Router();
 
 function entryAmount(entry, hourlyRate) {
-  return entry.billable ? (parseFloat(entry.hours) || 0) * hourlyRate : 0;
+  return entry.billable ? (Number.parseFloat(entry.hours) || 0) * hourlyRate : 0;
 }
 
 function roundMoney(amount) {

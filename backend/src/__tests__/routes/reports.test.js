@@ -58,6 +58,16 @@ describe('Report Routes', () => {
     jest.clearAllMocks();
   });
 
+  const mockReportData = (client, workEntries) => {
+    mockDb.get.mockImplementation((query, params, callback) => {
+      callback(null, client);
+    });
+
+    mockDb.all.mockImplementation((query, params, callback) => {
+      callback(null, workEntries);
+    });
+  };
+
   describe('GET /api/reports/client/:clientId', () => {
     test('should return client report with work entries', async () => {
       const mockClient = { id: 1, name: 'Test Client', hourlyRate: 100 };
@@ -66,13 +76,7 @@ describe('Report Routes', () => {
         { id: 2, hours: 3.0, billable: 1, description: 'Work 2', date: '2024-01-02' }
       ];
 
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, mockWorkEntries);
-      });
+      mockReportData(mockClient, mockWorkEntries);
 
       const response = await request(app).get('/api/reports/client/1');
 
@@ -94,13 +98,7 @@ describe('Report Routes', () => {
         { id: 2, hours: 3, billable: 0, description: 'Non-billable', date: '2024-01-02' }
       ];
 
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, mockWorkEntries);
-      });
+      mockReportData(mockClient, mockWorkEntries);
 
       const response = await request(app).get('/api/reports/client/1');
 
@@ -116,13 +114,7 @@ describe('Report Routes', () => {
         { id: 1, hours: 5.5, billable: 1, description: 'Work', date: '2024-01-01' }
       ];
 
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, mockWorkEntries);
-      });
+      mockReportData(mockClient, mockWorkEntries);
 
       const response = await request(app).get('/api/reports/client/1');
 
@@ -133,13 +125,7 @@ describe('Report Routes', () => {
     test('should return report with zero hours for client with no entries', async () => {
       const mockClient = { id: 1, name: 'Empty Client' };
 
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, []);
-      });
+      mockReportData(mockClient, []);
 
       const response = await request(app).get('/api/reports/client/1');
 
@@ -356,13 +342,7 @@ describe('Report Routes', () => {
       ];
       const writeRecords = jest.fn().mockRejectedValue(new Error('Stop after capture'));
 
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, mockWorkEntries);
-      });
+      mockReportData(mockClient, mockWorkEntries);
 
       const csvWriter = require('csv-writer');
       csvWriter.createObjectCsvWriter.mockReturnValue({ writeRecords });
@@ -384,13 +364,7 @@ describe('Report Routes', () => {
         { date: '2024-01-01', hours: 5, description: 'Work 1', created_at: '2024-01-01' }
       ];
 
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, mockWorkEntries);
-      });
+      mockReportData(mockClient, mockWorkEntries);
 
       const csvWriter = require('csv-writer');
       csvWriter.createObjectCsvWriter.mockReturnValue({
@@ -406,13 +380,7 @@ describe('Report Routes', () => {
     test('should verify CSV export calls correct database queries', async () => {
       const mockClient = { id: 1, name: 'Test Client' };
 
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, []);
-      });
+      mockReportData(mockClient, []);
 
       const csvWriter = require('csv-writer');
       csvWriter.createObjectCsvWriter.mockReturnValue({
@@ -434,13 +402,7 @@ describe('Report Routes', () => {
         { date: '2024-01-01', hours: 5, description: 'Work 1', created_at: '2024-01-01' }
       ];
 
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, mockWorkEntries);
-      });
+      mockReportData(mockClient, mockWorkEntries);
 
       fs.existsSync.mockReturnValue(false);
 
@@ -458,13 +420,7 @@ describe('Report Routes', () => {
       const mockClient = { id: 1, name: 'Test Client' };
       const mockWorkEntries = [];
 
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, mockWorkEntries);
-      });
+      mockReportData(mockClient, mockWorkEntries);
 
       fs.existsSync.mockReturnValue(true);
 
@@ -487,13 +443,7 @@ describe('Report Routes', () => {
         { date: '2024-01-01', hours: 5.5, billable: 1, description: 'Work 1', created_at: '2024-01-01' }
       ];
 
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, mockClient);
-      });
-
-      mockDb.all.mockImplementation((query, params, callback) => {
-        callback(null, mockWorkEntries);
-      });
+      mockReportData(mockClient, mockWorkEntries);
 
       const response = await request(app).get('/api/reports/export/pdf/1');
 

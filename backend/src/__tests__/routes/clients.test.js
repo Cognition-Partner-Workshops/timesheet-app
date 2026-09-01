@@ -38,6 +38,31 @@ describe('Client Routes', () => {
     jest.clearAllMocks();
   });
 
+  const mockClientCreation = (createdClient) => {
+    mockDb.run.mockImplementation(function(query, params, callback) {
+      this.lastID = 1;
+      callback.call(this, null);
+    });
+
+    mockDb.get.mockImplementation((query, params, callback) => {
+      callback(null, createdClient);
+    });
+  };
+
+  const mockClientUpdate = (updatedClient) => {
+    mockDb.get.mockImplementationOnce((query, params, callback) => {
+      callback(null, { id: 1 });
+    });
+
+    mockDb.run.mockImplementation((query, params, callback) => {
+      callback(null);
+    });
+
+    mockDb.get.mockImplementationOnce((query, params, callback) => {
+      callback(null, updatedClient);
+    });
+  };
+
   describe('GET /api/clients', () => {
     test('should return all clients for authenticated user', async () => {
       const mockClients = [
@@ -132,14 +157,7 @@ describe('Client Routes', () => {
       const newClient = { name: 'New Client', description: 'New Description' };
       const createdClient = { id: 1, ...newClient, created_at: '2024-01-01', updated_at: '2024-01-01' };
 
-      mockDb.run.mockImplementation(function(query, params, callback) {
-        this.lastID = 1;
-        callback.call(this, null);
-      });
-
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, createdClient);
-      });
+      mockClientCreation(createdClient);
 
       const response = await request(app)
         .post('/api/clients')
@@ -154,14 +172,7 @@ describe('Client Routes', () => {
       const newClient = { name: 'Rate Client', hourlyRate: 125.50 };
       const createdClient = { id: 1, ...newClient, created_at: '2024-01-01', updated_at: '2024-01-01' };
 
-      mockDb.run.mockImplementation(function(query, params, callback) {
-        this.lastID = 1;
-        callback.call(this, null);
-      });
-
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, createdClient);
-      });
+      mockClientCreation(createdClient);
 
       const response = await request(app)
         .post('/api/clients')
@@ -230,17 +241,7 @@ describe('Client Routes', () => {
     test('should update client name', async () => {
       const updatedClient = { id: 1, name: 'Updated Name', description: 'Old Desc' };
 
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1 }); // Client exists
-      });
-
-      mockDb.run.mockImplementation((query, params, callback) => {
-        callback(null);
-      });
-
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, updatedClient);
-      });
+      mockClientUpdate(updatedClient);
 
       const response = await request(app)
         .put('/api/clients/1')
@@ -252,17 +253,7 @@ describe('Client Routes', () => {
     });
 
     test('should update client description', async () => {
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1 });
-      });
-
-      mockDb.run.mockImplementation((query, params, callback) => {
-        callback(null);
-      });
-
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1, name: 'Client', description: 'New Description' });
-      });
+      mockClientUpdate({ id: 1, name: 'Client', description: 'New Description' });
 
       const response = await request(app)
         .put('/api/clients/1')
@@ -272,17 +263,7 @@ describe('Client Routes', () => {
     });
 
     test('should update client hourly rate', async () => {
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1 });
-      });
-
-      mockDb.run.mockImplementation((query, params, callback) => {
-        callback(null);
-      });
-
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1, name: 'Client', hourlyRate: 150 });
-      });
+      mockClientUpdate({ id: 1, name: 'Client', hourlyRate: 150 });
 
       const response = await request(app)
         .put('/api/clients/1')
@@ -297,17 +278,7 @@ describe('Client Routes', () => {
     });
 
     test('should not update hourly rate when it is omitted', async () => {
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1 });
-      });
-
-      mockDb.run.mockImplementation((query, params, callback) => {
-        callback(null);
-      });
-
-      mockDb.get.mockImplementationOnce((query, params, callback) => {
-        callback(null, { id: 1, name: 'Client' });
-      });
+      mockClientUpdate({ id: 1, name: 'Client' });
 
       const response = await request(app)
         .put('/api/clients/1')
