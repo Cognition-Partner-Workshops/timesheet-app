@@ -8,8 +8,8 @@ const fs = require('fs');
 
 const router = express.Router();
 
-function entryAmount(entry, hourlyRate) {
-  return entry.billable ? (Number.parseFloat(entry.hours) || 0) * hourlyRate : 0;
+function entryAmount(entry, billingRate) {
+  return entry.billable ? (Number.parseFloat(entry.hours) || 0) * billingRate : 0;
 }
 
 function roundMoney(amount) {
@@ -20,14 +20,14 @@ function fetchClientReportData(clientId, userEmail, callback) {
   const db = getDatabase();
 
   db.get(
-    'SELECT id, name, hourly_rate AS hourlyRate FROM clients WHERE id = ? AND user_email = ?',
+    'SELECT id, name, billing_rate AS billingRate FROM clients WHERE id = ? AND user_email = ?',
     [clientId, userEmail],
     (err, client) => {
       if (err || !client) {
         return callback(err, client);
       }
 
-      const hourlyRate = Number.parseFloat(client.hourlyRate) || 0;
+      const billingRate = Number.parseFloat(client.billingRate) || 0;
 
       db.all(
         `SELECT id, hours, description, date, billable, created_at, updated_at
@@ -40,7 +40,7 @@ function fetchClientReportData(clientId, userEmail, callback) {
             return callback(err);
           }
 
-          callback(null, { client, hourlyRate, workEntries });
+          callback(null, { client, billingRate, workEntries });
         }
       );
     }
@@ -73,10 +73,10 @@ router.use(authenticateUser);
 
 // Get hourly report for specific client
 router.get('/client/:clientId', (req, res) => {
-  handleClientReport(req, res, ({ client, hourlyRate, workEntries }) => {
+  handleClientReport(req, res, ({ client, billingRate, workEntries }) => {
     const workEntriesWithAmounts = workEntries.map(entry => ({
       ...entry,
-      amount: roundMoney(entryAmount(entry, hourlyRate))
+      amount: roundMoney(entryAmount(entry, billingRate))
     }));
 
     const totalHours = workEntries.reduce((sum, entry) => sum + Number.parseFloat(entry.hours), 0);
@@ -96,7 +96,7 @@ router.get('/client/:clientId', (req, res) => {
 
 // Export client report as CSV
 router.get('/export/csv/:clientId', (req, res) => {
-  handleClientReport(req, res, ({ client, hourlyRate, workEntries }) => {
+  handleClientReport(req, res, ({ client, billingRate, workEntries }) => {
     // Create temporary CSV file
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `${client.name.replace(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.csv`;
@@ -123,7 +123,7 @@ router.get('/export/csv/:clientId', (req, res) => {
     const records = workEntries.map(entry => ({
       ...entry,
       billable: entry.billable ? 'Yes' : 'No',
-      amount: roundMoney(entryAmount(entry, hourlyRate)).toFixed(2)
+      amount: roundMoney(entryAmount(entry, billingRate)).toFixed(2)
     }));
 
     csvWriter.writeRecords(records)
@@ -150,7 +150,7 @@ router.get('/export/csv/:clientId', (req, res) => {
 
 // Export client report as PDF
 router.get('/export/pdf/:clientId', (req, res) => {
-  handleClientReport(req, res, ({ client, hourlyRate, workEntries }) => {
+  handleClientReport(req, res, ({ client, billingRate, workEntries }) => {
     // Create PDF
     const doc = new PDFDocument();
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -169,7 +169,7 @@ router.get('/export/pdf/:clientId', (req, res) => {
 
     const totalHours = workEntries.reduce((sum, entry) => sum + Number.parseFloat(entry.hours), 0);
     const totalAmount = roundMoney(
-      workEntries.reduce((sum, entry) => sum + entryAmount(entry, hourlyRate), 0)
+      workEntries.reduce((sum, entry) => sum + entryAmount(entry, billingRate), 0)
     );
     doc.fontSize(14).text(`Total Hours: ${totalHours.toFixed(2)}`);
     doc.text(`Total Amount: ${totalAmount.toFixed(2)}`);
@@ -199,7 +199,7 @@ router.get('/export/pdf/:clientId', (req, res) => {
 
       doc.text(entry.date, 50, doc.y, { width: 90 });
       doc.text(entry.hours.toString(), 140, y, { width: 60 });
-      doc.text(roundMoney(entryAmount(entry, hourlyRate)).toFixed(2), 200, y, { width: 80 });
+      doc.text(roundMoney(entryAmount(entry, billingRate)).toFixed(2), 200, y, { width: 80 });
       doc.text(entry.description || 'No description', 285, y, { width: 265 });
       doc.moveDown();
 

@@ -70,7 +70,7 @@ describe('Report Routes', () => {
 
   describe('GET /api/reports/client/:clientId', () => {
     test('should return client report with work entries', async () => {
-      const mockClient = { id: 1, name: 'Test Client', hourlyRate: 100 };
+      const mockClient = { id: 1, name: 'Test Client', billingRate: 100 };
       const mockWorkEntries = [
         { id: 1, hours: 5.5, billable: 1, description: 'Work 1', date: '2024-01-01' },
         { id: 2, hours: 3.0, billable: 1, description: 'Work 2', date: '2024-01-02' }
@@ -92,7 +92,7 @@ describe('Report Routes', () => {
     });
 
     test('should exclude non-billable entries from total amount', async () => {
-      const mockClient = { id: 1, name: 'Test Client', hourlyRate: 100 };
+      const mockClient = { id: 1, name: 'Test Client', billingRate: 100 };
       const mockWorkEntries = [
         { id: 1, hours: 5.5, billable: 1, description: 'Billable', date: '2024-01-01' },
         { id: 2, hours: 3, billable: 0, description: 'Non-billable', date: '2024-01-02' }
@@ -108,8 +108,8 @@ describe('Report Routes', () => {
       expect(response.body.workEntries.map(entry => entry.amount)).toEqual([550, 0]);
     });
 
-    test.each([0, null])('should return zero amount for hourly rate %p', async (hourlyRate) => {
-      const mockClient = { id: 1, name: 'Test Client', hourlyRate };
+    test.each([0, null])('should return zero amount for billing rate %p', async (billingRate) => {
+      const mockClient = { id: 1, name: 'Test Client', billingRate };
       const mockWorkEntries = [
         { id: 1, hours: 5.5, billable: 1, description: 'Work', date: '2024-01-01' }
       ];
@@ -336,7 +336,7 @@ describe('Report Routes', () => {
 
   describe('CSV Export Success Path', () => {
     test('should include billable and amount columns in CSV export', async () => {
-      const mockClient = { id: 1, name: 'Test Client', hourlyRate: 100 };
+      const mockClient = { id: 1, name: 'Test Client', billingRate: 100 };
       const mockWorkEntries = [
         { date: '2024-01-01', hours: 5.5, billable: 1, description: 'Work 1', created_at: '2024-01-01' }
       ];
@@ -390,7 +390,7 @@ describe('Report Routes', () => {
       await request(app).get('/api/reports/export/csv/1');
 
       expect(mockDb.get).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT id, name, hourly_rate AS hourlyRate FROM clients'),
+        expect.stringContaining('SELECT id, name, billing_rate AS billingRate FROM clients'),
         expect.arrayContaining([1, 'test@example.com']),
         expect.any(Function)
       );
@@ -438,7 +438,7 @@ describe('Report Routes', () => {
 
   describe('PDF Export Success Path', () => {
     test('should include total amount in PDF export', async () => {
-      const mockClient = { id: 1, name: 'Test Client', hourlyRate: 100 };
+      const mockClient = { id: 1, name: 'Test Client', billingRate: 100 };
       const mockWorkEntries = [
         { date: '2024-01-01', hours: 5.5, billable: 1, description: 'Work 1', created_at: '2024-01-01' }
       ];
@@ -479,7 +479,7 @@ describe('Report Routes', () => {
       await request(app).get('/api/reports/export/pdf/1');
 
       expect(mockDb.get).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT id, name, hourly_rate AS hourlyRate FROM clients'),
+        expect.stringContaining('SELECT id, name, billing_rate AS billingRate FROM clients'),
         expect.arrayContaining([1, 'test@example.com']),
         expect.any(Function)
       );
