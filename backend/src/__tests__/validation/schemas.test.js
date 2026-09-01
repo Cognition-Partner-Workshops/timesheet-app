@@ -83,6 +83,36 @@ describe('Validation Schemas', () => {
       const { value } = clientSchema.validate(client);
       expect(value.name).toBe('Test Client');
     });
+
+    test('should validate hourly rate', () => {
+      const client = {
+        name: 'Test Client',
+        hourlyRate: 125.50
+      };
+
+      const { error } = clientSchema.validate(client);
+      expect(error).toBeUndefined();
+    });
+
+    test('should default missing hourly rate to zero', () => {
+      const client = {
+        name: 'Test Client'
+      };
+
+      const { error, value } = clientSchema.validate(client);
+      expect(error).toBeUndefined();
+      expect(value.hourlyRate).toBe(0);
+    });
+
+    test.each([-1, 100001, 'abc', 12.345])('should reject invalid hourly rate %p', (hourlyRate) => {
+      const client = {
+        name: 'Test Client',
+        hourlyRate
+      };
+
+      const { error } = clientSchema.validate(client);
+      expect(error).toBeDefined();
+    });
   });
 
   describe('workEntrySchema', () => {
@@ -287,6 +317,25 @@ describe('Validation Schemas', () => {
 
       const { error } = updateClientSchema.validate(update);
       expect(error).toBeUndefined();
+    });
+
+    test('should validate hourly rate update', () => {
+      const update = {
+        hourlyRate: 200
+      };
+
+      const { error } = updateClientSchema.validate(update);
+      expect(error).toBeUndefined();
+    });
+
+    test('should not default hourly rate on partial update', () => {
+      const update = {
+        name: 'X'
+      };
+
+      const { error, value } = updateClientSchema.validate(update);
+      expect(error).toBeUndefined();
+      expect(value.hourlyRate).toBeUndefined();
     });
   });
 

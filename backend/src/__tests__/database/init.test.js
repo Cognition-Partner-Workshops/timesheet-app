@@ -171,6 +171,18 @@ describe('Database Initialization', () => {
       expect(clientTableQuery[0]).toContain('FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE');
     });
 
+    test('clients table should define the default hourly rate', async () => {
+      const db = getDatabase();
+      await initializeDatabase();
+
+      const clientTableQuery = db.run.mock.calls.find(call =>
+        call[0].includes('CREATE TABLE IF NOT EXISTS clients')
+      );
+
+      expect(clientTableQuery).toBeDefined();
+      expect(clientTableQuery[0]).toContain('hourly_rate DECIMAL(10,2) NOT NULL DEFAULT 0');
+    });
+
     test('work_entries table should have foreign keys', async () => {
       const db = getDatabase();
       await initializeDatabase();
@@ -182,6 +194,18 @@ describe('Database Initialization', () => {
       expect(workEntriesQuery).toBeDefined();
       expect(workEntriesQuery[0]).toContain('FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE');
       expect(workEntriesQuery[0]).toContain('FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE');
+    });
+
+    test('work_entries table should define billable default to one', async () => {
+      const db = getDatabase();
+      await initializeDatabase();
+
+      const workEntriesQuery = db.run.mock.calls.find(call =>
+        call[0].includes('CREATE TABLE IF NOT EXISTS work_entries')
+      );
+
+      expect(workEntriesQuery).toBeDefined();
+      expect(workEntriesQuery[0]).toContain('billable INTEGER NOT NULL DEFAULT 1');
     });
   });
 });
