@@ -66,7 +66,12 @@ struct DashboardView: View {
         }
         .navigationTitle("Dashboard")
         .refreshable { await model.load() }
-        .task { await model.load() }
+        .task {
+            if clientsModel.clients.isEmpty {
+                await clientsModel.load()
+            }
+            await model.load()
+        }
         .sheet(isPresented: $showingEntryForm) {
             WorkEntryFormView(clients: clientsModel.clients) { payload in
                 await entriesModel.save(id: nil, payload: payload)

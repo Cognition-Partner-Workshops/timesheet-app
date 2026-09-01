@@ -8,7 +8,7 @@ final class SessionStore: ObservableObject {
     @Published private(set) var isSigningIn = false
     @Published var errorMessage: String?
 
-    private(set) var apiClient: any APIClient
+    @Published private(set) var apiClient: any APIClient
 
     init(apiClient: (any APIClient)? = nil) {
         self.apiClient = apiClient ?? Self.makeClient(baseURLString: UserDefaults.standard.string(forKey: "timesheet.baseURL") ?? "http://localhost:3001")

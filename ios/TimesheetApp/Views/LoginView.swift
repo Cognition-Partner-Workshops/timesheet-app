@@ -12,8 +12,12 @@ struct LoginView: View {
         _serverURL = State(initialValue: session.baseURLString)
     }
 
+    private var trimmedEmail: String {
+        email.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private var emailIsValid: Bool {
-        email.isEmpty || SessionStore.isValidEmail(email.trimmingCharacters(in: .whitespacesAndNewlines))
+        SessionStore.isValidEmail(trimmedEmail)
     }
 
     var body: some View {
@@ -37,7 +41,7 @@ struct LoginView: View {
                         .autocorrectionDisabled()
                         .textContentType(.emailAddress)
                         .textFieldStyle(.roundedBorder)
-                    if !emailIsValid {
+                    if !trimmedEmail.isEmpty && !emailIsValid {
                         Text("Enter a valid email address.")
                             .font(.caption)
                             .foregroundStyle(.red)
@@ -70,7 +74,7 @@ struct LoginView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(!emailIsValid || session.isSigningIn)
+                .disabled(trimmedEmail.isEmpty || !emailIsValid || session.isSigningIn)
                 Spacer()
             }
             .padding(24)

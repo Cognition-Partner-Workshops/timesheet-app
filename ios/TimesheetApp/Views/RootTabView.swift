@@ -25,7 +25,7 @@ struct RootTabView: View {
             }
             .tabItem { Label("Clients", systemImage: "person.2") }
             NavigationStack {
-                EntriesListView(model: entriesModel, clients: clientsModel.clients)
+                EntriesListView(model: entriesModel, clientsModel: clientsModel)
             }
             .tabItem { Label("Entries", systemImage: "clock") }
             NavigationStack {
@@ -33,5 +33,6 @@ struct RootTabView: View {
             }
             .tabItem { Label("Settings", systemImage: "gearshape") }
         }
+        .id(session.baseURLString)
     }
 }

@@ -115,6 +115,12 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(DateCoding.encode(full[0].date), "2026-09-01")
     }
 
+    func testDateOnlyRoundTripsInCurrentCalendar() throws {
+        let decoded = try DateCoding.decode("2026-09-01")
+        XCTAssertEqual(DateCoding.encode(decoded), "2026-09-01")
+        XCTAssertEqual(Calendar.current.component(.day, from: decoded), 1)
+    }
+
     func testErrorMapping() async {
         let statuses: [(Int, APIError)] = [(401, .unauthorized), (404, .notFound), (429, .rateLimited), (500, .server("boom"))]
         for (status, expected) in statuses {

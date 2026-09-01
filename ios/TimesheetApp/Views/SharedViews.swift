@@ -38,11 +38,3 @@ struct EmptyStateView: View {
         ContentUnavailableView(title, systemImage: systemImage, description: Text(description))
     }
 }
-
-private extension View {
-    func formCard() -> some View {
-        self
-            .textFieldStyle(.roundedBorder)
-            .padding(.horizontal)
-    }
-}

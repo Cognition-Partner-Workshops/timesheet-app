@@ -63,6 +63,14 @@ final class ViewModelTests: XCTestCase {
         await model.load()
         XCTAssertEqual(model.state, .failed("load failed"))
     }
+
+    func testWorkEntryValidation() {
+        XCTAssertNil(WorkEntryValidator.validate(clientID: 1, hours: 7.5))
+        XCTAssertNil(WorkEntryValidator.validate(clientID: 1, hours: 1.25))
+        XCTAssertNotNil(WorkEntryValidator.validate(clientID: 1, hours: 0))
+        XCTAssertNotNil(WorkEntryValidator.validate(clientID: 1, hours: 24.5))
+        XCTAssertNotNil(WorkEntryValidator.validate(clientID: 1, hours: 1.234))
+    }
 }
 
 private extension StubAPIClient {

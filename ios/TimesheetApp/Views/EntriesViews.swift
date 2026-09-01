@@ -2,7 +2,7 @@ import SwiftUI
 
 struct EntriesListView: View {
     @ObservedObject var model: EntriesViewModel
-    let clients: [Client]
+    @ObservedObject var clientsModel: ClientsViewModel
     @State private var showingForm = false
     @State private var editingEntry: WorkEntry?
 
@@ -34,7 +34,7 @@ struct EntriesListView: View {
             ToolbarItem(placement: .topBarLeading) {
                 Menu {
                     Button("All clients") { model.clientFilter = nil; Task { await model.load() } }
-                    ForEach(clients) { client in
+                    ForEach(clientsModel.clients) { client in
                         Button(client.name) { model.clientFilter = client.id; Task { await model.load() } }
                     }
                 } label: {
@@ -53,12 +53,17 @@ struct EntriesListView: View {
             }
         }
         .refreshable { await model.load() }
-        .task { await model.load() }
+        .task {
+            if clientsModel.clients.isEmpty {
+                await clientsModel.load()
+            }
+            await model.load()
+        }
         .sheet(isPresented: $showingForm) {
-            WorkEntryFormView(clients: clients) { payload in await model.save(id: nil, payload: payload) }
+            WorkEntryFormView(clients: clientsModel.clients) { payload in await model.save(id: nil, payload: payload) }
         }
         .sheet(item: $editingEntry) { entry in
-            WorkEntryFormView(clients: clients, entry: entry) { payload in await model.save(id: entry.id, payload: payload) }
+            WorkEntryFormView(clients: clientsModel.clients, entry: entry) { payload in await model.save(id: entry.id, payload: payload) }
         }
     }
 
@@ -141,12 +146,12 @@ struct WorkEntryFormView: View {
     }
 
     private func save() {
-        guard let clientID, let parsedHours, parsedHours > 0, parsedHours <= 24 else {
-            validationMessage = "Choose a client and enter hours greater than 0 and no more than 24."
+        guard let clientID, let parsedHours else {
+            validationMessage = WorkEntryValidator.validate(clientID: clientID, hours: parsedHours)
             return
         }
-        guard parsedHours * 100 == parsedHours.rounded() * 100 else {
-            validationMessage = "Hours can have at most two decimal places."
+        if let validationMessage = WorkEntryValidator.validate(clientID: clientID, hours: parsedHours) {
+            self.validationMessage = validationMessage
             return
         }
         validationMessage = nil
@@ -156,5 +161,18 @@ struct WorkEntryFormView: View {
             isSaving = false
             dismiss()
         }
+    }
+}
+
+enum WorkEntryValidator {
+    static func validate(clientID: Int?, hours: Double?) -> String? {
+        guard let clientID, clientID > 0, let hours, hours > 0, hours <= 24 else {
+            return "Choose a client and enter hours greater than 0 and no more than 24."
+        }
+        let scaledHours = hours * 100
+        guard abs(scaledHours.rounded() - scaledHours) < 0.0001 else {
+            return "Hours can have at most two decimal places."
+        }
+        return nil
     }
 }
