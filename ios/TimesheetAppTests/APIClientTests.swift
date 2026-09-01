@@ -115,6 +115,51 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(DateCoding.encode(full[0].date), "2026-09-01")
     }
 
+    func testDecodesEpochMillisecondWorkEntryDate() async throws {
+        MockURLProtocol.requestHandler = { _ in
+            Self.response(status: 200, body: #"{"workEntries":[{"id":1,"client_id":1,"hours":1,"date":1788220800000}]}"#)
+        }
+        let entry = try await client.workEntries(clientId: nil)[0]
+        XCTAssertEqual(DateCoding.encode(entry.date), "2026-09-01")
+        XCTAssertEqual(Calendar.current.component(.year, from: entry.date), 2026)
+        XCTAssertEqual(Calendar.current.component(.month, from: entry.date), 9)
+        XCTAssertEqual(Calendar.current.component(.day, from: entry.date), 1)
+    }
+
+    func testDecodesEpochMillisecondReportDate() async throws {
+        MockURLProtocol.requestHandler = { _ in
+            Self.response(status: 200, body: #"{"client":{"id":1,"name":"Acme"},"workEntries":[{"id":2,"hours":2.5,"date":1788220800000}],"totalHours":2.5,"entryCount":1}"#)
+        }
+        let entry = try await client.report(clientId: 1).workEntries[0]
+        XCTAssertEqual(DateCoding.encode(entry.date), "2026-09-01")
+        XCTAssertEqual(Calendar.current.component(.year, from: entry.date), 2026)
+        XCTAssertEqual(Calendar.current.component(.month, from: entry.date), 9)
+        XCTAssertEqual(Calendar.current.component(.day, from: entry.date), 1)
+    }
+
+    func testDecodesISODateToSameLocalCalendarDay() async throws {
+        MockURLProtocol.requestHandler = { _ in
+            Self.response(status: 200, body: #"{"workEntries":[{"id":1,"client_id":1,"hours":1,"date":"2026-09-01T00:00:00.000Z"}]}"#)
+        }
+        let entry = try await client.workEntries(clientId: nil)[0]
+        XCTAssertEqual(DateCoding.encode(entry.date), "2026-09-01")
+        XCTAssertEqual(Calendar.current.component(.day, from: entry.date), 1)
+    }
+
+    func testMalformedDateSurfacesDecodingError() async {
+        MockURLProtocol.requestHandler = { _ in
+            Self.response(status: 200, body: #"{"workEntries":[{"id":1,"client_id":1,"hours":1,"date":true}]}"#)
+        }
+        do {
+            _ = try await client.workEntries(clientId: nil)
+            XCTFail("Expected a decoding error")
+        } catch APIError.decoding {
+            return
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
     func testDateOnlyRoundTripsInCurrentCalendar() throws {
         let decoded = try DateCoding.decode("2026-09-01")
         XCTAssertEqual(DateCoding.encode(decoded), "2026-09-01")

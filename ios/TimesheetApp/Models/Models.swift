@@ -1,6 +1,12 @@
 import Foundation
 
 enum DateCoding {
+    private static let utcCalendar: Calendar = {
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+        return calendar
+    }()
+
     static let dateOnlyFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .iso8601)
@@ -16,18 +22,43 @@ enum DateCoding {
         return formatter
     }()
 
+    private static func localMidnight(for date: Date) -> Date {
+        let components = utcCalendar.dateComponents([.year, .month, .day], from: date)
+        return Calendar.current.date(from: components) ?? date
+    }
+
     static func decode(_ value: String) throws -> Date {
         if let date = dateOnlyFormatter.date(from: value) {
             return date
         }
         if let date = isoFormatter.date(from: value) {
-            return date
+            return localMidnight(for: date)
         }
         let fallback = ISO8601DateFormatter()
         if let date = fallback.date(from: value) {
-            return date
+            return localMidnight(for: date)
         }
         throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Invalid date: \(value)"))
+    }
+
+    static func decode(epochMilliseconds: Double) -> Date {
+        localMidnight(for: Date(timeIntervalSince1970: epochMilliseconds / 1000))
+    }
+
+    static func decodeDate<K: CodingKey>(
+        from container: KeyedDecodingContainer<K>,
+        forKey key: K
+    ) throws -> Date {
+        if let string = try? container.decode(String.self, forKey: key) {
+            return try decode(string)
+        }
+        if let epochMilliseconds = try? container.decode(Double.self, forKey: key) {
+            return decode(epochMilliseconds: epochMilliseconds)
+        }
+        throw DecodingError.dataCorrupted(.init(
+            codingPath: container.codingPath + [key],
+            debugDescription: "Invalid date value."
+        ))
     }
 
     static func encode(_ date: Date) -> String {
@@ -106,8 +137,7 @@ struct WorkEntry: Codable, Identifiable, Hashable, Sendable {
         clientID = try container.decodeIfPresent(Int.self, forKey: .clientID)
         hours = try container.decode(Double.self, forKey: .hours)
         description = try container.decodeIfPresent(String.self, forKey: .description)
-        let dateValue = try container.decode(String.self, forKey: .date)
-        date = try DateCoding.decode(dateValue)
+        date = try DateCoding.decodeDate(from: container, forKey: .date)
         createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
         updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
         clientName = try container.decodeIfPresent(String.self, forKey: .clientName)
@@ -185,7 +215,7 @@ struct ClientReport: Codable, Hashable, Sendable {
             id = try container.decode(Int.self, forKey: .id)
             hours = try container.decode(Double.self, forKey: .hours)
             description = try container.decodeIfPresent(String.self, forKey: .description)
-            date = try DateCoding.decode(container.decode(String.self, forKey: .date))
+            date = try DateCoding.decodeDate(from: container, forKey: .date)
             createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
             updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
         }

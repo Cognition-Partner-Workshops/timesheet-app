@@ -3,15 +3,19 @@ import SwiftUI
 
 @MainActor
 final class SessionStore: ObservableObject {
-    @AppStorage("timesheet.userEmail") var email = ""
-    @AppStorage("timesheet.baseURL") var baseURLString = "http://localhost:3001"
+    @Published private(set) var email: String
+    @Published private(set) var baseURLString: String
     @Published private(set) var isSigningIn = false
     @Published var errorMessage: String?
 
     @Published private(set) var apiClient: any APIClient
 
     init(apiClient: (any APIClient)? = nil) {
-        self.apiClient = apiClient ?? Self.makeClient(baseURLString: UserDefaults.standard.string(forKey: "timesheet.baseURL") ?? "http://localhost:3001")
+        let defaults = UserDefaults.standard
+        let storedBaseURL = defaults.string(forKey: "timesheet.baseURL") ?? "http://localhost:3001"
+        email = defaults.string(forKey: "timesheet.userEmail") ?? ""
+        baseURLString = storedBaseURL
+        self.apiClient = apiClient ?? Self.makeClient(baseURLString: storedBaseURL)
     }
 
     var isSignedIn: Bool { !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -33,6 +37,7 @@ final class SessionStore: ObservableObject {
         do {
             let user = try await apiClient.login(email: normalized)
             email = user.email
+            UserDefaults.standard.set(email, forKey: "timesheet.userEmail")
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -41,6 +46,7 @@ final class SessionStore: ObservableObject {
 
     func updateBaseURL(_ value: String) {
         baseURLString = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        UserDefaults.standard.set(baseURLString, forKey: "timesheet.baseURL")
         if let _ = URL(string: baseURLString) {
             apiClient = Self.makeClient(baseURLString: baseURLString)
         }
@@ -48,6 +54,7 @@ final class SessionStore: ObservableObject {
 
     func signOut() {
         email = ""
+        UserDefaults.standard.set(email, forKey: "timesheet.userEmail")
         errorMessage = nil
     }
 

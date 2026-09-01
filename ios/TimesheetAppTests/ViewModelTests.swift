@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import XCTest
 @testable import TimesheetApp
 
@@ -70,6 +71,35 @@ final class ViewModelTests: XCTestCase {
         XCTAssertNotNil(WorkEntryValidator.validate(clientID: 1, hours: 0))
         XCTAssertNotNil(WorkEntryValidator.validate(clientID: 1, hours: 24.5))
         XCTAssertNotNil(WorkEntryValidator.validate(clientID: 1, hours: 1.234))
+    }
+
+    func testSessionStorePublishesBaseURLUpdates() {
+        let defaults = UserDefaults.standard
+        let previousBaseURL = defaults.string(forKey: "timesheet.baseURL")
+        defer {
+            if let previousBaseURL {
+                defaults.set(previousBaseURL, forKey: "timesheet.baseURL")
+            } else {
+                defaults.removeObject(forKey: "timesheet.baseURL")
+            }
+        }
+
+        let session = SessionStore(apiClient: StubAPIClient())
+        let expectation = expectation(description: "SessionStore publishes base URL changes")
+        var didPublish = false
+        let cancellable = session.objectWillChange.sink {
+            guard !didPublish else { return }
+            didPublish = true
+            expectation.fulfill()
+        }
+
+        session.updateBaseURL("http://example.test:3001")
+
+        wait(for: [expectation], timeout: 1)
+        XCTAssertTrue(didPublish)
+        XCTAssertEqual(session.baseURLString, "http://example.test:3001")
+        XCTAssertEqual(defaults.string(forKey: "timesheet.baseURL"), "http://example.test:3001")
+        _ = cancellable
     }
 }
 
