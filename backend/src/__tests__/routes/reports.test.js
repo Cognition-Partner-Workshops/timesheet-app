@@ -38,6 +38,44 @@ const app = express();
 app.use(express.json());
 app.use('/api/reports', reportRoutes);
 
+/** Mock PDFDocument that ends the response on `end()` so supertest resolves. */
+function mockPdfDocument(startY) {
+  const PDFDocument = require('pdfkit');
+  let doc;
+  PDFDocument.mockImplementationOnce(() => {
+    doc = {
+      fontSize: jest.fn().mockReturnThis(),
+      text: jest.fn().mockReturnThis(),
+      moveDown: jest.fn().mockReturnThis(),
+      moveTo: jest.fn().mockReturnThis(),
+      lineTo: jest.fn().mockReturnThis(),
+      stroke: jest.fn().mockReturnThis(),
+      addPage: jest.fn().mockReturnThis(),
+      pipe: jest.fn((res) => { doc.res = res; }),
+      end: jest.fn(() => doc.res.end()),
+      y: startY
+    };
+    return doc;
+  });
+  return () => doc;
+}
+
+/** App whose `res.download` is replaced by `download(res, cb)` so the callback path can be exercised. */
+function appWithDownload(download) {
+  const downloadApp = express();
+  downloadApp.use((req, res, next) => {
+    res.download = jest.fn((filePath, name, cb) => download(res, cb));
+    next();
+  });
+  downloadApp.use('/api/reports', reportRoutes);
+  return downloadApp;
+}
+
+function mockClientWithEntries(mockDb, entries) {
+  mockDb.get.mockImplementation((query, params, callback) => callback(null, { id: 1, name: 'Test Client' }));
+  mockDb.all.mockImplementation((query, params, callback) => callback(null, entries));
+}
+
 describe('Report Routes', () => {
   let mockDb;
 
@@ -328,18 +366,11 @@ describe('Report Routes', () => {
     });
 
     test('should download the CSV and delete the temp file afterwards', async () => {
-      const downloadApp = express();
-      downloadApp.use((req, res, next) => {
-        res.download = jest.fn((filePath, name, cb) => {
-          res.status(200).send('csv');
-          cb(null);
-        });
-        next();
+      const downloadApp = appWithDownload((res, cb) => {
+        res.status(200).send('csv');
+        cb(null);
       });
-      downloadApp.use('/api/reports', reportRoutes);
-
-      mockDb.get.mockImplementation((query, params, callback) => callback(null, { id: 1, name: 'Test Client' }));
-      mockDb.all.mockImplementation((query, params, callback) => callback(null, []));
+      mockClientWithEntries(mockDb, []);
 
       const csvWriter = require('csv-writer');
       const writeRecords = jest.fn().mockResolvedValue(undefined);
@@ -355,18 +386,11 @@ describe('Report Routes', () => {
     });
 
     test('should still delete the temp file when sending the download fails', async () => {
-      const downloadApp = express();
-      downloadApp.use((req, res, next) => {
-        res.download = jest.fn((filePath, name, cb) => {
-          res.status(500).end();
-          cb(new Error('socket closed'));
-        });
-        next();
+      const downloadApp = appWithDownload((res, cb) => {
+        res.status(500).end();
+        cb(new Error('socket closed'));
       });
-      downloadApp.use('/api/reports', reportRoutes);
-
-      mockDb.get.mockImplementation((query, params, callback) => callback(null, { id: 1, name: 'Test Client' }));
-      mockDb.all.mockImplementation((query, params, callback) => callback(null, []));
+      mockClientWithEntries(mockDb, []);
       fs.unlink.mockImplementation((filePath, cb) => cb(new Error('unlink failed')));
 
       const csvWriter = require('csv-writer');
@@ -475,23 +499,7 @@ describe('Report Routes', () => {
     });
 
     test('should stream a PDF with attachment headers and render every entry', async () => {
-      const PDFDocument = require('pdfkit');
-      let doc;
-      PDFDocument.mockImplementationOnce(() => {
-        doc = {
-          fontSize: jest.fn().mockReturnThis(),
-          text: jest.fn().mockReturnThis(),
-          moveDown: jest.fn().mockReturnThis(),
-          moveTo: jest.fn().mockReturnThis(),
-          lineTo: jest.fn().mockReturnThis(),
-          stroke: jest.fn().mockReturnThis(),
-          addPage: jest.fn().mockReturnThis(),
-          pipe: jest.fn((res) => { doc.res = res; }),
-          end: jest.fn(() => doc.res.end('%PDF')),
-          y: 100
-        };
-        return doc;
-      });
+      const getDoc = mockPdfDocument(100);
 
       const entries = Array.from({ length: 6 }, (_, i) => ({
         date: `2024-01-0${i + 1}`, hours: 1.5, description: i === 0 ? null : `Task ${i}`, created_at: '2024-01-01'
@@ -500,6 +508,7 @@ describe('Report Routes', () => {
       mockDb.all.mockImplementation((query, params, callback) => callback(null, entries));
 
       const response = await request(app).get('/api/reports/export/pdf/1');
+      const doc = getDoc();
 
       expect(response.status).toBe(200);
       expect(response.headers['content-type']).toBe('application/pdf');
@@ -516,33 +525,15 @@ describe('Report Routes', () => {
     });
 
     test('should start a new page when the cursor passes the page break', async () => {
-      const PDFDocument = require('pdfkit');
-      let doc;
-      PDFDocument.mockImplementationOnce(() => {
-        doc = {
-          fontSize: jest.fn().mockReturnThis(),
-          text: jest.fn().mockReturnThis(),
-          moveDown: jest.fn().mockReturnThis(),
-          moveTo: jest.fn().mockReturnThis(),
-          lineTo: jest.fn().mockReturnThis(),
-          stroke: jest.fn().mockReturnThis(),
-          addPage: jest.fn().mockReturnThis(),
-          pipe: jest.fn((res) => { doc.res = res; }),
-          end: jest.fn(() => doc.res.end()),
-          y: 750
-        };
-        return doc;
-      });
-
-      mockDb.get.mockImplementation((query, params, callback) => callback(null, { id: 1, name: 'Test Client' }));
-      mockDb.all.mockImplementation((query, params, callback) => callback(null, [
+      const getDoc = mockPdfDocument(750);
+      mockClientWithEntries(mockDb, [
         { date: '2024-01-01', hours: 2, description: 'Work', created_at: '2024-01-01' }
-      ]));
+      ]);
 
       const response = await request(app).get('/api/reports/export/pdf/1');
 
       expect(response.status).toBe(200);
-      expect(doc.addPage).toHaveBeenCalledTimes(1);
+      expect(getDoc().addPage).toHaveBeenCalledTimes(1);
     });
 
     test('should return 404 when the client does not belong to the user', async () => {
