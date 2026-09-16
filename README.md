@@ -16,6 +16,11 @@ A full-stack web application for tracking and reporting employee hourly work acr
 - Anyone with a valid email can create an account and log in
 - Consider integrating with company SSO for production use
 
+## iOS app
+
+A native SwiftUI client lives in [`ios/`](ios/README.md). It uses the same API and
+supports sign-in, clients, time entries, reports, and CSV/PDF export.
+
 ## Features
 
 - ✅ User authentication (email-based with JWT tokens)
