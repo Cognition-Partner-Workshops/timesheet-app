@@ -68,13 +68,14 @@ struct ReportDetailView: View {
 
             if !report.workEntries.isEmpty {
                 Section("Hours by day") {
-                    Chart(dailyTotals(report)) { item in
+                    let totals = dailyTotals(report)
+                    Chart(totals) { item in
                         BarMark(x: .value("Day", item.day, unit: .day), y: .value("Hours", item.hours))
                             .foregroundStyle(Color.accentColor.gradient)
                             .cornerRadius(3)
                     }
                     .chartXAxis {
-                        AxisMarks(values: .automatic(desiredCount: 5)) { _ in
+                        AxisMarks(values: .stride(by: .day, count: axisStride(for: totals))) { _ in
                             AxisGridLine()
                             AxisValueLabel(format: .dateTime.month(.abbreviated).day())
                         }
@@ -100,6 +101,13 @@ struct ReportDetailView: View {
         }
         .listStyle(.insetGrouped)
         .refreshable { await load() }
+    }
+
+    /// One label per day, thinned so roughly five labels fit however wide the date range is.
+    private func axisStride(for totals: [DailyHours]) -> Int {
+        guard let first = totals.first?.day, let last = totals.last?.day else { return 1 }
+        let span = (Calendar.current.dateComponents([.day], from: first, to: last).day ?? 0) + 1
+        return max(1, Int((Double(span) / 5).rounded(.up)))
     }
 
     private func dailyTotals(_ report: ClientReport) -> [DailyHours] {
