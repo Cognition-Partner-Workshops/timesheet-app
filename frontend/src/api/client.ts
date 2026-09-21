@@ -1,4 +1,5 @@
 import axios, { type AxiosInstance, type AxiosResponse } from 'axios';
+import { USER_EMAIL_STORAGE_KEY } from '../constants';
 
 // Use empty string to make requests relative to the current origin
 // Vite proxy will forward /api requests to the backend
@@ -19,7 +20,7 @@ class ApiClient {
     // Request interceptor to add email header
     this.client.interceptors.request.use(
       (config) => {
-        const userEmail = localStorage.getItem('userEmail');
+        const userEmail = localStorage.getItem(USER_EMAIL_STORAGE_KEY);
         if (userEmail) {
           config.headers['x-user-email'] = userEmail;
         }
@@ -36,7 +37,7 @@ class ApiClient {
       (error) => {
         if (error.response?.status === 401) {
           // Clear stored email on auth error
-          localStorage.removeItem('userEmail');
+          localStorage.removeItem(USER_EMAIL_STORAGE_KEY);
           window.location.href = '/login';
         }
         return Promise.reject(error);
