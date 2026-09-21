@@ -26,7 +26,21 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
-const drawerWidth = 240;
+const DRAWER_WIDTH = 240;
+const APP_TITLE = 'Time Tracker';
+
+interface MenuItem {
+  text: string;
+  icon: ReactNode;
+  path: string;
+}
+
+const MENU_ITEMS: MenuItem[] = [
+  { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
+  { text: 'Clients', icon: <BusinessIcon />, path: '/clients' },
+  { text: 'Work Entries', icon: <AssignmentIcon />, path: '/work-entries' },
+  { text: 'Reports', icon: <AssessmentIcon />, path: '/reports' },
+];
 
 interface LayoutProps {
   children: ReactNode;
@@ -42,22 +56,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     setMobileOpen(!mobileOpen);
   };
 
-  const menuItems = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-    { text: 'Clients', icon: <BusinessIcon />, path: '/clients' },
-    { text: 'Work Entries', icon: <AssignmentIcon />, path: '/work-entries' },
-    { text: 'Reports', icon: <AssessmentIcon />, path: '/reports' },
-  ];
+  const pageTitle = MENU_ITEMS.find((item) => item.path === location.pathname)?.text || APP_TITLE;
 
   const drawer = (
     <div>
       <Toolbar>
         <Typography variant="h6" noWrap component="div">
-          Time Tracker
+          {APP_TITLE}
         </Typography>
       </Toolbar>
       <List>
-        {menuItems.map((item) => (
+        {MENU_ITEMS.map((item) => (
           <ListItem key={item.text} disablePadding>
             <ListItemButton
               selected={location.pathname === item.path}
@@ -78,8 +87,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <AppBar
         position="fixed"
         sx={{
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
-          ml: { sm: `${drawerWidth}px` },
+          width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` },
+          ml: { sm: `${DRAWER_WIDTH}px` },
         }}
       >
         <Toolbar>
@@ -93,7 +102,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            {menuItems.find(item => item.path === location.pathname)?.text || 'Time Tracker'}
+            {pageTitle}
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Typography variant="body2">{user?.email}</Typography>
@@ -113,8 +122,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </AppBar>
       <Box
         component="nav"
-        sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
-        aria-label="mailbox folders"
+        sx={{ width: { sm: DRAWER_WIDTH }, flexShrink: { sm: 0 } }}
+        aria-label="main navigation"
       >
         <Drawer
           variant="temporary"
@@ -125,7 +134,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           }}
           sx={{
             display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: DRAWER_WIDTH },
           }}
         >
           {drawer}
@@ -134,7 +143,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           variant="permanent"
           sx={{
             display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: DRAWER_WIDTH },
           }}
           open
         >
@@ -146,7 +155,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         sx={{
           flexGrow: 1,
           p: 3,
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
+          width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` },
         }}
       >
         <Toolbar />
