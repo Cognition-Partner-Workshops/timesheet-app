@@ -34,6 +34,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import apiClient from '../api/client';
+import QueryErrorAlert from '../components/QueryErrorAlert';
 import { type WorkEntry } from '../types/api';
 
 const WorkEntriesPage: React.FC = () => {
@@ -49,12 +50,12 @@ const WorkEntriesPage: React.FC = () => {
 
   const queryClient = useQueryClient();
 
-  const { data: workEntriesData, isLoading: entriesLoading } = useQuery({
+  const { data: workEntriesData, isLoading: entriesLoading, error: entriesError } = useQuery({
     queryKey: ['workEntries'],
     queryFn: () => apiClient.getWorkEntries(),
   });
 
-  const { data: clientsData, isLoading: clientsLoading } = useQuery({
+  const { data: clientsData, isLoading: clientsLoading, error: clientsError } = useQuery({
     queryKey: ['clients'],
     queryFn: () => apiClient.getClients(),
   });
@@ -199,6 +200,8 @@ const WorkEntriesPage: React.FC = () => {
             {error}
           </Alert>
         )}
+        <QueryErrorAlert error={clientsError} message="Failed to load clients" />
+        <QueryErrorAlert error={entriesError} message="Failed to load work entries" />
 
         {clients.length === 0 ? (
           <Paper sx={{ p: 3, textAlign: 'center' }}>

@@ -28,6 +28,7 @@ import {
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
+import QueryErrorAlert from '../components/QueryErrorAlert';
 import { type Client } from '../types/api';
 
 const ClientsPage: React.FC = () => {
@@ -38,7 +39,7 @@ const ClientsPage: React.FC = () => {
 
   const queryClient = useQueryClient();
 
-  const { data: clientsData, isLoading } = useQuery({
+  const { data: clientsData, isLoading, error: clientsError } = useQuery({
     queryKey: ['clients'],
     queryFn: () => apiClient.getClients(),
   });
@@ -193,6 +194,7 @@ const ClientsPage: React.FC = () => {
           {error}
         </Alert>
       )}
+      <QueryErrorAlert error={clientsError} message="Failed to load clients" />
 
       <Paper>
         <TableContainer>

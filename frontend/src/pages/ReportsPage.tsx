@@ -29,18 +29,19 @@ import {
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
+import QueryErrorAlert from '../components/QueryErrorAlert';
 import { type ClientReport } from '../types/api';
 
 const ReportsPage: React.FC = () => {
   const [selectedClientId, setSelectedClientId] = useState<number>(0);
   const [error, setError] = useState('');
 
-  const { data: clientsData, isLoading: clientsLoading } = useQuery({
+  const { data: clientsData, isLoading: clientsLoading, error: clientsError } = useQuery({
     queryKey: ['clients'],
     queryFn: () => apiClient.getClients(),
   });
 
-  const { data: reportData, isLoading: reportLoading } = useQuery({
+  const { data: reportData, isLoading: reportLoading, error: reportError } = useQuery({
     queryKey: ['clientReport', selectedClientId],
     queryFn: () => apiClient.getClientReport(selectedClientId),
     enabled: selectedClientId > 0,
@@ -110,6 +111,8 @@ const ReportsPage: React.FC = () => {
           {error}
         </Alert>
       )}
+      <QueryErrorAlert error={clientsError} message="Failed to load clients" />
+      <QueryErrorAlert error={reportError} message="Failed to load report" />
 
       {clients.length === 0 ? (
         <Paper sx={{ p: 3, textAlign: 'center' }}>
