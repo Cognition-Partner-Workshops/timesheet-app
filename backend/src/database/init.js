@@ -87,13 +87,7 @@ async function initializeDatabase() {
   });
 }
 
-/**
- * Closes the shared connection. Safe to call concurrently or repeatedly:
- * callers that arrive while a close is in flight wait for it to finish, and
- * calls made after the connection is closed (or never opened) resolve at once.
- * Close errors are logged rather than rejected so shutdown always completes.
- * @returns {Promise<void>}
- */
+/** Closes the shared connection. Idempotent and concurrency-safe: callers wait for an in-flight close or resolve at once; close errors are logged, not rejected. */
 function closeDatabase() {
   return new Promise((resolve, reject) => {
     if (isClosed) {
