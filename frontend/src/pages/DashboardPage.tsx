@@ -17,16 +17,17 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
+import QueryErrorAlert from '../components/QueryErrorAlert';
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
 
-  const { data: clientsData } = useQuery({
+  const { data: clientsData, error: clientsError } = useQuery({
     queryKey: ['clients'],
     queryFn: () => apiClient.getClients(),
   });
 
-  const { data: workEntriesData } = useQuery({
+  const { data: workEntriesData, error: workEntriesError } = useQuery({
     queryKey: ['workEntries'],
     queryFn: () => apiClient.getWorkEntries(),
   });
@@ -67,10 +68,12 @@ const DashboardPage: React.FC = () => {
         Dashboard
       </Typography>
 
+      <QueryErrorAlert error={clientsError} message="Failed to load clients" />
+      <QueryErrorAlert error={workEntriesError} message="Failed to load work entries" />
+
       <Grid container spacing={3} sx={{ mb: 4 }}>
         {statsCards.map((stat, index) => (
-          // @ts-expect-error - MUI Grid item prop type issue
-          <Grid item xs={12} sm={6} md={4} key={index}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }} key={index}>
             <Card
               sx={{
                 cursor: 'pointer',
@@ -110,8 +113,7 @@ const DashboardPage: React.FC = () => {
       </Grid>
 
       <Grid container spacing={3}>
-        {/* @ts-expect-error - MUI Grid item prop type issue */}
-        <Grid item xs={12} md={8}>
+        <Grid size={{ xs: 12, md: 8 }}>
           <Paper sx={{ p: 3 }}>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} gap={3}>
               <Typography variant="h6">Recent Work Entries</Typography>
@@ -144,8 +146,7 @@ const DashboardPage: React.FC = () => {
           </Paper>
         </Grid>
 
-        {/* @ts-expect-error - MUI Grid item prop type issue */}
-        <Grid item xs={12} md={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" mb={2}>
               Quick Actions

@@ -142,6 +142,41 @@ describe('Database Initialization', () => {
 
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
+
+    test('should wait for an in-progress close before resolving concurrent callers', async () => {
+      const db = getDatabase();
+      db.close.mockImplementation((callback) => setTimeout(() => callback(null), 30));
+
+      const firstClose = closeDatabase();
+      const secondClose = closeDatabase();
+
+      await expect(Promise.all([firstClose, secondClose])).resolves.toEqual([undefined, undefined]);
+      expect(db.close).toHaveBeenCalledTimes(1);
+    });
+
+    test('should resolve without closing when no connection has been opened', async () => {
+      jest.resetModules();
+      const { closeDatabase: closeFreshDatabase } = require('../../database/init');
+      const freshSqlite = require('sqlite3');
+
+      await expect(closeFreshDatabase()).resolves.toBeUndefined();
+
+      // verbose() runs at module load; the connection itself is only opened via Database()
+      const { Database: freshDatabaseCtor } = freshSqlite.verbose.mock.results[0].value;
+      expect(freshDatabaseCtor).not.toHaveBeenCalled();
+      expect(consoleLogSpy).not.toHaveBeenCalledWith('Database connection closed');
+    });
+
+    test('should open a new connection after the previous one was closed', async () => {
+      const db = getDatabase();
+      db.close.mockImplementation((callback) => callback(null));
+      await closeDatabase();
+
+      const reopened = getDatabase();
+
+      expect(reopened).toBeDefined();
+      expect(consoleLogSpy).toHaveBeenCalledWith('Connected to SQLite in-memory database');
+    });
   });
 
   describe('Database Schema', () => {

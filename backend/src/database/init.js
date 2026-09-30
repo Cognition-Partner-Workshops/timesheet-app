@@ -5,6 +5,11 @@ let db = null;
 let isClosing = false;
 let isClosed = false;
 
+/**
+ * Returns the shared SQLite connection, opening a new in-memory database on
+ * first use (or after the previous connection was closed).
+ * @returns {import('sqlite3').Database}
+ */
 function getDatabase() {
   if (!db) {
     // Reset state when creating a new database connection
@@ -22,6 +27,10 @@ function getDatabase() {
   return db;
 }
 
+/**
+ * Creates the application tables and indexes if they do not already exist.
+ * @returns {Promise<void>}
+ */
 async function initializeDatabase() {
   const database = getDatabase();
   
@@ -78,6 +87,7 @@ async function initializeDatabase() {
   });
 }
 
+/** Closes the shared connection. Idempotent and concurrency-safe: callers wait for an in-flight close or resolve at once; close errors are logged, not rejected. */
 function closeDatabase() {
   return new Promise((resolve, reject) => {
     if (isClosed) {
