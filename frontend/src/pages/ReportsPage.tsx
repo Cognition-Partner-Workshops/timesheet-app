@@ -177,7 +177,7 @@ const ReportsPage: React.FC = () => {
           {selectedClient && report && (
             <>
                 <Grid container spacing={3} sx={{ mb: 3 }}>
-                  <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                  <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <Card>
                     <CardContent>
                       <Typography color="textSecondary" gutterBottom>
@@ -189,7 +189,7 @@ const ReportsPage: React.FC = () => {
                     </CardContent>
                   </Card>
                 </Grid>
-                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                   <Card>
                     <CardContent>
                       <Typography color="textSecondary" gutterBottom>
@@ -201,7 +201,7 @@ const ReportsPage: React.FC = () => {
                     </CardContent>
                   </Card>
                 </Grid>
-                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                   <Card>
                     <CardContent>
                       <Typography color="textSecondary" gutterBottom>
@@ -209,6 +209,18 @@ const ReportsPage: React.FC = () => {
                       </Typography>
                       <Typography variant="h4" component="div">
                         {report.entryCount > 0 ? (report.totalHours / report.entryCount).toFixed(2) : '0.00'}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                  <Card>
+                    <CardContent>
+                      <Typography color="textSecondary" gutterBottom>
+                        Total Billed
+                      </Typography>
+                      <Typography variant="h4" component="div">
+                        {(report.totalAmount ?? 0).toFixed(2)}
                       </Typography>
                     </CardContent>
                   </Card>
@@ -222,6 +234,7 @@ const ReportsPage: React.FC = () => {
                       <TableRow>
                         <TableCell>Date</TableCell>
                         <TableCell>Hours</TableCell>
+                        <TableCell>Amount</TableCell>
                         <TableCell>Description</TableCell>
                         <TableCell>Created</TableCell>
                       </TableRow>
@@ -243,6 +256,11 @@ const ReportsPage: React.FC = () => {
                               />
                             </TableCell>
                             <TableCell>
+                              <Typography variant="body2">
+                                {(entry.amount ?? 0).toFixed(2)}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
                               {entry.description ? (
                                 <Typography variant="body2" color="text.secondary">
                                   {entry.description}
@@ -260,7 +278,7 @@ const ReportsPage: React.FC = () => {
                         ))
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={4} align="center">
+                          <TableCell colSpan={5} align="center">
                             <Typography color="text.secondary" sx={{ py: 3 }}>
                               No work entries found for this client.
                             </Typography>
