@@ -1,0 +1,72 @@
+name: TimesheetApp
+options:
+  bundleIdPrefix: com.cognition.timesheet
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "16.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: ""
+    CODE_SIGNING_REQUIRED: NO
+    CODE_SIGNING_ALLOWED: NO
+targets:
+  TimesheetApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: TimesheetApp
+    info:
+      path: TimesheetApp/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Timesheet
+        CFBundleShortVersionString: "1.0.0"
+        CFBundleVersion: "1"
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        ITSAppUsesNonExemptEncryption: false
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cognition.timesheet.ios
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        SWIFT_EMIT_LOC_STRINGS: YES
+  TimesheetAppTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: TimesheetAppTests
+    dependencies:
+      - target: TimesheetApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cognition.timesheet.ios.tests
+schemes:
+  TimesheetApp:
+    build:
+      targets:
+        TimesheetApp: all
+        TimesheetAppTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: true
+      targets:
+        - TimesheetAppTests
