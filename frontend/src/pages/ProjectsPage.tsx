@@ -82,7 +82,12 @@ const ProjectsPage: React.FC = () => {
   const { data: projectsData, isLoading: projectsLoading } = useProjects(
     statusFilter ? { status: statusFilter } : undefined
   );
-  const { data: clientsData, isLoading: clientsLoading } = useClients();
+  const {
+    data: clientsData,
+    isLoading: clientsLoading,
+    isError: clientsError,
+    refetch: refetchClients,
+  } = useClients();
 
   const createMutation = useCreateProject();
   const updateMutation = useUpdateProject();
@@ -90,6 +95,7 @@ const ProjectsPage: React.FC = () => {
 
   const projects = projectsData?.projects || [];
   const clients = clientsData?.clients || [];
+  const hasNoClients = clientsData !== undefined && clients.length === 0;
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
   const handleOpen = (project?: Project) => {
@@ -212,7 +218,21 @@ const ProjectsPage: React.FC = () => {
           </Box>
         </Box>
 
-        {clients.length === 0 && (
+        {clientsError && !clientsData && (
+          <Alert
+            severity="error"
+            sx={{ mb: 2 }}
+            action={
+              <Button color="inherit" size="small" onClick={() => refetchClients()}>
+                Retry
+              </Button>
+            }
+          >
+            Failed to load clients. Projects can't be added until clients load.
+          </Alert>
+        )}
+
+        {hasNoClients && (
           <Alert severity="info" sx={{ mb: 2 }}>
             You need to create at least one client before adding projects.
           </Alert>

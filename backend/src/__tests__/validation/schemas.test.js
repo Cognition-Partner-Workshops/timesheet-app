@@ -354,6 +354,14 @@ describe('Validation Schemas', () => {
       expect(error).toBeDefined();
     });
 
+    test.each(['2024-01-15T00:30:00Z', '2024-02-30', '2023-13-01'])(
+      'should reject non-calendar-date startDate %s',
+      (startDate) => {
+        expect(projectSchema.validate({ ...valid, startDate }).error).toBeDefined();
+        expect(updateProjectSchema.validate({ startDate }).error).toBeDefined();
+      }
+    );
+
     test('should reject invalid startDate', () => {
       const { error } = projectSchema.validate({ ...valid, startDate: '15/01/2024' });
       expect(error).toBeDefined();

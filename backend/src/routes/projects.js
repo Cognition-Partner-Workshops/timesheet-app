@@ -9,7 +9,7 @@ const PROJECT_SELECT = `
   SELECT p.id, p.name, p.description, p.client_id, p.start_date, p.status,
          p.created_at, p.updated_at, c.name as client_name
   FROM projects p
-  JOIN clients c ON p.client_id = c.id
+  JOIN clients c ON p.client_id = c.id AND c.user_email = p.user_email
 `;
 
 const UPDATABLE_COLUMNS = {
@@ -25,9 +25,16 @@ function sendServerError(res, err, message = 'Internal server error') {
   return res.status(500).json({ error: message });
 }
 
+// Returns a positive safe integer only if the whole string is decimal digits, else null
+function parsePositiveId(raw) {
+  if (typeof raw !== 'string' || !/^\d+$/.test(raw)) return null;
+  const id = Number(raw);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
 function parseProjectId(req, res) {
-  const projectId = parseInt(req.params.id);
-  if (isNaN(projectId)) {
+  const projectId = parsePositiveId(req.params.id);
+  if (projectId === null) {
     res.status(400).json({ error: 'Invalid project ID' });
     return null;
   }
@@ -81,8 +88,8 @@ router.get('/', (req, res) => {
   const params = [req.userEmail];
 
   if (clientId) {
-    const clientIdNum = parseInt(clientId);
-    if (isNaN(clientIdNum)) {
+    const clientIdNum = parsePositiveId(clientId);
+    if (clientIdNum === null) {
       return res.status(400).json({ error: 'Invalid client ID' });
     }
     conditions.push('p.client_id = ?');

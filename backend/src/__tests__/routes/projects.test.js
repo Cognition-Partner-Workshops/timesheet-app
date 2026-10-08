@@ -91,8 +91,8 @@ describe('Project Routes', () => {
       expect(params).toEqual(['test@example.com', 3, 'on-hold']);
     });
 
-    test('should return 400 for invalid clientId filter', async () => {
-      const response = await request(app).get('/api/projects?clientId=abc');
+    test.each(['abc', '1abc', '0'])('should return 400 for invalid clientId filter %s', async (clientId) => {
+      const response = await request(app).get(`/api/projects?clientId=${clientId}`);
 
       expectResponse(response, 400, { error: 'Invalid client ID' });
       expect(mockDb.all).not.toHaveBeenCalled();
@@ -124,7 +124,7 @@ describe('Project Routes', () => {
 
       expectResponse(response, 200, { project: mockProject });
       expect(mockDb.get).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE p.id = ? AND p.user_email = ?'),
+        expect.stringMatching(/c\.user_email = p\.user_email[\s\S]*WHERE p\.id = \? AND p\.user_email = \?/),
         [1, 'test@example.com'],
         expect.any(Function)
       );
@@ -419,11 +419,13 @@ describe('Project Routes', () => {
   });
 
   test.each([
-    ['get', undefined],
-    ['put', { name: 'X' }],
-    ['delete', undefined]
-  ])('%s /api/projects/:id should return 400 for non-numeric ID', async (method, body) => {
-    const response = await request(app)[method]('/api/projects/invalid').send(body);
+    ['get', 'invalid', undefined],
+    ['get', '1abc', undefined],
+    ['put', '1abc', { name: 'X' }],
+    ['delete', '1abc', undefined],
+    ['delete', '0', undefined]
+  ])('%s /api/projects/%s should return 400 for invalid ID', async (method, id, body) => {
+    const response = await request(app)[method](`/api/projects/${id}`).send(body);
 
     expectResponse(response, 400, { error: 'Invalid project ID' });
     expect(mockDb.get).not.toHaveBeenCalled();
