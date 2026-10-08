@@ -1,22 +1,40 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fs = require('node:fs');
+const { runMigrations, run } = require('./migrations');
 
 let db = null;
 let isClosing = false;
 let isClosed = false;
+
+function resolveDatabasePath() {
+  if (process.env.DATABASE_PATH) {
+    return process.env.DATABASE_PATH;
+  }
+  if (process.env.NODE_ENV === 'test') {
+    return ':memory:';
+  }
+  return path.join(__dirname, '../../data/timesheet.db');
+}
 
 function getDatabase() {
   if (!db) {
     // Reset state when creating a new database connection
     isClosing = false;
     isClosed = false;
-    // Use in-memory database as specified in requirements
-    db = new sqlite3.Database(':memory:', (err) => {
+
+    const dbPath = resolveDatabasePath();
+    if (dbPath !== ':memory:') {
+      fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+    }
+
+    db = new sqlite3.Database(dbPath, (err) => {
       if (err) {
         console.error('Error opening database:', err);
         throw err;
       }
-      console.log('Connected to SQLite in-memory database');
+      const label = dbPath === ':memory:' ? 'in-memory' : `file: ${dbPath}`;
+      console.log(`Connected to SQLite database (${label})`);
     });
   }
   return db;
@@ -24,58 +42,9 @@ function getDatabase() {
 
 async function initializeDatabase() {
   const database = getDatabase();
-  
-  return new Promise((resolve, reject) => {
-    database.serialize(() => {
-      // Create users table
-      database.run(`
-        CREATE TABLE IF NOT EXISTS users (
-          email TEXT PRIMARY KEY,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-
-      // Create clients table
-      database.run(`
-        CREATE TABLE IF NOT EXISTS clients (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          description TEXT,
-          department TEXT,
-          email TEXT,
-          user_email TEXT NOT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
-        )
-      `);
-
-      // Create work_entries table
-      database.run(`
-        CREATE TABLE IF NOT EXISTS work_entries (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          client_id INTEGER NOT NULL,
-          user_email TEXT NOT NULL,
-          hours DECIMAL(5,2) NOT NULL,
-          description TEXT,
-          date DATE NOT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE,
-          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
-        )
-      `);
-
-      // Create indexes for better performance
-      database.run(`CREATE INDEX IF NOT EXISTS idx_clients_user_email ON clients (user_email)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_client_id ON work_entries (client_id)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_user_email ON work_entries (user_email)`);
-      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_date ON work_entries (date)`);
-
-      console.log('Database tables created successfully');
-      resolve();
-    });
-  });
+  await run(database, 'PRAGMA foreign_keys = ON');
+  await runMigrations(database);
+  console.log('Database tables created successfully');
 }
 
 function closeDatabase() {
@@ -120,6 +89,7 @@ function closeDatabase() {
 
 module.exports = {
   getDatabase,
+  resolveDatabasePath,
   initializeDatabase,
   closeDatabase
 };

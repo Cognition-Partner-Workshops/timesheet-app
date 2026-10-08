@@ -325,4 +325,25 @@ describe('Validation Schemas', () => {
       expect(error).toBeUndefined();
     });
   });
+  describe('Date-only validation', () => {
+    const base = { clientId: 1, hours: 2 };
+
+    test('keeps YYYY-MM-DD dates as strings', () => {
+      const { error, value } = workEntrySchema.validate({ ...base, date: '2024-02-29' });
+      expect(error).toBeUndefined();
+      expect(value.date).toBe('2024-02-29');
+    });
+
+    test.each(['2023-02-29', '2024-13-01', '2024-01-15T00:00:00Z', '15/01/2024', 1705276800000])(
+      'rejects %p', (date) => {
+        const { error } = workEntrySchema.validate({ ...base, date });
+        expect(error).toBeDefined();
+      }
+    );
+
+    test('update schema keeps dates as strings', () => {
+      const { value } = updateWorkEntrySchema.validate({ date: '2024-03-01' });
+      expect(value.date).toBe('2024-03-01');
+    });
+  });
 });
