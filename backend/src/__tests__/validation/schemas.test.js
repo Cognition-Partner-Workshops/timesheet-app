@@ -95,7 +95,7 @@ describe('Validation Schemas', () => {
       expect(error.details[0].type).toBe('string.email');
     });
 
-    test('should reject email longer than 255 characters', () => {
+    test('should reject overlong email (Joi email check fires before max(255))', () => {
       const { error } = clientSchema.validate({
         name: 'Test Client',
         email: `${'a'.repeat(246)}@example.com`
@@ -431,7 +431,7 @@ describe('Validation Schemas', () => {
       expect(error.details[0].type).toBe('string.email');
     });
 
-    test('should reject email longer than 255 characters', () => {
+    test('should reject overlong email (Joi email check fires before max(255))', () => {
       const { error } = updateClientSchema.validate({
         email: `${'a'.repeat(246)}@example.com`
       });
