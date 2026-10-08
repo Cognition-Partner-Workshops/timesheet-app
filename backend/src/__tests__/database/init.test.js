@@ -86,6 +86,7 @@ describe('Database Initialization', () => {
       const runCalls = db.run.mock.calls;
       const queries = runCalls.map(call => call[0]);
       
+      expect(queries[0]).toBe('PRAGMA foreign_keys = ON');
       expect(queries.some(q => q.includes('CREATE TABLE IF NOT EXISTS users'))).toBe(true);
       expect(queries.some(q => q.includes('CREATE TABLE IF NOT EXISTS clients'))).toBe(true);
       expect(queries.some(q => q.includes('CREATE TABLE IF NOT EXISTS projects'))).toBe(true);
