@@ -37,6 +37,74 @@ describe('Validation Schemas', () => {
       expect(error).toBeUndefined();
     });
 
+    test('should accept and trim department', () => {
+      const { error, value } = clientSchema.validate({
+        name: 'Test Client',
+        department: '  Finance  '
+      });
+
+      expect(error).toBeUndefined();
+      expect(value.department).toBe('Finance');
+    });
+
+    test('should allow empty department', () => {
+      const { error } = clientSchema.validate({
+        name: 'Test Client',
+        department: ''
+      });
+
+      expect(error).toBeUndefined();
+    });
+
+    test('should reject department longer than 255 characters', () => {
+      const { error } = clientSchema.validate({
+        name: 'Test Client',
+        department: 'a'.repeat(256)
+      });
+
+      expect(error.details[0].path).toEqual(['department']);
+      expect(error.details[0].type).toBe('string.max');
+    });
+
+    test('should accept and trim email', () => {
+      const { error, value } = clientSchema.validate({
+        name: 'Test Client',
+        email: '  test@example.com  '
+      });
+
+      expect(error).toBeUndefined();
+      expect(value.email).toBe('test@example.com');
+    });
+
+    test('should allow empty email', () => {
+      const { error } = clientSchema.validate({
+        name: 'Test Client',
+        email: ''
+      });
+
+      expect(error).toBeUndefined();
+    });
+
+    test('should reject invalid email', () => {
+      const { error } = clientSchema.validate({
+        name: 'Test Client',
+        email: 'not-an-email'
+      });
+
+      expect(error.details[0].path).toEqual(['email']);
+      expect(error.details[0].type).toBe('string.email');
+    });
+
+    test('should reject email longer than 255 characters', () => {
+      const { error } = clientSchema.validate({
+        name: 'Test Client',
+        email: `${'a'.repeat(246)}@example.com`
+      });
+
+      expect(error.details[0].path).toEqual(['email']);
+      expect(error.details[0].type).toBe('string.email');
+    });
+
     test('should reject missing name', () => {
       const client = {
         description: 'No name'
@@ -44,6 +112,8 @@ describe('Validation Schemas', () => {
 
       const { error } = clientSchema.validate(client);
       expect(error).toBeDefined();
+      expect(error.details[0].path).toEqual(['name']);
+      expect(error.details[0].type).toBe('any.required');
     });
 
     test('should reject empty name', () => {
@@ -54,6 +124,8 @@ describe('Validation Schemas', () => {
 
       const { error } = clientSchema.validate(client);
       expect(error).toBeDefined();
+      expect(error.details[0].path).toEqual(['name']);
+      expect(error.details[0].type).toBe('string.empty');
     });
 
     test('should reject name longer than 255 characters', () => {
@@ -63,6 +135,8 @@ describe('Validation Schemas', () => {
 
       const { error } = clientSchema.validate(client);
       expect(error).toBeDefined();
+      expect(error.details[0].path).toEqual(['name']);
+      expect(error.details[0].type).toBe('string.max');
     });
 
     test('should reject description longer than 1000 characters', () => {
@@ -73,6 +147,8 @@ describe('Validation Schemas', () => {
 
       const { error } = clientSchema.validate(client);
       expect(error).toBeDefined();
+      expect(error.details[0].path).toEqual(['description']);
+      expect(error.details[0].type).toBe('string.max');
     });
 
     test('should trim whitespace from name', () => {
@@ -118,6 +194,8 @@ describe('Validation Schemas', () => {
 
       const { error } = workEntrySchema.validate(entry);
       expect(error).toBeDefined();
+      expect(error.details[0].path).toEqual(['clientId']);
+      expect(error.details[0].type).toBe('any.required');
     });
 
     test('should reject negative clientId', () => {
@@ -129,6 +207,8 @@ describe('Validation Schemas', () => {
 
       const { error } = workEntrySchema.validate(entry);
       expect(error).toBeDefined();
+      expect(error.details[0].path).toEqual(['clientId']);
+      expect(error.details[0].type).toBe('number.positive');
     });
 
     test('should reject zero clientId', () => {
@@ -140,6 +220,8 @@ describe('Validation Schemas', () => {
 
       const { error } = workEntrySchema.validate(entry);
       expect(error).toBeDefined();
+      expect(error.details[0].path).toEqual(['clientId']);
+      expect(error.details[0].type).toBe('number.positive');
     });
 
     test('should reject missing hours', () => {
@@ -150,6 +232,8 @@ describe('Validation Schemas', () => {
 
       const { error } = workEntrySchema.validate(entry);
       expect(error).toBeDefined();
+      expect(error.details[0].path).toEqual(['hours']);
+      expect(error.details[0].type).toBe('any.required');
     });
 
     test('should reject negative hours', () => {
@@ -161,6 +245,8 @@ describe('Validation Schemas', () => {
 
       const { error } = workEntrySchema.validate(entry);
       expect(error).toBeDefined();
+      expect(error.details[0].path).toEqual(['hours']);
+      expect(error.details[0].type).toBe('number.positive');
     });
 
     test('should reject hours greater than 24', () => {
@@ -172,6 +258,8 @@ describe('Validation Schemas', () => {
 
       const { error } = workEntrySchema.validate(entry);
       expect(error).toBeDefined();
+      expect(error.details[0].path).toEqual(['hours']);
+      expect(error.details[0].type).toBe('number.max');
     });
 
     test('should accept decimal hours', () => {
@@ -193,6 +281,8 @@ describe('Validation Schemas', () => {
 
       const { error } = workEntrySchema.validate(entry);
       expect(error).toBeDefined();
+      expect(error.details[0].path).toEqual(['date']);
+      expect(error.details[0].type).toBe('any.required');
     });
 
     test('should reject invalid date format', () => {
@@ -204,6 +294,8 @@ describe('Validation Schemas', () => {
 
       const { error } = workEntrySchema.validate(entry);
       expect(error).toBeDefined();
+      expect(error.details[0].path).toEqual(['date']);
+      expect(error.details[0].type).toBe('date.format');
     });
   });
 
@@ -232,6 +324,8 @@ describe('Validation Schemas', () => {
 
       const { error } = updateWorkEntrySchema.validate(update);
       expect(error).toBeDefined();
+      expect(error.details[0].path).toEqual([]);
+      expect(error.details[0].type).toBe('object.min');
     });
 
     test('should validate clientId update', () => {
@@ -277,6 +371,8 @@ describe('Validation Schemas', () => {
 
       const { error } = updateClientSchema.validate(update);
       expect(error).toBeDefined();
+      expect(error.details[0].path).toEqual([]);
+      expect(error.details[0].type).toBe('object.min');
     });
 
     test('should validate both fields update', () => {
@@ -287,6 +383,61 @@ describe('Validation Schemas', () => {
 
       const { error } = updateClientSchema.validate(update);
       expect(error).toBeUndefined();
+    });
+
+    test('should accept and trim department', () => {
+      const { error, value } = updateClientSchema.validate({
+        department: '  Finance  '
+      });
+
+      expect(error).toBeUndefined();
+      expect(value.department).toBe('Finance');
+    });
+
+    test('should allow empty department', () => {
+      const { error } = updateClientSchema.validate({ department: '' });
+
+      expect(error).toBeUndefined();
+    });
+
+    test('should reject department longer than 255 characters', () => {
+      const { error } = updateClientSchema.validate({
+        department: 'a'.repeat(256)
+      });
+
+      expect(error.details[0].path).toEqual(['department']);
+      expect(error.details[0].type).toBe('string.max');
+    });
+
+    test('should accept and trim email', () => {
+      const { error, value } = updateClientSchema.validate({
+        email: '  test@example.com  '
+      });
+
+      expect(error).toBeUndefined();
+      expect(value.email).toBe('test@example.com');
+    });
+
+    test('should allow empty email', () => {
+      const { error } = updateClientSchema.validate({ email: '' });
+
+      expect(error).toBeUndefined();
+    });
+
+    test('should reject invalid email', () => {
+      const { error } = updateClientSchema.validate({ email: 'not-an-email' });
+
+      expect(error.details[0].path).toEqual(['email']);
+      expect(error.details[0].type).toBe('string.email');
+    });
+
+    test('should reject email longer than 255 characters', () => {
+      const { error } = updateClientSchema.validate({
+        email: `${'a'.repeat(246)}@example.com`
+      });
+
+      expect(error.details[0].path).toEqual(['email']);
+      expect(error.details[0].type).toBe('string.email');
     });
   });
 
@@ -307,6 +458,8 @@ describe('Validation Schemas', () => {
 
       const { error } = emailSchema.validate(data);
       expect(error).toBeDefined();
+      expect(error.details[0].path).toEqual(['email']);
+      expect(error.details[0].type).toBe('string.email');
     });
 
     test('should reject missing email', () => {
@@ -314,6 +467,8 @@ describe('Validation Schemas', () => {
 
       const { error } = emailSchema.validate(data);
       expect(error).toBeDefined();
+      expect(error.details[0].path).toEqual(['email']);
+      expect(error.details[0].type).toBe('any.required');
     });
 
     test('should accept email with subdomain', () => {
