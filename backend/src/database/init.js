@@ -1,6 +1,6 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
-const fs = require('fs');
+const fs = require('node:fs');
 const { runMigrations, run } = require('./migrations');
 
 let db = null;
