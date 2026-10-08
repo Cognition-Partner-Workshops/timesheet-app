@@ -318,53 +318,32 @@ describe('Validation Schemas', () => {
       }
     });
 
-    test('should reject invalid status', () => {
-      const { error } = projectSchema.validate({ ...validProject, status: 'bogus' });
-      expect(error).toBeDefined();
-    });
-
-    test('should reject missing name', () => {
-      const { name, ...rest } = validProject;
+    test.each([
+      ['name', 'name'],
+      ['clientId', 'clientId'],
+      ['startDate', 'startDate']
+    ])('should reject missing %s', (_label, field) => {
+      const { [field]: _removed, ...rest } = validProject;
       const { error } = projectSchema.validate(rest);
       expect(error).toBeDefined();
     });
 
-    test('should reject missing clientId', () => {
-      const { clientId, ...rest } = validProject;
-      const { error } = projectSchema.validate(rest);
+    test.each([
+      ['invalid status', { status: 'bogus' }],
+      ['negative clientId', { clientId: -1 }],
+      ['name longer than 255 characters', { name: 'a'.repeat(256) }]
+    ])('should reject %s', (_label, override) => {
+      const { error } = projectSchema.validate({ ...validProject, ...override });
       expect(error).toBeDefined();
     });
 
-    test('should reject negative clientId', () => {
-      const { error } = projectSchema.validate({ ...validProject, clientId: -1 });
-      expect(error).toBeDefined();
-    });
-
-    test('should reject missing startDate', () => {
-      const { startDate, ...rest } = validProject;
-      const { error } = projectSchema.validate(rest);
-      expect(error).toBeDefined();
-    });
-
-    test('should reject invalid startDate format', () => {
-      const { error } = projectSchema.validate({ ...validProject, startDate: '01/15/2024' });
-      expect(error).toBeDefined();
-    });
-
-    test('should reject startDate with timestamp', () => {
-      const { error } = projectSchema.validate({ ...validProject, startDate: '2026-01-15T10:00:00Z' });
-      expect(error).toBeDefined();
-    });
-
-    test('should reject impossible calendar date (Feb 30)', () => {
-      const { error } = projectSchema.validate({ ...validProject, startDate: '2026-02-30' });
-      expect(error).toBeDefined();
-    });
-
-    test('should reject invalid month', () => {
-      const { error } = projectSchema.validate({ ...validProject, startDate: '2026-13-01' });
-      expect(error).toBeDefined();
-    });
+    test.each(['01/15/2024', '2026-01-15T10:00:00Z', '2026-02-30', '2026-13-01'])(
+      'should reject invalid startDate %s',
+      (startDate) => {
+        const { error } = projectSchema.validate({ ...validProject, startDate });
+        expect(error).toBeDefined();
+      }
+    );
 
     test('should accept valid date-only startDate', () => {
       const { error, value } = projectSchema.validate({ ...validProject, startDate: '2026-01-15' });
@@ -389,10 +368,6 @@ describe('Validation Schemas', () => {
       expect(error).toBeUndefined();
     });
 
-    test('should reject name longer than 255 characters', () => {
-      const { error } = projectSchema.validate({ ...validProject, name: 'a'.repeat(256) });
-      expect(error).toBeDefined();
-    });
   });
 
   describe('updateProjectSchema', () => {
@@ -417,20 +392,13 @@ describe('Validation Schemas', () => {
       expect(value.startDate).toBe('2026-01-15');
     });
 
-    test('should reject startDate update with timestamp', () => {
-      const { error } = updateProjectSchema.validate({ startDate: '2026-01-15T10:00:00Z' });
-      expect(error).toBeDefined();
-    });
-
-    test('should reject impossible calendar date in update (Feb 30)', () => {
-      const { error } = updateProjectSchema.validate({ startDate: '2026-02-30' });
-      expect(error).toBeDefined();
-    });
-
-    test('should reject invalid month in update', () => {
-      const { error } = updateProjectSchema.validate({ startDate: '2026-13-01' });
-      expect(error).toBeDefined();
-    });
+    test.each(['2026-01-15T10:00:00Z', '2026-02-30', '2026-13-01'])(
+      'should reject invalid startDate update %s',
+      (startDate) => {
+        const { error } = updateProjectSchema.validate({ startDate });
+        expect(error).toBeDefined();
+      }
+    );
 
     test('should reject empty update', () => {
       const { error } = updateProjectSchema.validate({});
