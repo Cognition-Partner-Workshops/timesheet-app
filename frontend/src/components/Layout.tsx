@@ -14,6 +14,13 @@ import {
   Typography,
   Button,
   Avatar,
+  Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Alert,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -22,9 +29,13 @@ import {
   Assignment as AssignmentIcon,
   Assessment as AssessmentIcon,
   Logout as LogoutIcon,
+  Download as DownloadIcon,
+  DeleteForever as DeleteForeverIcon,
 } from '@mui/icons-material';
+import { useMutation } from '@tanstack/react-query';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import apiClient from '../api/client';
 
 const drawerWidth = 240;
 
@@ -37,6 +48,33 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [privacyError, setPrivacyError] = React.useState('');
+
+  const exportMutation = useMutation({
+    mutationFn: () => apiClient.exportMyData(),
+    onSuccess: (blob: Blob) => {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'my-data-export.json';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    },
+    onError: () => setPrivacyError('Failed to export your data'),
+  });
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: () => apiClient.deleteMyAccount(),
+    onSuccess: () => {
+      setDeleteDialogOpen(false);
+      logout();
+      navigate('/login');
+    },
+    onError: () => setPrivacyError('Failed to delete your account'),
+  });
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -68,6 +106,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </ListItemButton>
           </ListItem>
         ))}
+      </List>
+      <Divider />
+      <List subheader={<Typography variant="overline" sx={{ px: 2 }}>Privacy</Typography>}>
+        <ListItem disablePadding>
+          <ListItemButton onClick={() => exportMutation.mutate()} disabled={exportMutation.isPending}>
+            <ListItemIcon><DownloadIcon /></ListItemIcon>
+            <ListItemText primary="Download My Data" />
+          </ListItemButton>
+        </ListItem>
+        <ListItem disablePadding>
+          <ListItemButton onClick={() => setDeleteDialogOpen(true)}>
+            <ListItemIcon><DeleteForeverIcon color="error" /></ListItemIcon>
+            <ListItemText primary="Delete My Account" />
+          </ListItemButton>
+        </ListItem>
       </List>
     </div>
   );
@@ -150,8 +203,32 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         }}
       >
         <Toolbar />
+        {privacyError && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setPrivacyError('')}>
+            {privacyError}
+          </Alert>
+        )}
         {children}
       </Box>
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+        <DialogTitle>Delete your account?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This permanently deletes your account, all clients and all work entries. This cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => deleteAccountMutation.mutate()}
+            disabled={deleteAccountMutation.isPending}
+          >
+            Delete Permanently
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

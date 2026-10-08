@@ -101,16 +101,16 @@ describe('Error Handler Middleware', () => {
       });
     });
 
-    test('should default to 500 status if not specified', () => {
+    test('should default to 500 status and hide internal message', () => {
       const genericError = {
-        message: 'Something went wrong'
+        message: 'Something went wrong for alice@example.com'
       };
 
       errorHandler(genericError, req, res, next);
 
       expect(res.status).toHaveBeenCalledWith(500);
       expect(res.json).toHaveBeenCalledWith({
-        error: 'Something went wrong'
+        error: 'Internal server error'
       });
     });
 
@@ -127,12 +127,28 @@ describe('Error Handler Middleware', () => {
   });
 
   describe('Console Logging', () => {
-    test('should log error to console', () => {
+    test('should log sanitized error to console', () => {
       const error = new Error('Test error');
       
       errorHandler(error, req, res, next);
 
-      expect(console.error).toHaveBeenCalledWith('Error:', error);
+      expect(console.error).toHaveBeenCalledWith('Error:', { name: 'Error', message: 'Test error' });
+    });
+
+    test('should not log request body or raw emails from Joi errors', () => {
+      const joiError = {
+        isJoi: true,
+        name: 'ValidationError',
+        message: '"email" must be valid: alice@example.com',
+        details: [{ message: 'invalid' }],
+        _original: { email: 'alice@example.com' }
+      };
+
+      errorHandler(joiError, req, res, next);
+
+      const logged = JSON.stringify(console.error.mock.calls);
+      expect(logged).not.toContain('alice@example.com');
+      expect(logged).toContain('a***@example.com');
     });
   });
 });

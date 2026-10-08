@@ -1,5 +1,7 @@
+const { logError } = require('../utils/logger');
+
 function errorHandler(err, req, res, next) {
-  console.error('Error:', err);
+  logError('Error:', err);
 
   // Joi validation errors
   if (err.isJoi) {
@@ -17,9 +19,10 @@ function errorHandler(err, req, res, next) {
     });
   }
 
-  // Default error
-  res.status(err.status || 500).json({
-    error: err.message || 'Internal server error'
+  // Default error: never echo internal (5xx) messages, which may contain PII
+  const status = err.status || 500;
+  res.status(status).json({
+    error: status < 500 && err.message ? err.message : 'Internal server error'
   });
 }
 
