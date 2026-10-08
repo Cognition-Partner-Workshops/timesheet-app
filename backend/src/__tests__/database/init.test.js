@@ -88,6 +88,7 @@ describe('Database Initialization', () => {
       
       expect(queries.some(q => q.includes('CREATE TABLE IF NOT EXISTS users'))).toBe(true);
       expect(queries.some(q => q.includes('CREATE TABLE IF NOT EXISTS clients'))).toBe(true);
+      expect(queries.some(q => q.includes('CREATE TABLE IF NOT EXISTS projects'))).toBe(true);
       expect(queries.some(q => q.includes('CREATE TABLE IF NOT EXISTS work_entries'))).toBe(true);
     });
 
@@ -99,6 +100,8 @@ describe('Database Initialization', () => {
       const queries = runCalls.map(call => call[0]);
       
       expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_clients_user_email'))).toBe(true);
+      expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_projects_user_email'))).toBe(true);
+      expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_projects_client_id'))).toBe(true);
       expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_work_entries_client_id'))).toBe(true);
       expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_work_entries_user_email'))).toBe(true);
       expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_work_entries_date'))).toBe(true);
@@ -182,6 +185,21 @@ describe('Database Initialization', () => {
       expect(workEntriesQuery).toBeDefined();
       expect(workEntriesQuery[0]).toContain('FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE');
       expect(workEntriesQuery[0]).toContain('FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE');
+    });
+
+    test('projects table should have required columns and foreign keys', async () => {
+      const db = getDatabase();
+      await initializeDatabase();
+
+      const projectsQuery = db.run.mock.calls.find(call =>
+        call[0].includes('CREATE TABLE IF NOT EXISTS projects')
+      );
+
+      expect(projectsQuery).toBeDefined();
+      expect(projectsQuery[0]).toContain('start_date DATE NOT NULL');
+      expect(projectsQuery[0]).toContain("CHECK (status IN ('active', 'completed', 'on-hold'))");
+      expect(projectsQuery[0]).toContain('FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE');
+      expect(projectsQuery[0]).toContain('FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE');
     });
   });
 });

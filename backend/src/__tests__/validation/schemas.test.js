@@ -3,6 +3,8 @@ const {
   workEntrySchema,
   updateWorkEntrySchema,
   updateClientSchema,
+  projectSchema,
+  updateProjectSchema,
   emailSchema
 } = require('../../validation/schemas');
 
@@ -287,6 +289,79 @@ describe('Validation Schemas', () => {
 
       const { error } = updateClientSchema.validate(update);
       expect(error).toBeUndefined();
+    });
+  });
+
+  describe('projectSchema', () => {
+    test('should validate valid project data and default status to active', () => {
+      const { error, value } = projectSchema.validate({
+        name: 'Website redesign',
+        description: 'Refresh the company website',
+        clientId: 3,
+        startDate: '2024-01-15'
+      });
+
+      expect(error).toBeUndefined();
+      expect(value.status).toBe('active');
+      expect(value.startDate).toBeInstanceOf(Date);
+    });
+
+    test('should trim the name and allow an empty description', () => {
+      const { error, value } = projectSchema.validate({
+        name: '  Website redesign  ',
+        description: '',
+        clientId: 3,
+        startDate: '2024-01-15',
+        status: 'on-hold'
+      });
+
+      expect(error).toBeUndefined();
+      expect(value.name).toBe('Website redesign');
+    });
+
+    test.each([
+      [{ description: 'Missing name', clientId: 1, startDate: '2024-01-15' }, 'name'],
+      [{ name: 'No client', startDate: '2024-01-15' }, 'clientId'],
+      [{ name: 'No start date', clientId: 1 }, 'startDate'],
+      [{ name: 'Bad status', clientId: 1, startDate: '2024-01-15', status: 'paused' }, 'status'],
+      [{ name: 'Bad date', clientId: 1, startDate: '01/15/2024' }, 'startDate']
+    ])('should reject invalid project data %j', (project) => {
+      expect(projectSchema.validate(project).error).toBeDefined();
+    });
+
+    test('should reject names and descriptions exceeding their maximum lengths', () => {
+      const tooLongName = projectSchema.validate({
+        name: 'a'.repeat(256),
+        clientId: 1,
+        startDate: '2024-01-15'
+      });
+      const tooLongDescription = projectSchema.validate({
+        name: 'Project',
+        description: 'a'.repeat(1001),
+        clientId: 1,
+        startDate: '2024-01-15'
+      });
+
+      expect(tooLongName.error).toBeDefined();
+      expect(tooLongDescription.error).toBeDefined();
+    });
+  });
+
+  describe('updateProjectSchema', () => {
+    test('should validate partial updates', () => {
+      const { error } = updateProjectSchema.validate({
+        status: 'completed',
+        startDate: '2024-02-01'
+      });
+
+      expect(error).toBeUndefined();
+    });
+
+    test('should reject empty and invalid updates', () => {
+      expect(updateProjectSchema.validate({}).error).toBeDefined();
+      expect(updateProjectSchema.validate({ status: 'paused' }).error).toBeDefined();
+      expect(updateProjectSchema.validate({ clientId: 0 }).error).toBeDefined();
+      expect(updateProjectSchema.validate({ startDate: 'not-a-date' }).error).toBeDefined();
     });
   });
 
