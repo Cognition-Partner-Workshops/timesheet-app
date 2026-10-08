@@ -28,12 +28,25 @@ import {
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
-import { type Client } from '../types/api';
+import { type Client, type CreateClientRequest, type UpdateClientRequest } from '../types/api';
+import { centsToInput, formatMoney, parseMoneyInput } from '../utils/money';
+
+const EMPTY_FORM = {
+  name: '',
+  description: '',
+  department: '',
+  email: '',
+  hourlyRate: '',
+  currency: '',
+  billingEmail: '',
+  billingAddress: '',
+  paymentTermsDays: '',
+};
 
 const ClientsPage: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
-  const [formData, setFormData] = useState({ name: '', description: '', department: '', email: '' });
+  const [formData, setFormData] = useState(EMPTY_FORM);
   const [error, setError] = useState('');
 
   const queryClient = useQueryClient();
@@ -44,7 +57,7 @@ const ClientsPage: React.FC = () => {
   });
 
   const createMutation = useMutation({
-    mutationFn: (clientData: { name: string; description?: string; department?: string; email?: string }) =>
+    mutationFn: (clientData: CreateClientRequest) =>
       apiClient.createClient(clientData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
@@ -57,7 +70,7 @@ const ClientsPage: React.FC = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { name?: string; description?: string; department?: string; email?: string } }) =>
+    mutationFn: ({ id, data }: { id: number; data: UpdateClientRequest }) =>
       apiClient.updateClient(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
@@ -100,11 +113,16 @@ const ClientsPage: React.FC = () => {
         name: client.name, 
         description: client.description || '',
         department: client.department || '',
-        email: client.email || ''
+        email: client.email || '',
+        hourlyRate: centsToInput(client.hourly_rate_cents),
+        currency: client.currency || '',
+        billingEmail: client.billing_email || '',
+        billingAddress: client.billing_address || '',
+        paymentTermsDays: client.payment_terms_days != null ? String(client.payment_terms_days) : '',
       });
     } else {
       setEditingClient(null);
-      setFormData({ name: '', description: '', department: '', email: '' });
+      setFormData(EMPTY_FORM);
     }
     setError('');
     setOpen(true);
@@ -113,7 +131,7 @@ const ClientsPage: React.FC = () => {
   const handleClose = () => {
     setOpen(false);
     setEditingClient(null);
-    setFormData({ name: '', description: '', department: '', email: '' });
+    setFormData(EMPTY_FORM);
     setError('');
   };
 
@@ -126,6 +144,14 @@ const ClientsPage: React.FC = () => {
       return;
     }
 
+    const billing = {
+      hourlyRateCents: parseMoneyInput(formData.hourlyRate),
+      currency: formData.currency.trim() ? formData.currency.trim().toUpperCase() : null,
+      billingEmail: formData.billingEmail || null,
+      billingAddress: formData.billingAddress || null,
+      paymentTermsDays: formData.paymentTermsDays !== '' ? Number(formData.paymentTermsDays) : null,
+    };
+
     if (editingClient) {
       updateMutation.mutate({
         id: editingClient.id,
@@ -134,6 +160,7 @@ const ClientsPage: React.FC = () => {
           description: formData.description || undefined,
           department: formData.department || undefined,
           email: formData.email || undefined,
+          ...billing,
         },
       });
     } else {
@@ -142,6 +169,7 @@ const ClientsPage: React.FC = () => {
         description: formData.description || undefined,
         department: formData.department || undefined,
         email: formData.email || undefined,
+        ...billing,
       });
     }
   };
@@ -203,6 +231,7 @@ const ClientsPage: React.FC = () => {
                 <TableCell>Department</TableCell>
                 <TableCell>Email</TableCell>
                 <TableCell>Description</TableCell>
+                <TableCell>Rate</TableCell>
                 <TableCell>Created</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
@@ -244,6 +273,11 @@ const ClientsPage: React.FC = () => {
                       )}
                     </TableCell>
                     <TableCell>
+                      {client.hourly_rate_cents != null
+                        ? `${formatMoney(client.hourly_rate_cents, client.currency || 'USD')}/h`
+                        : <Chip label="Not set" size="small" variant="outlined" />}
+                    </TableCell>
+                    <TableCell>
                       <Typography variant="body2" color="text.secondary">
                         {new Date(client.created_at).toLocaleDateString()}
                       </Typography>
@@ -268,7 +302,7 @@ const ClientsPage: React.FC = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">
+                  <TableCell colSpan={7} align="center">
                     <Typography color="text.secondary" sx={{ py: 3 }}>
                       No clients found. Create your first client to get started.
                     </Typography>
@@ -323,6 +357,19 @@ const ClientsPage: React.FC = () => {
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               disabled={createMutation.isPending || updateMutation.isPending}
             />
+            <Typography variant="subtitle2" sx={{ mt: 2 }}>Billing</Typography>
+            <Box display="flex" gap={2}>
+              <TextField margin="dense" label="Hourly rate" type="number" inputProps={{ min: 0, step: 0.01 }}
+                value={formData.hourlyRate} onChange={(e) => setFormData({ ...formData, hourlyRate: e.target.value })} disabled={createMutation.isPending || updateMutation.isPending} />
+              <TextField margin="dense" label="Currency" placeholder="USD" inputProps={{ maxLength: 3 }}
+                value={formData.currency} onChange={(e) => setFormData({ ...formData, currency: e.target.value })} disabled={createMutation.isPending || updateMutation.isPending} />
+              <TextField margin="dense" label="Payment terms (days)" type="number" inputProps={{ min: 0, max: 365 }}
+                value={formData.paymentTermsDays} onChange={(e) => setFormData({ ...formData, paymentTermsDays: e.target.value })} disabled={createMutation.isPending || updateMutation.isPending} />
+            </Box>
+            <TextField margin="dense" label="Billing email" type="email" fullWidth
+              value={formData.billingEmail} onChange={(e) => setFormData({ ...formData, billingEmail: e.target.value })} disabled={createMutation.isPending || updateMutation.isPending} />
+            <TextField margin="dense" label="Billing address" fullWidth multiline rows={2}
+              value={formData.billingAddress} onChange={(e) => setFormData({ ...formData, billingAddress: e.target.value })} disabled={createMutation.isPending || updateMutation.isPending} />
           </DialogContent>
           <DialogActions>
             <Button onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>

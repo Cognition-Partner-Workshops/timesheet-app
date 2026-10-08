@@ -31,6 +31,8 @@ import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
 import { type ClientReport } from '../types/api';
 import { parseISO } from 'date-fns';
+import { Link as RouterLink } from 'react-router-dom';
+import { formatMoney } from '../utils/money';
 
 const ReportsPage: React.FC = () => {
   const [selectedClientId, setSelectedClientId] = useState<number>(0);
@@ -211,6 +213,28 @@ const ReportsPage: React.FC = () => {
                       <Typography variant="h4" component="div">
                         {report.entryCount > 0 ? (report.totalHours / report.entryCount).toFixed(2) : '0.00'}
                       </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                  <Card>
+                    <CardContent>
+                      <Typography color="textSecondary" gutterBottom>
+                        Unbilled
+                      </Typography>
+                      <Typography variant="h5" component="div">
+                        {(report.unbilledHours ?? 0).toFixed(2)} h
+                        {report.unbilledAmountCents != null && ` · ${formatMoney(report.unbilledAmountCents, report.client.currency || 'USD')}`}
+                      </Typography>
+                      <Button
+                        size="small"
+                        sx={{ mt: 1 }}
+                        component={RouterLink}
+                        to={`/invoices/new?clientId=${report.client.id}`}
+                        disabled={!report.unbilledEntryCount}
+                      >
+                        Create invoice
+                      </Button>
                     </CardContent>
                   </Card>
                 </Grid>

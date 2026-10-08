@@ -31,6 +31,7 @@ import {
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
+import { Link as RouterLink } from 'react-router-dom';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -48,6 +49,7 @@ const WorkEntriesPage: React.FC = () => {
   });
   const [error, setError] = useState('');
 
+  const [billedFilter, setBilledFilter] = useState<'all' | 'billed' | 'unbilled'>('all');
   const queryClient = useQueryClient();
 
   const { data: workEntriesData, isLoading: entriesLoading } = useQuery({
@@ -97,7 +99,12 @@ const WorkEntriesPage: React.FC = () => {
     },
   });
 
-  const workEntries = workEntriesData?.workEntries || [];
+  const allWorkEntries: WorkEntry[] = workEntriesData?.workEntries || [];
+  const workEntries = allWorkEntries.filter((entry) => {
+    if (billedFilter === 'billed') return Boolean(entry.invoice_id);
+    if (billedFilter === 'unbilled') return !entry.invoice_id;
+    return true;
+  });
   const clients = clientsData?.clients || [];
 
   const handleOpen = (entry?: WorkEntry) => {
@@ -189,7 +196,21 @@ const WorkEntriesPage: React.FC = () => {
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <Box>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-          <Typography variant="h4">Work Entries</Typography>
+          <Box display="flex" alignItems="center" gap={2}>
+            <Typography variant="h4">Work Entries</Typography>
+            <TextField
+              select
+              size="small"
+              label="Billing"
+              value={billedFilter}
+              onChange={(e) => setBilledFilter(e.target.value as 'all' | 'billed' | 'unbilled')}
+              sx={{ minWidth: 140 }}
+            >
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value="unbilled">Unbilled</MenuItem>
+              <MenuItem value="billed">Billed</MenuItem>
+            </TextField>
+          </Box>
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpen()}>
             Add Work Entry
           </Button>
@@ -254,10 +275,23 @@ const WorkEntriesPage: React.FC = () => {
                           )}
                         </TableCell>
                         <TableCell align="right">
+                          {entry.invoice_id && (
+                            <Chip
+                              size="small"
+                              color={entry.invoice_status === 'draft' ? 'default' : 'success'}
+                              label={entry.invoice_number ? `Billed: ${entry.invoice_number}` : 'On draft invoice'}
+                              component={RouterLink}
+                              to={`/invoices/${entry.invoice_id}`}
+                              clickable
+                              sx={{ mr: 1 }}
+                            />
+                          )}
                           <IconButton
                             onClick={() => handleOpen(entry)}
                             color="primary"
                             size="small"
+                            disabled={Boolean(entry.invoice_id)}
+                            aria-label="Edit work entry"
                           >
                             <EditIcon />
                           </IconButton>
@@ -265,6 +299,8 @@ const WorkEntriesPage: React.FC = () => {
                             onClick={() => handleDelete(entry)}
                             color="error"
                             size="small"
+                            disabled={Boolean(entry.invoice_id)}
+                            aria-label="Delete work entry"
                           >
                             <DeleteIcon />
                           </IconButton>

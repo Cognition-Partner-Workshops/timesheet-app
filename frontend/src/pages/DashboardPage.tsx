@@ -18,6 +18,8 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
 import { parseISO } from 'date-fns';
+import { ReceiptLong as ReceiptIcon, WarningAmber as WarningIcon } from '@mui/icons-material';
+import { formatMoney } from '../utils/money';
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -31,6 +33,14 @@ const DashboardPage: React.FC = () => {
     queryKey: ['workEntries'],
     queryFn: () => apiClient.getWorkEntries(),
   });
+
+  const { data: invoiceData } = useQuery({
+    queryKey: ['invoices', 'summary'],
+    queryFn: () => apiClient.getInvoices({ pageSize: 1 }),
+  });
+  const invoiceSummary = invoiceData?.summary || [];
+  const sumByCurrency = (key: 'outstanding_cents' | 'overdue_cents') =>
+    invoiceSummary.filter((s) => s[key] > 0).map((s) => formatMoney(s[key], s.currency)).join(' · ') || '0';
 
   const clients = clientsData?.clients || [];
   const workEntries = workEntriesData?.workEntries || [];
@@ -59,6 +69,20 @@ const DashboardPage: React.FC = () => {
       icon: <AssessmentIcon />,
       color: '#f57c00',
       action: () => navigate('/reports'),
+    },
+    {
+      title: 'Outstanding',
+      value: sumByCurrency('outstanding_cents'),
+      icon: <ReceiptIcon />,
+      color: '#7b1fa2',
+      action: () => navigate('/invoices'),
+    },
+    {
+      title: 'Overdue',
+      value: sumByCurrency('overdue_cents'),
+      icon: <WarningIcon />,
+      color: '#d32f2f',
+      action: () => navigate('/invoices'),
     },
   ];
 
