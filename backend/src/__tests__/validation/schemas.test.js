@@ -3,6 +3,8 @@ const {
   workEntrySchema,
   updateWorkEntrySchema,
   updateClientSchema,
+  projectSchema,
+  updateProjectSchema,
   emailSchema
 } = require('../../validation/schemas');
 
@@ -287,6 +289,88 @@ describe('Validation Schemas', () => {
 
       const { error } = updateClientSchema.validate(update);
       expect(error).toBeUndefined();
+    });
+  });
+
+  describe('projectSchema', () => {
+    test('validates project data and defaults status to active', () => {
+      const { error, value } = projectSchema.validate({
+        name: 'Website',
+        clientId: 4,
+        startDate: '2026-04-17'
+      });
+
+      expect(error).toBeUndefined();
+      expect(value.status).toBe('active');
+    });
+
+    test('preserves the raw start date string', () => {
+      const { value } = projectSchema.validate({
+        name: 'Website',
+        clientId: 4,
+        startDate: '2026-04-17'
+      });
+
+      expect(value.startDate).toBe('2026-04-17');
+    });
+
+    test('allows an empty description', () => {
+      const { error } = projectSchema.validate({
+        name: 'Website',
+        clientId: 4,
+        startDate: '2026-04-17',
+        description: ''
+      });
+
+      expect(error).toBeUndefined();
+    });
+
+    test('rejects an invalid status', () => {
+      const { error } = projectSchema.validate({
+        name: 'Website',
+        clientId: 4,
+        startDate: '2026-04-17',
+        status: 'archived'
+      });
+
+      expect(error).toBeDefined();
+    });
+
+    test.each([
+      ['name', { clientId: 4, startDate: '2026-04-17' }],
+      ['clientId', { name: 'Website', startDate: '2026-04-17' }],
+      ['startDate', { name: 'Website', clientId: 4 }]
+    ])('requires %s', (field, project) => {
+      const { error } = projectSchema.validate(project);
+
+      expect(error).toBeDefined();
+    });
+  });
+
+  describe('updateProjectSchema', () => {
+    test('validates a partial project update without adding a default status', () => {
+      const { error, value } = updateProjectSchema.validate({ name: 'Updated' });
+
+      expect(error).toBeUndefined();
+      expect(value.status).toBeUndefined();
+    });
+
+    test('preserves the raw start date string', () => {
+      const { value } = updateProjectSchema.validate({ startDate: '2026-04-17' });
+
+      expect(value.startDate).toBe('2026-04-17');
+    });
+
+    test('rejects an invalid status', () => {
+      const { error } = updateProjectSchema.validate({ status: 'archived' });
+
+      expect(error).toBeDefined();
+    });
+
+    test('rejects an empty update', () => {
+      const { error } = updateProjectSchema.validate({});
+
+      expect(error).toBeDefined();
     });
   });
 
