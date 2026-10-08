@@ -68,7 +68,7 @@ const ProjectsPage: React.FC = () => {
   const [error, setError] = useState('');
 
   const { data: projectsData, isLoading } = useProjects();
-  const { data: clientsData } = useQuery({
+  const { data: clientsData, isError: clientsError, isSuccess: clientsLoaded } = useQuery({
     queryKey: ['clients'],
     queryFn: () => apiClient.getClients(),
   });
@@ -134,7 +134,7 @@ const ProjectsPage: React.FC = () => {
 
     const data = {
       name: formData.name,
-      description: formData.description || undefined,
+      description: formData.description,
       clientId: Number(formData.clientId),
       startDate: formData.startDate,
       status: formData.status,
@@ -143,7 +143,7 @@ const ProjectsPage: React.FC = () => {
     if (editingProject) {
       updateMutation.mutate({ id: editingProject.id, data }, mutationOptions);
     } else {
-      createMutation.mutate(data, mutationOptions);
+      createMutation.mutate({ ...data, description: data.description || undefined }, mutationOptions);
     }
   };
 
@@ -174,13 +174,19 @@ const ProjectsPage: React.FC = () => {
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => handleOpen()}
-          disabled={clients.length === 0}
+          disabled={!clientsLoaded || clients.length === 0}
         >
           Add Project
         </Button>
       </Box>
 
-      {clients.length === 0 && (
+      {clientsError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          Failed to load clients
+        </Alert>
+      )}
+
+      {clientsLoaded && clients.length === 0 && (
         <Alert severity="info" sx={{ mb: 2 }}>
           Create a client first
         </Alert>

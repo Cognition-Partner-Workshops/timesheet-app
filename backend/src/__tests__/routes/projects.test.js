@@ -97,6 +97,20 @@ describe('Project Routes', () => {
       expect(response.body).toEqual({ error: 'Invalid client ID' });
     });
 
+    test('should return 400 for clientId filter with trailing garbage', async () => {
+      const response = await request(app).get('/api/projects?clientId=1abc');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Invalid client ID' });
+    });
+
+    test('should return 400 for zero clientId filter', async () => {
+      const response = await request(app).get('/api/projects?clientId=0');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Invalid client ID' });
+    });
+
     test('should return 400 for invalid status filter', async () => {
       const response = await request(app).get('/api/projects?status=invalid');
 
@@ -164,6 +178,20 @@ describe('Project Routes', () => {
       expect(response.body).toEqual({ error: 'Invalid project ID' });
     });
 
+    test('should return 400 for project ID with trailing garbage', async () => {
+      const response = await request(app).get('/api/projects/1garbage');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Invalid project ID' });
+    });
+
+    test('should return 400 for zero project ID', async () => {
+      const response = await request(app).get('/api/projects/0');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Invalid project ID' });
+    });
+
     test('should handle database error', async () => {
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(new Error('Database error'), null);
@@ -210,6 +238,11 @@ describe('Project Routes', () => {
       expect(mockDb.run).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO projects'),
         ['New Project', 'Project description', 1, 'test@example.com', '2024-01-15', 'active'],
+        expect.any(Function)
+      );
+      expect(mockDb.get).toHaveBeenCalledWith(
+        expect.stringContaining('WHERE p.id = ? AND p.user_email = ?'),
+        [1, 'test@example.com'],
         expect.any(Function)
       );
     });
@@ -390,6 +423,11 @@ describe('Project Routes', () => {
       expect(response.status).toBe(200);
       expect(response.body.message).toBe('Project updated successfully');
       expect(response.body.project).toEqual(updatedProject);
+      expect(mockDb.get).toHaveBeenLastCalledWith(
+        expect.stringContaining('WHERE p.id = ? AND p.user_email = ?'),
+        [1, 'test@example.com'],
+        expect.any(Function)
+      );
     });
 
     test('should build correct SET clause for partial update', async () => {
@@ -478,6 +516,24 @@ describe('Project Routes', () => {
     test('should return 400 for invalid project ID', async () => {
       const response = await request(app)
         .put('/api/projects/invalid')
+        .send({ name: 'Updated' });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Invalid project ID' });
+    });
+
+    test('should return 400 for project ID with trailing garbage', async () => {
+      const response = await request(app)
+        .put('/api/projects/1garbage')
+        .send({ name: 'Updated' });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Invalid project ID' });
+    });
+
+    test('should return 400 for zero project ID', async () => {
+      const response = await request(app)
+        .put('/api/projects/0')
         .send({ name: 'Updated' });
 
       expect(response.status).toBe(400);
@@ -586,6 +642,20 @@ describe('Project Routes', () => {
 
     test('should return 400 for invalid project ID', async () => {
       const response = await request(app).delete('/api/projects/invalid');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Invalid project ID' });
+    });
+
+    test('should return 400 for project ID with trailing garbage', async () => {
+      const response = await request(app).delete('/api/projects/1garbage');
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Invalid project ID' });
+    });
+
+    test('should return 400 for zero project ID', async () => {
+      const response = await request(app).delete('/api/projects/0');
 
       expect(response.status).toBe(400);
       expect(response.body).toEqual({ error: 'Invalid project ID' });

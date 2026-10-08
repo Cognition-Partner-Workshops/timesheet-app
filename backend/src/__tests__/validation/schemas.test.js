@@ -351,6 +351,27 @@ describe('Validation Schemas', () => {
       expect(error).toBeDefined();
     });
 
+    test('should reject startDate with timestamp', () => {
+      const { error } = projectSchema.validate({ ...validProject, startDate: '2026-01-15T10:00:00Z' });
+      expect(error).toBeDefined();
+    });
+
+    test('should reject impossible calendar date (Feb 30)', () => {
+      const { error } = projectSchema.validate({ ...validProject, startDate: '2026-02-30' });
+      expect(error).toBeDefined();
+    });
+
+    test('should reject invalid month', () => {
+      const { error } = projectSchema.validate({ ...validProject, startDate: '2026-13-01' });
+      expect(error).toBeDefined();
+    });
+
+    test('should accept valid date-only startDate', () => {
+      const { error, value } = projectSchema.validate({ ...validProject, startDate: '2026-01-15' });
+      expect(error).toBeUndefined();
+      expect(value.startDate).toBe('2026-01-15');
+    });
+
     test('should keep startDate as raw string', () => {
       const { error, value } = projectSchema.validate(validProject);
       expect(error).toBeUndefined();
@@ -391,9 +412,24 @@ describe('Validation Schemas', () => {
     });
 
     test('should validate startDate update', () => {
-      const { error, value } = updateProjectSchema.validate({ startDate: '2024-02-01' });
+      const { error, value } = updateProjectSchema.validate({ startDate: '2026-01-15' });
       expect(error).toBeUndefined();
-      expect(value.startDate).toBe('2024-02-01');
+      expect(value.startDate).toBe('2026-01-15');
+    });
+
+    test('should reject startDate update with timestamp', () => {
+      const { error } = updateProjectSchema.validate({ startDate: '2026-01-15T10:00:00Z' });
+      expect(error).toBeDefined();
+    });
+
+    test('should reject impossible calendar date in update (Feb 30)', () => {
+      const { error } = updateProjectSchema.validate({ startDate: '2026-02-30' });
+      expect(error).toBeDefined();
+    });
+
+    test('should reject invalid month in update', () => {
+      const { error } = updateProjectSchema.validate({ startDate: '2026-13-01' });
+      expect(error).toBeDefined();
     });
 
     test('should reject empty update', () => {

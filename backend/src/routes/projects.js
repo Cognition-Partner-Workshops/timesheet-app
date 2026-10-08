@@ -12,6 +12,8 @@ const PROJECT_SELECT = `
   JOIN clients c ON p.client_id = c.id
 `;
 
+const parseId = (v) => (/^\d+$/.test(String(v)) ? parseInt(v, 10) : NaN);
+
 // All routes require authentication
 router.use(authenticateUser);
 
@@ -24,8 +26,8 @@ router.get('/', (req, res) => {
   const params = [req.userEmail];
 
   if (clientId) {
-    const clientIdNum = parseInt(clientId);
-    if (isNaN(clientIdNum)) {
+    const clientIdNum = parseId(clientId);
+    if (isNaN(clientIdNum) || clientIdNum <= 0) {
       return res.status(400).json({ error: 'Invalid client ID' });
     }
     query += ' AND p.client_id = ?';
@@ -54,9 +56,9 @@ router.get('/', (req, res) => {
 
 // Get specific project
 router.get('/:id', (req, res) => {
-  const projectId = parseInt(req.params.id);
+  const projectId = parseId(req.params.id);
 
-  if (isNaN(projectId)) {
+  if (isNaN(projectId) || projectId <= 0) {
     return res.status(400).json({ error: 'Invalid project ID' });
   }
 
@@ -117,8 +119,8 @@ router.post('/', (req, res, next) => {
 
             // Return the created project with client name
             db.get(
-              `${PROJECT_SELECT} WHERE p.id = ?`,
-              [this.lastID],
+              `${PROJECT_SELECT} WHERE p.id = ? AND p.user_email = ?`,
+              [this.lastID, req.userEmail],
               (err, row) => {
                 if (err) {
                   console.error('Database error:', err);
@@ -143,9 +145,9 @@ router.post('/', (req, res, next) => {
 // Update project
 router.put('/:id', (req, res, next) => {
   try {
-    const projectId = parseInt(req.params.id);
+    const projectId = parseId(req.params.id);
 
-    if (isNaN(projectId)) {
+    if (isNaN(projectId) || projectId <= 0) {
       return res.status(400).json({ error: 'Invalid project ID' });
     }
 
@@ -235,8 +237,8 @@ router.put('/:id', (req, res, next) => {
 
             // Return updated project with client name
             db.get(
-              `${PROJECT_SELECT} WHERE p.id = ?`,
-              [projectId],
+              `${PROJECT_SELECT} WHERE p.id = ? AND p.user_email = ?`,
+              [projectId, req.userEmail],
               (err, row) => {
                 if (err) {
                   console.error('Database error:', err);
@@ -260,9 +262,9 @@ router.put('/:id', (req, res, next) => {
 
 // Delete project
 router.delete('/:id', (req, res) => {
-  const projectId = parseInt(req.params.id);
+  const projectId = parseId(req.params.id);
 
-  if (isNaN(projectId)) {
+  if (isNaN(projectId) || projectId <= 0) {
     return res.status(400).json({ error: 'Invalid project ID' });
   }
 
