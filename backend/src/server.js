@@ -3,7 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
-const path = require('path');
+const path = require('node:path');
 
 const authRoutes = require('./routes/auth');
 const clientRoutes = require('./routes/clients');
@@ -14,6 +14,7 @@ const { initializeDatabase } = require('./database/init');
 const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
+app.disable('x-powered-by');
 const PORT = process.env.PORT || 3001;
 const isProduction = process.env.NODE_ENV === 'production';
 
