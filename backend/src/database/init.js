@@ -1,4 +1,5 @@
 const sqlite3 = require('sqlite3').verbose();
+const { PROJECTS_TABLE_SQL, PROJECTS_INDEX_SQL } = require('./projectsSchema');
 const path = require('path');
 
 let db = null;
@@ -66,11 +67,15 @@ async function initializeDatabase() {
         )
       `);
 
+      // Create projects table
+      database.run(PROJECTS_TABLE_SQL);
+
       // Create indexes for better performance
       database.run(`CREATE INDEX IF NOT EXISTS idx_clients_user_email ON clients (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_client_id ON work_entries (client_id)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_user_email ON work_entries (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_date ON work_entries (date)`);
+      PROJECTS_INDEX_SQL.forEach((sql) => database.run(sql));
 
       console.log('Database tables created successfully');
       resolve();

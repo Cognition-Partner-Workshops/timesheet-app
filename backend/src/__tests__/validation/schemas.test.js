@@ -3,6 +3,8 @@ const {
   workEntrySchema,
   updateWorkEntrySchema,
   updateClientSchema,
+  projectSchema,
+  updateProjectSchema,
   emailSchema
 } = require('../../validation/schemas');
 
@@ -287,6 +289,71 @@ describe('Validation Schemas', () => {
 
       const { error } = updateClientSchema.validate(update);
       expect(error).toBeUndefined();
+    });
+  });
+
+  describe('projectSchema', () => {
+    const valid = { name: 'Project', clientId: 1, startDate: '2024-01-15' };
+
+    test('should validate valid project data and default status to active', () => {
+      const { error, value } = projectSchema.validate({ ...valid, description: 'Desc' });
+      expect(error).toBeUndefined();
+      expect(value.status).toBe('active');
+      expect(value.startDate).toBeInstanceOf(Date);
+    });
+
+    test.each(['active', 'completed', 'on-hold'])('should accept status %s', (status) => {
+      const { error } = projectSchema.validate({ ...valid, status });
+      expect(error).toBeUndefined();
+    });
+
+    test('should reject invalid status', () => {
+      const { error } = projectSchema.validate({ ...valid, status: 'archived' });
+      expect(error).toBeDefined();
+    });
+
+    test.each(['name', 'clientId', 'startDate'])('should require %s', (field) => {
+      const data = { ...valid };
+      delete data[field];
+      const { error } = projectSchema.validate(data);
+      expect(error).toBeDefined();
+    });
+
+    test('should reject non-ISO startDate', () => {
+      const { error } = projectSchema.validate({ ...valid, startDate: 'January 15' });
+      expect(error).toBeDefined();
+    });
+
+    test('should reject non-positive clientId', () => {
+      const { error } = projectSchema.validate({ ...valid, clientId: 0 });
+      expect(error).toBeDefined();
+    });
+
+    test('should reject name longer than 255 characters', () => {
+      const { error } = projectSchema.validate({ ...valid, name: 'a'.repeat(256) });
+      expect(error).toBeDefined();
+    });
+  });
+
+  describe('updateProjectSchema', () => {
+    test('should accept partial update', () => {
+      const { error } = updateProjectSchema.validate({ status: 'on-hold' });
+      expect(error).toBeUndefined();
+    });
+
+    test('should not apply a default status', () => {
+      const { value } = updateProjectSchema.validate({ name: 'Renamed' });
+      expect(value.status).toBeUndefined();
+    });
+
+    test('should reject empty update', () => {
+      const { error } = updateProjectSchema.validate({});
+      expect(error).toBeDefined();
+    });
+
+    test('should reject invalid status', () => {
+      const { error } = updateProjectSchema.validate({ status: 'done' });
+      expect(error).toBeDefined();
     });
   });
 
