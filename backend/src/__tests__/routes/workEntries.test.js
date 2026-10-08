@@ -585,4 +585,85 @@ describe('Work Entry Routes', () => {
       expect(response.body.message).toBe('Work entry updated successfully');
     });
   });
+
+  describe('POST /api/work-entries/:id/duplicate', () => {
+    const today = new Date().toISOString().split('T')[0];
+
+    test('should duplicate an existing work entry with today\'s date', async () => {
+      mockDb.get
+        .mockImplementationOnce((query, params, callback) => {
+          callback(null, {
+            id: 1,
+            client_id: 2,
+            user_email: 'test@example.com',
+            hours: 5,
+            description: 'Original work',
+            date: '2024-01-01'
+          });
+        })
+        .mockImplementationOnce((query, params, callback) => {
+          callback(null, {
+            id: 42,
+            client_id: 2,
+            hours: 5,
+            description: 'Original work',
+            date: today,
+            client_name: 'Client A'
+          });
+        });
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        callback.call({ lastID: 42 }, null);
+      });
+
+      const response = await request(app).post('/api/work-entries/1/duplicate');
+
+      expect(response.status).toBe(201);
+      expect(response.body.message).toBe('Work entry duplicated successfully');
+      expect(response.body.workEntry.id).toBe(42);
+      expect(response.body.workEntry.date).toBe(today);
+      expect(mockDb.get.mock.calls[0][1]).toEqual([1]);
+      expect(mockDb.run).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO work_entries'),
+        [2, 'test@example.com', 5, 'Original work', today],
+        expect.any(Function)
+      );
+    });
+
+    test('should return 404 when the work entry does not exist', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, undefined);
+      });
+
+      const response = await request(app).post('/api/work-entries/999/duplicate');
+
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({ error: 'Work entry not found' });
+      expect(mockDb.get).toHaveBeenCalledWith(
+        expect.any(String),
+        [999],
+        expect.any(Function)
+      );
+      expect(mockDb.run).not.toHaveBeenCalled();
+    });
+
+    test('should return 403 when the work entry belongs to another user', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, {
+          id: 1,
+          client_id: 2,
+          user_email: 'other@example.com',
+          hours: 5,
+          description: 'Original work',
+          date: '2024-01-01'
+        });
+      });
+
+      const response = await request(app).post('/api/work-entries/1/duplicate');
+
+      expect(response.status).toBe(403);
+      expect(response.body).toEqual({ error: 'Access denied' });
+      expect(mockDb.run).not.toHaveBeenCalled();
+    });
+  });
 });
