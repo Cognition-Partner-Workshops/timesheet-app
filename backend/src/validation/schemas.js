@@ -1,5 +1,7 @@
 const Joi = require('joi');
 
+const PROJECT_STATUSES = ['active', 'completed', 'on-hold'];
+
 const clientSchema = Joi.object({
   name: Joi.string().trim().min(1).max(255).required(),
   description: Joi.string().trim().max(1000).optional().allow(''),
@@ -21,6 +23,22 @@ const updateWorkEntrySchema = Joi.object({
   date: Joi.date().iso().optional()
 }).min(1); // At least one field must be provided
 
+const projectSchema = Joi.object({
+  name: Joi.string().trim().min(1).max(255).required(),
+  description: Joi.string().trim().max(1000).optional().allow(''),
+  clientId: Joi.number().integer().positive().required(),
+  startDate: Joi.date().iso().raw().required(),
+  status: Joi.string().valid(...PROJECT_STATUSES).default('active')
+});
+
+const updateProjectSchema = Joi.object({
+  name: Joi.string().trim().min(1).max(255).optional(),
+  description: Joi.string().trim().max(1000).optional().allow(''),
+  clientId: Joi.number().integer().positive().optional(),
+  startDate: Joi.date().iso().raw().optional(),
+  status: Joi.string().valid(...PROJECT_STATUSES).optional()
+}).min(1);
+
 const updateClientSchema = Joi.object({
   name: Joi.string().trim().min(1).max(255).optional(),
   description: Joi.string().trim().max(1000).optional().allow(''),
@@ -33,9 +51,12 @@ const emailSchema = Joi.object({
 });
 
 module.exports = {
+  PROJECT_STATUSES,
   clientSchema,
   workEntrySchema,
   updateWorkEntrySchema,
   updateClientSchema,
+  projectSchema,
+  updateProjectSchema,
   emailSchema
 };
