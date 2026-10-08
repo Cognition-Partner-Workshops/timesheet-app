@@ -83,6 +83,7 @@ const ProjectsPage: React.FC = () => {
   const projects = projectsData?.projects || [];
   const clients = clientsData?.clients || [];
   const isSaving = createMutation.isPending || updateMutation.isPending;
+  const submitLabel = editingProject ? 'Update' : 'Create';
 
   const handleOpen = (project?: Project) => {
     if (project) {
@@ -123,7 +124,7 @@ const ProjectsPage: React.FC = () => {
       return;
     }
 
-    if (!formData.startDate || isNaN(formData.startDate.getTime())) {
+    if (!formData.startDate || Number.isNaN(formData.startDate.getTime())) {
       setError('Please select a valid start date');
       return;
     }
@@ -368,7 +369,7 @@ const ProjectsPage: React.FC = () => {
                 Cancel
               </Button>
               <Button type="submit" variant="contained" disabled={isSaving}>
-                {isSaving ? <CircularProgress size={24} /> : editingProject ? 'Update' : 'Create'}
+                {isSaving ? <CircularProgress size={24} /> : submitLabel}
               </Button>
             </DialogActions>
           </form>

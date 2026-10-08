@@ -26,8 +26,8 @@ router.get('/', (req, res) => {
   const params = [req.userEmail];
 
   if (clientId) {
-    const clientIdNum = parseInt(clientId);
-    if (isNaN(clientIdNum)) {
+    const clientIdNum = Number.parseInt(clientId);
+    if (Number.isNaN(clientIdNum)) {
       return res.status(400).json({ error: 'Invalid client ID' });
     }
     query += ' AND p.client_id = ?';
@@ -58,9 +58,9 @@ router.get('/', (req, res) => {
 
 // Get specific project
 router.get('/:id', (req, res) => {
-  const projectId = parseInt(req.params.id);
+  const projectId = Number.parseInt(req.params.id);
 
-  if (isNaN(projectId)) {
+  if (Number.isNaN(projectId)) {
     return res.status(400).json({ error: 'Invalid project ID' });
   }
 
@@ -146,9 +146,9 @@ router.post('/', (req, res, next) => {
 // Update project
 router.put('/:id', (req, res, next) => {
   try {
-    const projectId = parseInt(req.params.id);
+    const projectId = Number.parseInt(req.params.id);
 
-    if (isNaN(projectId)) {
+    if (Number.isNaN(projectId)) {
       return res.status(400).json({ error: 'Invalid project ID' });
     }
 
@@ -263,9 +263,9 @@ router.put('/:id', (req, res, next) => {
 
 // Delete project
 router.delete('/:id', (req, res) => {
-  const projectId = parseInt(req.params.id);
+  const projectId = Number.parseInt(req.params.id);
 
-  if (isNaN(projectId)) {
+  if (Number.isNaN(projectId)) {
     return res.status(400).json({ error: 'Invalid project ID' });
   }
 
