@@ -47,6 +47,13 @@ const statusColors: Record<ProjectStatus, 'success' | 'info' | 'warning'> = {
   'on-hold': 'warning',
 };
 
+const formatLocalDate = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const ProjectsPage: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -168,7 +175,7 @@ const ProjectsPage: React.FC = () => {
       name: formData.name,
       description: formData.description || undefined,
       clientId: formData.clientId,
-      startDate: formData.startDate.toISOString().split('T')[0],
+      startDate: formatLocalDate(formData.startDate),
       status: formData.status,
     };
 
