@@ -1,5 +1,4 @@
-const sqlite3 = require('sqlite3');
-const { getDatabase, initializeDatabase, closeDatabase } = require('../../database/init');
+const mockSqliteState = { openError: null };
 
 // Mock sqlite3
 jest.mock('sqlite3', () => {
@@ -14,7 +13,7 @@ jest.mock('sqlite3', () => {
   return {
     verbose: jest.fn(() => ({
       Database: jest.fn((path, callback) => {
-        callback(null);
+        callback(mockSqliteState.openError);
         return mockDatabase;
       })
     }))
@@ -23,6 +22,7 @@ jest.mock('sqlite3', () => {
 
 describe('Database Initialization', () => {
   let consoleLogSpy, consoleErrorSpy;
+  let getDatabase, initializeDatabase, closeDatabase;
 
   beforeEach(() => {
     consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
@@ -30,9 +30,11 @@ describe('Database Initialization', () => {
     
     // Reset the database singleton
     jest.resetModules();
+    ({ getDatabase, initializeDatabase, closeDatabase } = require('../../database/init'));
   });
 
   afterEach(() => {
+    mockSqliteState.openError = null;
     consoleLogSpy.mockRestore();
     consoleErrorSpy.mockRestore();
     jest.clearAllMocks();
@@ -54,18 +56,8 @@ describe('Database Initialization', () => {
     });
 
     test('should handle database connection error', () => {
+      mockSqliteState.openError = new Error('Connection failed');
       jest.resetModules();
-      
-      jest.doMock('sqlite3', () => {
-        return {
-          verbose: jest.fn(() => ({
-            Database: jest.fn((path, callback) => {
-              callback(new Error('Connection failed'));
-              return {};
-            })
-          }))
-        };
-      });
 
       const { getDatabase: getDatabaseWithError } = require('../../database/init');
       
