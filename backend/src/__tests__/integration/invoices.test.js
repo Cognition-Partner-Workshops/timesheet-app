@@ -264,9 +264,15 @@ describe('lifecycle', () => {
     expect(draftPdf.headers['content-type']).toBe('application/pdf');
     expect(draftPdf.headers['content-disposition']).toContain(`invoice-draft-${inv.id}-Acme.pdf`);
     expect(draftPdf.body.slice(0, 4).toString()).toBe('%PDF');
+    expect(draftPdf.body.toString('latin1').match(/\/Type \/Page\b(?!s)/g)).toHaveLength(1);
 
     await user.post(`/api/invoices/${inv.id}/issue`);
-    const issuedPdf = await user.get(`/api/invoices/${inv.id}/pdf`);
+    const issuedPdf = await user.get(`/api/invoices/${inv.id}/pdf`).buffer(true).parse((res, cb) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+    expect(issuedPdf.body.toString('latin1').match(/\/Type \/Page\b(?!s)/g)).toHaveLength(1);
     expect(issuedPdf.headers['content-disposition']).toContain('invoice-INV-0001-Acme.pdf');
   });
 

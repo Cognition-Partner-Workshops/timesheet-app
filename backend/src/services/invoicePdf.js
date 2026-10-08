@@ -130,12 +130,16 @@ function streamInvoicePdf(invoice, userEmail, res) {
   const range = doc.bufferedPageRange();
   for (let i = range.start; i < range.start + range.count; i++) {
     doc.switchToPage(i);
+    // Writing below the bottom margin makes PDFKit add a page, so drop it while drawing the footer.
+    const { bottom } = doc.page.margins;
+    doc.page.margins.bottom = 0;
     if (watermark) drawWatermark(doc, watermark);
     doc.fontSize(8).fillColor('gray').text(
       `${invoice.invoice_number || 'Draft'}  |  Page ${i + 1} of ${range.count}`,
       MARGIN, doc.page.height - MARGIN + 10, { width: 495, align: 'center', lineBreak: false }
     );
     doc.fillColor('black');
+    doc.page.margins.bottom = bottom;
   }
 
   doc.end();
