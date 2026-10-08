@@ -183,6 +183,17 @@ Frontend will be running at `http://localhost:5173`
 - `GET /api/reports/export/csv/:clientId` - Export report as CSV
 - `GET /api/reports/export/pdf/:clientId` - Export report as PDF
 
+### Invoices
+- `GET /api/invoices?clientId=&status=` - List invoices
+- `GET /api/invoices/preview?clientId=&periodStart=&periodEnd=` - Preview unbilled entries for a period (no writes)
+- `POST /api/invoices` - Generate a draft invoice from unbilled work entries (optional `workEntryIds` to bill a subset)
+- `GET /api/invoices/:id` - Get invoice with line items
+- `PATCH /api/invoices/:id/status` - Transition status (`draft → issued → paid`, `draft|issued → void`)
+- `DELETE /api/invoices/:id` - Delete a draft invoice (its entries become unbilled again)
+- `GET /api/invoices/:id/pdf` - Download invoice PDF
+
+Clients need an `hourlyRate` before they can be invoiced. Invoices snapshot client details, rates, and line items at generation time, so later edits to clients don't change them. Billed work entries can't be edited or deleted; voiding an invoice releases its entries for rebilling while keeping an archived copy of its line items.
+
 All authenticated endpoints require `Authorization: Bearer <token>` header.
 
 ## Security Features
@@ -271,7 +282,7 @@ See `backend/DEPLOYMENT.md` for detailed production deployment instructions.
 
 ## Known Limitations
 
-1. **In-memory database** - All data is lost on server restart
+1. **In-memory database** - All data is lost on server restart, including invoices. Real billing use requires persistent storage and a migration story, which is out of scope for the v1 invoicing feature.
 2. **Email-only auth** - No password protection, assumes trusted network
 3. **No user roles** - All users have equal access to all data
 4. **Single-server architecture** - Not designed for horizontal scaling

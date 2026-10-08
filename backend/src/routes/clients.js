@@ -2,8 +2,12 @@ const express = require('express');
 const { getDatabase } = require('../database/init');
 const { authenticateUser } = require('../middleware/auth');
 const { clientSchema, updateClientSchema } = require('../validation/schemas');
+const { toCents } = require('../utils/billing');
 
 const router = express.Router();
+
+const CLIENT_COLUMNS = `id, name, description, department, email,
+  hourly_rate / 100.0 AS hourly_rate, currency, billing_address, created_at, updated_at`;
 
 // All routes require authentication
 router.use(authenticateUser);
@@ -13,7 +17,7 @@ router.get('/', (req, res) => {
   const db = getDatabase();
   
   db.all(
-    'SELECT id, name, description, department, email, created_at, updated_at FROM clients WHERE user_email = ? ORDER BY name',
+    `SELECT ${CLIENT_COLUMNS} FROM clients WHERE user_email = ? ORDER BY name`,
     [req.userEmail],
     (err, rows) => {
       if (err) {
@@ -37,7 +41,7 @@ router.get('/:id', (req, res) => {
   const db = getDatabase();
   
   db.get(
-    'SELECT id, name, description, department, email, created_at, updated_at FROM clients WHERE id = ? AND user_email = ?',
+    `SELECT ${CLIENT_COLUMNS} FROM clients WHERE id = ? AND user_email = ?`,
     [clientId, req.userEmail],
     (err, row) => {
       if (err) {
@@ -62,12 +66,22 @@ router.post('/', (req, res, next) => {
       return next(error);
     }
 
-    const { name, description, department, email } = value;
+    const { name, description, department, email, hourlyRate, currency, billingAddress } = value;
     const db = getDatabase();
 
     db.run(
-      'INSERT INTO clients (name, description, department, email, user_email) VALUES (?, ?, ?, ?, ?)',
-      [name, description || null, department || null, email || null, req.userEmail],
+      `INSERT INTO clients (name, description, department, email, hourly_rate, currency, billing_address, user_email)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        name,
+        description || null,
+        department || null,
+        email || null,
+        toCents(hourlyRate),
+        currency || 'USD',
+        billingAddress || null,
+        req.userEmail
+      ],
       function(err) {
         if (err) {
           console.error('Database error:', err);
@@ -76,8 +90,8 @@ router.post('/', (req, res, next) => {
 
         // Return the created client
         db.get(
-          'SELECT id, name, description, department, email, created_at, updated_at FROM clients WHERE id = ?',
-          [this.lastID],
+          `SELECT ${CLIENT_COLUMNS} FROM clients WHERE id = ? AND user_email = ?`,
+          [this.lastID, req.userEmail],
           (err, row) => {
             if (err) {
               console.error('Database error:', err);
@@ -151,6 +165,21 @@ router.put('/:id', (req, res, next) => {
           values.push(value.email || null);
         }
 
+        if (value.hourlyRate !== undefined) {
+          updates.push('hourly_rate = ?');
+          values.push(toCents(value.hourlyRate));
+        }
+
+        if (value.currency !== undefined) {
+          updates.push('currency = ?');
+          values.push(value.currency);
+        }
+
+        if (value.billingAddress !== undefined) {
+          updates.push('billing_address = ?');
+          values.push(value.billingAddress || null);
+        }
+
         updates.push('updated_at = CURRENT_TIMESTAMP');
         values.push(clientId, req.userEmail);
 
@@ -164,8 +193,8 @@ router.put('/:id', (req, res, next) => {
 
           // Return updated client
           db.get(
-            'SELECT id, name, description, department, email, created_at, updated_at FROM clients WHERE id = ?',
-            [clientId],
+            `SELECT ${CLIENT_COLUMNS} FROM clients WHERE id = ? AND user_email = ?`,
+            [clientId, req.userEmail],
             (err, row) => {
               if (err) {
                 console.error('Database error:', err);
@@ -189,20 +218,35 @@ router.put('/:id', (req, res, next) => {
 // Delete all clients for authenticated user
 router.delete('/', (req, res) => {
   const db = getDatabase();
-  
-  db.run(
-    'DELETE FROM clients WHERE user_email = ?',
+
+  db.get(
+    "SELECT COUNT(*) AS count FROM invoices WHERE user_email = ? AND status != 'void'",
     [req.userEmail],
-    function(err) {
+    (err, row) => {
       if (err) {
         console.error('Database error:', err);
-        return res.status(500).json({ error: 'Failed to delete clients' });
+        return res.status(500).json({ error: 'Internal server error' });
       }
-      
-      res.json({ 
-        message: 'All clients deleted successfully',
-        deletedCount: this.changes
-      });
+
+      if (row && row.count > 0) {
+        return res.status(409).json({ error: 'Cannot delete clients that have non-void invoices' });
+      }
+
+      db.run(
+        'DELETE FROM clients WHERE user_email = ?',
+        [req.userEmail],
+        function(err) {
+          if (err) {
+            console.error('Database error:', err);
+            return res.status(500).json({ error: 'Failed to delete clients' });
+          }
+
+          res.json({
+            message: 'All clients deleted successfully',
+            deletedCount: this.changes
+          });
+        }
+      );
     }
   );
 });
@@ -219,8 +263,11 @@ router.delete('/:id', (req, res) => {
   
   // Check if client exists and belongs to user
   db.get(
-    'SELECT id FROM clients WHERE id = ? AND user_email = ?',
-    [clientId, req.userEmail],
+    `SELECT c.id,
+            (SELECT COUNT(*) FROM invoices i
+             WHERE i.client_id = c.id AND i.user_email = ? AND i.status != 'void') AS active_invoice_count
+     FROM clients c WHERE c.id = ? AND c.user_email = ?`,
+    [req.userEmail, clientId, req.userEmail],
     (err, row) => {
       if (err) {
         console.error('Database error:', err);
@@ -229,6 +276,10 @@ router.delete('/:id', (req, res) => {
       
       if (!row) {
         return res.status(404).json({ error: 'Client not found' });
+      }
+
+      if (row.active_invoice_count > 0) {
+        return res.status(409).json({ error: 'Cannot delete a client that has non-void invoices' });
       }
       
       // Delete client (work entries will be deleted due to CASCADE)

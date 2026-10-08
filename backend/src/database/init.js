@@ -27,6 +27,8 @@ async function initializeDatabase() {
   
   return new Promise((resolve, reject) => {
     database.serialize(() => {
+      database.run('PRAGMA foreign_keys = ON');
+
       // Create users table
       database.run(`
         CREATE TABLE IF NOT EXISTS users (
@@ -43,6 +45,9 @@ async function initializeDatabase() {
           description TEXT,
           department TEXT,
           email TEXT,
+          hourly_rate INTEGER CHECK (hourly_rate IS NULL OR hourly_rate >= 0),
+          currency TEXT NOT NULL DEFAULT 'USD',
+          billing_address TEXT,
           user_email TEXT NOT NULL,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -66,11 +71,94 @@ async function initializeDatabase() {
         )
       `);
 
+      // Invoices store a frozen snapshot of client details and totals (money in cents)
+      database.run(`
+        CREATE TABLE IF NOT EXISTS invoices (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_email TEXT NOT NULL,
+          client_id INTEGER NOT NULL,
+          invoice_number TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'draft'
+            CHECK (status IN ('draft', 'issued', 'paid', 'void')),
+          period_start DATE NOT NULL,
+          period_end DATE NOT NULL,
+          issue_date DATE,
+          due_date DATE,
+          client_name TEXT NOT NULL,
+          client_email TEXT,
+          billing_address TEXT,
+          currency TEXT NOT NULL,
+          subtotal_cents INTEGER NOT NULL,
+          total_cents INTEGER NOT NULL,
+          total_hours DECIMAL(9,2) NOT NULL,
+          notes TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE,
+          FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE,
+          UNIQUE (user_email, invoice_number),
+          CHECK (period_start <= period_end)
+        )
+      `);
+
+      // UNIQUE work_entry_id guarantees an entry can never be billed twice
+      database.run(`
+        CREATE TABLE IF NOT EXISTS invoice_line_items (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          invoice_id INTEGER NOT NULL,
+          user_email TEXT NOT NULL,
+          work_entry_id INTEGER NOT NULL UNIQUE,
+          entry_date DATE NOT NULL,
+          description TEXT,
+          hours DECIMAL(5,2) NOT NULL,
+          rate_cents INTEGER NOT NULL,
+          amount_cents INTEGER NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (invoice_id) REFERENCES invoices (id) ON DELETE CASCADE,
+          FOREIGN KEY (work_entry_id) REFERENCES work_entries (id) ON DELETE RESTRICT,
+          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
+        )
+      `);
+
+      // Audit copy of line items from voided invoices (their entries become billable again)
+      database.run(`
+        CREATE TABLE IF NOT EXISTS invoice_line_items_archive (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          invoice_id INTEGER NOT NULL,
+          user_email TEXT NOT NULL,
+          work_entry_id INTEGER NOT NULL,
+          entry_date DATE NOT NULL,
+          description TEXT,
+          hours DECIMAL(5,2) NOT NULL,
+          rate_cents INTEGER NOT NULL,
+          amount_cents INTEGER NOT NULL,
+          created_at DATETIME,
+          archived_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (invoice_id) REFERENCES invoices (id) ON DELETE CASCADE,
+          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
+        )
+      `);
+
+      // Per-user, per-year invoice number sequence; numbers are never reused
+      database.run(`
+        CREATE TABLE IF NOT EXISTS invoice_sequences (
+          user_email TEXT NOT NULL,
+          year INTEGER NOT NULL,
+          next_value INTEGER NOT NULL,
+          PRIMARY KEY (user_email, year),
+          FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
+        )
+      `);
+
       // Create indexes for better performance
       database.run(`CREATE INDEX IF NOT EXISTS idx_clients_user_email ON clients (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_client_id ON work_entries (client_id)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_user_email ON work_entries (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_date ON work_entries (date)`);
+      database.run(`CREATE INDEX IF NOT EXISTS idx_invoices_user_email ON invoices (user_email)`);
+      database.run(`CREATE INDEX IF NOT EXISTS idx_invoices_client_id ON invoices (client_id)`);
+      database.run(`CREATE INDEX IF NOT EXISTS idx_invoice_line_items_invoice_id ON invoice_line_items (invoice_id)`);
+      database.run(`CREATE INDEX IF NOT EXISTS idx_invoice_line_items_archive_invoice_id ON invoice_line_items_archive (invoice_id)`);
 
       console.log('Database tables created successfully');
       resolve();

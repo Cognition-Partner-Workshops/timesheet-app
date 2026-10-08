@@ -19,6 +19,10 @@ import {
   Alert,
   CircularProgress,
   Chip,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -28,12 +32,23 @@ import {
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
-import { type Client } from '../types/api';
+import { type Client, type CreateClientRequest, type UpdateClientRequest } from '../types/api';
+import { CURRENCIES, formatCurrency } from '../utils/billing';
+
+const EMPTY_FORM = {
+  name: '',
+  description: '',
+  department: '',
+  email: '',
+  hourlyRate: '',
+  currency: 'USD',
+  billingAddress: '',
+};
 
 const ClientsPage: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
-  const [formData, setFormData] = useState({ name: '', description: '', department: '', email: '' });
+  const [formData, setFormData] = useState(EMPTY_FORM);
   const [error, setError] = useState('');
 
   const queryClient = useQueryClient();
@@ -44,7 +59,7 @@ const ClientsPage: React.FC = () => {
   });
 
   const createMutation = useMutation({
-    mutationFn: (clientData: { name: string; description?: string; department?: string; email?: string }) =>
+    mutationFn: (clientData: CreateClientRequest) =>
       apiClient.createClient(clientData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
@@ -57,7 +72,7 @@ const ClientsPage: React.FC = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { name?: string; description?: string; department?: string; email?: string } }) =>
+    mutationFn: ({ id, data }: { id: number; data: UpdateClientRequest }) =>
       apiClient.updateClient(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
@@ -100,11 +115,14 @@ const ClientsPage: React.FC = () => {
         name: client.name, 
         description: client.description || '',
         department: client.department || '',
-        email: client.email || ''
+        email: client.email || '',
+        hourlyRate: client.hourly_rate === null ? '' : client.hourly_rate.toString(),
+        currency: client.currency || 'USD',
+        billingAddress: client.billing_address || '',
       });
     } else {
       setEditingClient(null);
-      setFormData({ name: '', description: '', department: '', email: '' });
+      setFormData(EMPTY_FORM);
     }
     setError('');
     setOpen(true);
@@ -113,7 +131,7 @@ const ClientsPage: React.FC = () => {
   const handleClose = () => {
     setOpen(false);
     setEditingClient(null);
-    setFormData({ name: '', description: '', department: '', email: '' });
+    setFormData(EMPTY_FORM);
     setError('');
   };
 
@@ -126,6 +144,12 @@ const ClientsPage: React.FC = () => {
       return;
     }
 
+    const hourlyRate = formData.hourlyRate.trim() === '' ? null : Number(formData.hourlyRate);
+    if (hourlyRate !== null && (Number.isNaN(hourlyRate) || hourlyRate < 0 || hourlyRate > 100000)) {
+      setError('Hourly rate must be between 0 and 100000');
+      return;
+    }
+
     if (editingClient) {
       updateMutation.mutate({
         id: editingClient.id,
@@ -134,6 +158,9 @@ const ClientsPage: React.FC = () => {
           description: formData.description || undefined,
           department: formData.department || undefined,
           email: formData.email || undefined,
+          hourlyRate,
+          currency: formData.currency,
+          billingAddress: formData.billingAddress,
         },
       });
     } else {
@@ -142,6 +169,9 @@ const ClientsPage: React.FC = () => {
         description: formData.description || undefined,
         department: formData.department || undefined,
         email: formData.email || undefined,
+        hourlyRate,
+        currency: formData.currency,
+        billingAddress: formData.billingAddress || undefined,
       });
     }
   };
@@ -202,6 +232,7 @@ const ClientsPage: React.FC = () => {
                 <TableCell>Name</TableCell>
                 <TableCell>Department</TableCell>
                 <TableCell>Email</TableCell>
+                <TableCell>Hourly Rate</TableCell>
                 <TableCell>Description</TableCell>
                 <TableCell>Created</TableCell>
                 <TableCell align="right">Actions</TableCell>
@@ -232,6 +263,15 @@ const ClientsPage: React.FC = () => {
                         </Typography>
                       ) : (
                         <Chip label="-" size="small" variant="outlined" />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {client.hourly_rate !== null ? (
+                        <Typography variant="body2" color="text.secondary">
+                          {formatCurrency(client.hourly_rate, client.currency)}/h
+                        </Typography>
+                      ) : (
+                        <Chip label="Not set" size="small" variant="outlined" />
                       )}
                     </TableCell>
                     <TableCell>
@@ -268,7 +308,7 @@ const ClientsPage: React.FC = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">
+                  <TableCell colSpan={7} align="center">
                     <Typography color="text.secondary" sx={{ py: 3 }}>
                       No clients found. Create your first client to get started.
                     </Typography>
@@ -321,6 +361,45 @@ const ClientsPage: React.FC = () => {
               rows={3}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              disabled={createMutation.isPending || updateMutation.isPending}
+            />
+            <Box display="flex" gap={2}>
+              <TextField
+                margin="dense"
+                label="Hourly Rate"
+                type="number"
+                fullWidth
+                inputProps={{ min: 0, max: 100000, step: 0.01 }}
+                helperText="Required to generate invoices"
+                value={formData.hourlyRate}
+                onChange={(e) => setFormData({ ...formData, hourlyRate: e.target.value })}
+                disabled={createMutation.isPending || updateMutation.isPending}
+              />
+              <FormControl margin="dense" sx={{ minWidth: 120 }}>
+                <InputLabel>Currency</InputLabel>
+                <Select
+                  label="Currency"
+                  value={formData.currency}
+                  onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                >
+                  {CURRENCIES.map((code) => (
+                    <MenuItem key={code} value={code}>
+                      {code}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+            <TextField
+              margin="dense"
+              label="Billing Address"
+              fullWidth
+              multiline
+              rows={3}
+              inputProps={{ maxLength: 1000 }}
+              value={formData.billingAddress}
+              onChange={(e) => setFormData({ ...formData, billingAddress: e.target.value })}
               disabled={createMutation.isPending || updateMutation.isPending}
             />
           </DialogContent>
