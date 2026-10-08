@@ -19,7 +19,6 @@ import {
   Grid,
   Alert,
   CircularProgress,
-  Chip,
   IconButton,
   Tooltip,
 } from '@mui/material';
@@ -29,7 +28,7 @@ import {
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
-import { formatCalendarDate } from '../utils/date';
+import WorkEntryCells from '../components/WorkEntryCells';
 import { type ClientReport } from '../types/api';
 
 const ReportsPage: React.FC = () => {
@@ -231,27 +230,7 @@ const ReportsPage: React.FC = () => {
                       {report.workEntries.length > 0 ? (
                         report.workEntries.map((entry) => (
                           <TableRow key={entry.id}>
-                            <TableCell>
-                              <Typography variant="body2">
-                                {formatCalendarDate(entry.date)}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Chip 
-                                label={`${entry.hours} hours`} 
-                                color="primary" 
-                                variant="outlined" 
-                              />
-                            </TableCell>
-                            <TableCell>
-                              {entry.description ? (
-                                <Typography variant="body2" color="text.secondary">
-                                  {entry.description}
-                                </Typography>
-                              ) : (
-                                <Chip label="No description" size="small" variant="outlined" />
-                              )}
-                            </TableCell>
+                            <WorkEntryCells date={entry.date} hours={entry.hours} description={entry.description} />
                             <TableCell>
                               <Typography variant="body2" color="text.secondary">
                                 {new Date(entry.created_at).toLocaleDateString()}
