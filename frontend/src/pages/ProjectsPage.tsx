@@ -40,7 +40,7 @@ import {
   useProjects,
   useUpdateProject,
 } from '../hooks/useProjects';
-import { type Project, type ProjectStatus } from '../types/api';
+import { type Client, type Project, type ProjectStatus } from '../types/api';
 
 const STATUS_OPTIONS: { value: ProjectStatus; label: string; color: 'success' | 'primary' | 'warning' }[] = [
   { value: 'active', label: 'Active', color: 'success' },
@@ -70,6 +70,201 @@ const emptyForm = (): ProjectFormData => ({
 const getErrorMessage = (err: unknown, fallback: string) => {
   const error = err as { response?: { data?: { error?: string } } };
   return error.response?.data?.error || fallback;
+};
+
+const getProjectFormValidationError = (formData: ProjectFormData) => {
+  if (!formData.name.trim()) {
+    return 'Project name is required';
+  }
+
+  if (!formData.clientId) {
+    return 'Please select a client';
+  }
+
+  return '';
+};
+
+interface ProjectsTableBodyProps {
+  projects: Project[];
+  statusFilter: ProjectStatus | '';
+  onEdit: (project: Project) => void;
+  onDelete: (project: Project) => void;
+  isDeletePending: boolean;
+}
+
+const ProjectsTableBody: React.FC<ProjectsTableBodyProps> = ({
+  projects,
+  statusFilter,
+  onEdit,
+  onDelete,
+  isDeletePending,
+}) => {
+  if (projects.length === 0) {
+    return (
+      <TableBody>
+        <TableRow>
+          <TableCell colSpan={6} align="center">
+            <Typography color="text.secondary" sx={{ py: 3 }}>
+              {statusFilter
+                ? 'No projects match the selected status.'
+                : 'No projects found. Create your first project to get started.'}
+            </Typography>
+          </TableCell>
+        </TableRow>
+      </TableBody>
+    );
+  }
+
+  return (
+    <TableBody>
+      {projects.map((project) => {
+        const statusOption = getStatusOption(project.status);
+        return (
+          <TableRow key={project.id}>
+            <TableCell>
+              <Typography variant="subtitle1" fontWeight="medium">
+                {project.name}
+              </Typography>
+            </TableCell>
+            <TableCell>
+              <Typography variant="body2">{project.client_name}</Typography>
+            </TableCell>
+            <TableCell>
+              <Typography variant="body2">
+                {parseISO(project.start_date).toLocaleDateString()}
+              </Typography>
+            </TableCell>
+            <TableCell>
+              <Chip label={statusOption.label} color={statusOption.color} size="small" />
+            </TableCell>
+            <TableCell>
+              {project.description ? (
+                <Typography variant="body2" color="text.secondary">
+                  {project.description}
+                </Typography>
+              ) : (
+                <Chip label="No description" size="small" variant="outlined" />
+              )}
+            </TableCell>
+            <TableCell align="right">
+              <IconButton
+                onClick={() => onEdit(project)}
+                color="primary"
+                size="small"
+                aria-label={`Edit ${project.name}`}
+              >
+                <EditIcon />
+              </IconButton>
+              <IconButton
+                onClick={() => onDelete(project)}
+                color="error"
+                size="small"
+                aria-label={`Delete ${project.name}`}
+                disabled={isDeletePending}
+              >
+                <DeleteIcon />
+              </IconButton>
+            </TableCell>
+          </TableRow>
+        );
+      })}
+    </TableBody>
+  );
+};
+
+interface ProjectsContentProps {
+  clients: Client[];
+  projects: Project[];
+  clientsError: boolean;
+  projectsError: boolean;
+  statusFilter: ProjectStatus | '';
+  refetchClients: () => Promise<unknown>;
+  refetchProjects: () => Promise<unknown>;
+  onEdit: (project: Project) => void;
+  onDelete: (project: Project) => void;
+  isDeletePending: boolean;
+}
+
+const ProjectsContent: React.FC<ProjectsContentProps> = ({
+  clients,
+  projects,
+  clientsError,
+  projectsError,
+  statusFilter,
+  refetchClients,
+  refetchProjects,
+  onEdit,
+  onDelete,
+  isDeletePending,
+}) => {
+  if (clientsError) {
+    return (
+      <Alert
+        severity="error"
+        action={
+          <Button color="inherit" size="small" onClick={() => refetchClients()}>
+            Retry
+          </Button>
+        }
+      >
+        Failed to load clients.
+      </Alert>
+    );
+  }
+
+  if (clients.length === 0) {
+    return (
+      <Paper sx={{ p: 3, textAlign: 'center' }}>
+        <Typography color="text.secondary" sx={{ mb: 2 }}>
+          You need to create at least one client before adding projects.
+        </Typography>
+        <Button variant="contained" href="/clients">
+          Create Client
+        </Button>
+      </Paper>
+    );
+  }
+
+  if (projectsError) {
+    return (
+      <Alert
+        severity="error"
+        action={
+          <Button color="inherit" size="small" onClick={() => refetchProjects()}>
+            Retry
+          </Button>
+        }
+      >
+        Failed to load projects.
+      </Alert>
+    );
+  }
+
+  return (
+    <Paper>
+      <TableContainer>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Name</TableCell>
+              <TableCell>Client</TableCell>
+              <TableCell>Start Date</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Description</TableCell>
+              <TableCell align="right">Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <ProjectsTableBody
+            projects={projects}
+            statusFilter={statusFilter}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            isDeletePending={isDeletePending}
+          />
+        </Table>
+      </TableContainer>
+    </Paper>
+  );
 };
 
 const ProjectsPage: React.FC = () => {
@@ -126,17 +321,13 @@ const ProjectsPage: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    if (!formData.name.trim()) {
-      setError('Project name is required');
+    const validationError = getProjectFormValidationError(formData);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
-    if (!formData.clientId) {
-      setError('Please select a client');
-      return;
-    }
-
-    if (!formData.startDate || isNaN(formData.startDate.getTime())) {
+    if (!formData.startDate || Number.isNaN(formData.startDate.getTime())) {
       setError('Please select a valid start date');
       return;
     }
@@ -175,6 +366,8 @@ const ProjectsPage: React.FC = () => {
       });
     }
   };
+
+  const submitButtonLabel = editingProject ? 'Update' : 'Create';
 
   if (projectsLoading || clientsLoading) {
     return (
@@ -223,120 +416,18 @@ const ProjectsPage: React.FC = () => {
           </Alert>
         )}
 
-        {clientsError ? (
-          <Alert
-            severity="error"
-            action={
-              <Button color="inherit" size="small" onClick={() => refetchClients()}>
-                Retry
-              </Button>
-            }
-          >
-            Failed to load clients.
-          </Alert>
-        ) : clients.length === 0 ? (
-          <Paper sx={{ p: 3, textAlign: 'center' }}>
-            <Typography color="text.secondary" sx={{ mb: 2 }}>
-              You need to create at least one client before adding projects.
-            </Typography>
-            <Button variant="contained" href="/clients">
-              Create Client
-            </Button>
-          </Paper>
-        ) : projectsError ? (
-          <Alert
-            severity="error"
-            action={
-              <Button color="inherit" size="small" onClick={() => refetchProjects()}>
-                Retry
-              </Button>
-            }
-          >
-            Failed to load projects.
-          </Alert>
-        ) : (
-          <Paper>
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Client</TableCell>
-                    <TableCell>Start Date</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Description</TableCell>
-                    <TableCell align="right">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {projects.length > 0 ? (
-                    projects.map((project) => {
-                      const statusOption = getStatusOption(project.status);
-                      return (
-                        <TableRow key={project.id}>
-                          <TableCell>
-                            <Typography variant="subtitle1" fontWeight="medium">
-                              {project.name}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2">{project.client_name}</Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2">
-                              {parseISO(project.start_date).toLocaleDateString()}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Chip label={statusOption.label} color={statusOption.color} size="small" />
-                          </TableCell>
-                          <TableCell>
-                            {project.description ? (
-                              <Typography variant="body2" color="text.secondary">
-                                {project.description}
-                              </Typography>
-                            ) : (
-                              <Chip label="No description" size="small" variant="outlined" />
-                            )}
-                          </TableCell>
-                          <TableCell align="right">
-                            <IconButton
-                              onClick={() => handleOpen(project)}
-                              color="primary"
-                              size="small"
-                              aria-label={`Edit ${project.name}`}
-                            >
-                              <EditIcon />
-                            </IconButton>
-                            <IconButton
-                              onClick={() => handleDelete(project)}
-                              color="error"
-                              size="small"
-                              aria-label={`Delete ${project.name}`}
-                              disabled={deleteMutation.isPending}
-                            >
-                              <DeleteIcon />
-                            </IconButton>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={6} align="center">
-                        <Typography color="text.secondary" sx={{ py: 3 }}>
-                          {statusFilter
-                            ? 'No projects match the selected status.'
-                            : 'No projects found. Create your first project to get started.'}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
-        )}
+        <ProjectsContent
+          clients={clients}
+          projects={projects}
+          clientsError={clientsError}
+          projectsError={projectsError}
+          statusFilter={statusFilter}
+          refetchClients={refetchClients}
+          refetchProjects={refetchProjects}
+          onEdit={handleOpen}
+          onDelete={handleDelete}
+          isDeletePending={deleteMutation.isPending}
+        />
 
         <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
           <DialogTitle>{editingProject ? 'Edit Project' : 'Add New Project'}</DialogTitle>
@@ -422,7 +513,7 @@ const ProjectsPage: React.FC = () => {
                 Cancel
               </Button>
               <Button type="submit" variant="contained" disabled={isSaving}>
-                {isSaving ? <CircularProgress size={24} /> : editingProject ? 'Update' : 'Create'}
+                {isSaving ? <CircularProgress size={24} /> : submitButtonLabel}
               </Button>
             </DialogActions>
           </form>
