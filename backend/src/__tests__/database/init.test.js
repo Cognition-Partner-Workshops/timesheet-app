@@ -92,6 +92,13 @@ describe('Database Initialization', () => {
       expect(queries.some(q => q.includes('CREATE TABLE IF NOT EXISTS projects'))).toBe(true);
     });
 
+    test('should enable foreign key enforcement before creating tables', async () => {
+      const db = getDatabase();
+      await initializeDatabase();
+
+      expect(db.run).toHaveBeenNthCalledWith(1, 'PRAGMA foreign_keys = ON');
+    });
+
     test('should create indexes for performance', async () => {
       const db = getDatabase();
       await initializeDatabase();

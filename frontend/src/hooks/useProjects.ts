@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
 import type {
   Client,
@@ -14,6 +14,7 @@ export const useProjects = (filters: { clientId?: number; status?: ProjectStatus
     queryKey: [...PROJECTS_QUERY_KEY, filters],
     queryFn: () => apiClient.getProjects(filters),
     select: (data) => data.projects,
+    placeholderData: keepPreviousData,
   });
 
 export const useProjectClients = () =>
