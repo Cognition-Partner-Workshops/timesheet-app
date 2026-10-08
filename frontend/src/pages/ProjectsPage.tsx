@@ -257,9 +257,9 @@ const ProjectsPage: React.FC = () => {
               labelId="project-client-filter-label"
               label="Client"
               value={clientFilter}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setClientFilter(String(value) === '' ? '' : Number(value));
+              onChange={(event) => {
+                const value = event.target.value;
+                setClientFilter(String(value) === '' ? '' : Number(value));
               }}
             >
               <MenuItem value="">All clients</MenuItem>
