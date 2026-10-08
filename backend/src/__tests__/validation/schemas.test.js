@@ -3,6 +3,8 @@ const {
   workEntrySchema,
   updateWorkEntrySchema,
   updateClientSchema,
+  projectSchema,
+  updateProjectSchema,
   emailSchema
 } = require('../../validation/schemas');
 
@@ -323,6 +325,91 @@ describe('Validation Schemas', () => {
 
       const { error } = emailSchema.validate(data);
       expect(error).toBeUndefined();
+    });
+  });
+
+  describe('projectSchema', () => {
+    const validProject = {
+      name: 'Website Redesign',
+      description: 'Redesign marketing site',
+      clientId: 1,
+      startDate: '2024-01-15',
+      status: 'completed'
+    };
+
+    test('should validate valid project data', () => {
+      const { error } = projectSchema.validate(validProject);
+      expect(error).toBeUndefined();
+    });
+
+    test('should default status to active', () => {
+      const { status, ...rest } = validProject;
+      const { error, value } = projectSchema.validate(rest);
+      expect(error).toBeUndefined();
+      expect(value.status).toBe('active');
+    });
+
+    test('should accept all valid statuses', () => {
+      ['active', 'completed', 'on-hold'].forEach(status => {
+        const { error } = projectSchema.validate({ ...validProject, status });
+        expect(error).toBeUndefined();
+      });
+    });
+
+    test('should reject invalid status', () => {
+      const { error } = projectSchema.validate({ ...validProject, status: 'archived' });
+      expect(error).toBeDefined();
+    });
+
+    test('should allow empty or missing description', () => {
+      expect(projectSchema.validate({ ...validProject, description: '' }).error).toBeUndefined();
+      const { description, ...rest } = validProject;
+      expect(projectSchema.validate(rest).error).toBeUndefined();
+    });
+
+    test('should require name, clientId and startDate', () => {
+      ['name', 'clientId', 'startDate'].forEach(field => {
+        const project = { ...validProject };
+        delete project[field];
+        expect(projectSchema.validate(project).error).toBeDefined();
+      });
+    });
+
+    test('should reject non-positive clientId', () => {
+      expect(projectSchema.validate({ ...validProject, clientId: 0 }).error).toBeDefined();
+      expect(projectSchema.validate({ ...validProject, clientId: -1 }).error).toBeDefined();
+    });
+
+    test('should reject invalid startDate', () => {
+      const { error } = projectSchema.validate({ ...validProject, startDate: 'not-a-date' });
+      expect(error).toBeDefined();
+    });
+
+    test('should reject name longer than 255 characters', () => {
+      const { error } = projectSchema.validate({ ...validProject, name: 'a'.repeat(256) });
+      expect(error).toBeDefined();
+    });
+  });
+
+  describe('updateProjectSchema', () => {
+    test('should validate partial update', () => {
+      const { error } = updateProjectSchema.validate({ status: 'on-hold' });
+      expect(error).toBeUndefined();
+    });
+
+    test('should reject empty update', () => {
+      const { error } = updateProjectSchema.validate({});
+      expect(error).toBeDefined();
+    });
+
+    test('should reject invalid status', () => {
+      const { error } = updateProjectSchema.validate({ status: 'paused' });
+      expect(error).toBeDefined();
+    });
+
+    test('should not default status on update', () => {
+      const { value } = updateProjectSchema.validate({ name: 'Renamed' });
+      expect(value.status).toBeUndefined();
     });
   });
 });
