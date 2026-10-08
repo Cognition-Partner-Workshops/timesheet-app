@@ -1,5 +1,19 @@
 const Joi = require('joi');
 
+const dateOnly = Joi.string()
+  .pattern(/^\d{4}-\d{2}-\d{2}$/)
+  .custom((value, helpers) => {
+    const parsed = new Date(`${value}T00:00:00Z`);
+    if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+      return helpers.error('any.invalid');
+    }
+    return value;
+  })
+  .messages({
+    'string.pattern.base': '"date" must be in YYYY-MM-DD format',
+    'any.invalid': '"date" must be a valid calendar date',
+  });
+
 const clientSchema = Joi.object({
   name: Joi.string().trim().min(1).max(255).required(),
   description: Joi.string().trim().max(1000).optional().allow(''),
@@ -11,14 +25,14 @@ const workEntrySchema = Joi.object({
   clientId: Joi.number().integer().positive().required(),
   hours: Joi.number().positive().max(24).precision(2).required(),
   description: Joi.string().trim().max(1000).optional().allow(''),
-  date: Joi.date().iso().required()
+  date: dateOnly.required()
 });
 
 const updateWorkEntrySchema = Joi.object({
   clientId: Joi.number().integer().positive().optional(),
   hours: Joi.number().positive().max(24).precision(2).optional(),
   description: Joi.string().trim().max(1000).optional().allow(''),
-  date: Joi.date().iso().optional()
+  date: dateOnly.optional()
 }).min(1); // At least one field must be provided
 
 const updateClientSchema = Joi.object({

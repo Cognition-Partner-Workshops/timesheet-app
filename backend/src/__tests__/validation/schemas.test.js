@@ -94,8 +94,10 @@ describe('Validation Schemas', () => {
         date: '2024-01-15'
       };
 
-      const { error } = workEntrySchema.validate(validEntry);
+      const { error, value } = workEntrySchema.validate(validEntry);
       expect(error).toBeUndefined();
+      expect(value.date).toBe('2024-01-15');
+      expect(typeof value.date).toBe('string');
     });
 
     test('should allow empty description', () => {
@@ -195,11 +197,16 @@ describe('Validation Schemas', () => {
       expect(error).toBeDefined();
     });
 
-    test('should reject invalid date format', () => {
+    test.each([
+      '2024-02-30',
+      '2024-13-01',
+      '2024-01-15T10:00:00Z',
+      '01/15/2024'
+    ])('should reject invalid date %s', (date) => {
       const entry = {
         clientId: 1,
         hours: 5,
-        date: '01/15/2024'
+        date
       };
 
       const { error } = workEntrySchema.validate(entry);
@@ -248,8 +255,20 @@ describe('Validation Schemas', () => {
         date: '2024-02-01'
       };
 
-      const { error } = updateWorkEntrySchema.validate(update);
+      const { error, value } = updateWorkEntrySchema.validate(update);
       expect(error).toBeUndefined();
+      expect(value.date).toBe('2024-02-01');
+      expect(typeof value.date).toBe('string');
+    });
+
+    test.each([
+      '2024-02-30',
+      '2024-13-01',
+      '2024-01-15T10:00:00Z',
+      '01/15/2024'
+    ])('should reject invalid date update %s', (date) => {
+      const { error } = updateWorkEntrySchema.validate({ date });
+      expect(error).toBeDefined();
     });
   });
 

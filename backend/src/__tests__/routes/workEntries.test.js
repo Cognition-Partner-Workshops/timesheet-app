@@ -150,6 +150,11 @@ describe('Work Entry Routes', () => {
 
       expect(response.status).toBe(201);
       expect(response.body.message).toBe('Work entry created successfully');
+      expect(mockDb.run).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO work_entries'),
+        [1, 'test@example.com', 5.5, 'Development work', '2024-01-15'],
+        expect.any(Function)
+      );
     });
 
     test('should return 400 if client not found', async () => {
@@ -243,6 +248,31 @@ describe('Work Entry Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.message).toBe('Work entry updated successfully');
+    });
+
+    test('should update work entry date as a date-only string', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        if (query.includes('SELECT id FROM work_entries')) {
+          callback(null, { id: 1 });
+        } else {
+          callback(null, { id: 1, date: '2024-02-01' });
+        }
+      });
+
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+
+      const response = await request(app)
+        .put('/api/work-entries/1')
+        .send({ date: '2024-02-01' });
+
+      expect(response.status).toBe(200);
+      expect(mockDb.run).toHaveBeenCalledWith(
+        expect.stringContaining('date = ?'),
+        ['2024-02-01', 1, 'test@example.com'],
+        expect.any(Function)
+      );
     });
 
     test('should update work entry client', async () => {
