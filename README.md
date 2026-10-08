@@ -5,20 +5,18 @@ A full-stack web application for tracking and reporting employee hourly work acr
 ## ⚠️ Important Notes
 
 ### Data Persistence
-**This application uses SQLite in-memory database as specified in requirements.**
-- ⚠️ **All data is lost when the backend server restarts**
-- Suitable for development and testing
-- For production use, modify `backend/src/database/init.js` to use file-based SQLite instead of `:memory:`
+- Data is stored in a SQLite file at `backend/data/timesheet.db` by default (set `DATABASE_PATH` to change it, or `:memory:` for a throwaway database; tests use in-memory).
+- Schema changes are applied on startup by versioned migrations in `backend/src/database/migrations.js` (tracked with `PRAGMA user_version`). Add a new migration instead of editing a shipped one.
+- Foreign keys are enforced (`PRAGMA foreign_keys = ON`).
 
-### Authentication
-- Email-only authentication with JWT tokens
-- No password required - assumes trusted internal network
-- Anyone with a valid email can create an account and log in
-- Consider integrating with company SSO for production use
+### Authentication (known risk)
+- Login is email-only, with **no password and no token**. The backend trusts the `x-user-email` request header on every call.
+- Anyone who knows (or guesses) a user's email can read and change that user's clients, work entries and invoices by sending that header.
+- Only run this on a trusted internal network. Replacing it with real authentication (passwords or company SSO) is a separate piece of work.
 
 ## Features
 
-- ✅ User authentication (email-based with JWT tokens)
+- ✅ User login (email only, no password; see the authentication risk above)
 - ✅ Add, edit, and delete clients
 - ✅ Add, edit, and delete hourly work entries for each client
 - ✅ View hourly reports for each client
@@ -36,8 +34,8 @@ A full-stack web application for tracking and reporting employee hourly work acr
 
 ### Backend
 - **Node.js** with Express
-- **SQLite** in-memory database
-- **JWT** for authentication
+- **SQLite** (file-based, with versioned migrations)
+- `x-user-email` header for user identification (no real authentication)
 - **Joi** for validation
 - **PDFKit** for PDF generation
 - **csv-writer** for CSV export
@@ -51,7 +49,7 @@ A full-stack web application for tracking and reporting employee hourly work acr
 │   │   ├── database/
 │   │   │   └── init.js           # Database initialization
 │   │   ├── middleware/
-│   │   │   ├── auth.js           # JWT authentication
+│   │   │   ├── auth.js           # x-user-email header check
 │   │   │   └── errorHandler.js  # Error handling
 │   │   ├── routes/
 │   │   │   ├── auth.js           # Authentication endpoints
@@ -67,7 +65,7 @@ A full-stack web application for tracking and reporting employee hourly work acr
 └── frontend/
     ├── src/
     │   ├── api/
-    │   │   └── client.ts         # API client with JWT
+    │   │   └── client.ts         # API client (sends x-user-email)
     │   ├── components/
     │   │   └── Layout.tsx        # Main layout
     │   ├── contexts/
@@ -112,7 +110,8 @@ cp .env.example .env
 PORT=3001
 NODE_ENV=development
 FRONTEND_URL=http://localhost:5173
-JWT_SECRET=your-secure-secret-key-change-this
+# Optional: where the SQLite file lives (default: backend/data/timesheet.db)
+# DATABASE_PATH=./data/timesheet.db
 ```
 
 5. Start the development server:
@@ -161,7 +160,7 @@ Frontend will be running at `http://localhost:5173`
 ## API Endpoints
 
 ### Authentication
-- `POST /api/auth/login` - Login with email, returns JWT token
+- `POST /api/auth/login` - Login with email (creates the user if needed)
 - `GET /api/auth/me` - Get current user info (requires auth)
 
 ### Clients
@@ -183,11 +182,10 @@ Frontend will be running at `http://localhost:5173`
 - `GET /api/reports/export/csv/:clientId` - Export report as CSV
 - `GET /api/reports/export/pdf/:clientId` - Export report as PDF
 
-All authenticated endpoints require `Authorization: Bearer <token>` header.
+All authenticated endpoints require the `x-user-email` header.
 
 ## Security Features
 
-- JWT-based authentication with 24-hour token expiration
 - Rate limiting on authentication endpoints (5 attempts per 15 minutes)
 - CORS protection
 - Helmet security headers
@@ -260,9 +258,9 @@ npm run preview  # Preview production build
 See `backend/DEPLOYMENT.md` for detailed production deployment instructions.
 
 ### Quick Production Checklist
-- [ ] Set strong `JWT_SECRET` in environment variables
+- [ ] Restrict network access: email-only login is not real authentication (see Authentication above)
 - [ ] Configure proper `FRONTEND_URL` for CORS
-- [ ] Consider switching to file-based SQLite for data persistence
+- [ ] Put `DATABASE_PATH` on a persistent volume and back it up
 - [ ] Set up HTTPS/SSL certificates
 - [ ] Configure proper logging and monitoring
 - [ ] Set up automated backups (if using persistent storage)
@@ -271,8 +269,8 @@ See `backend/DEPLOYMENT.md` for detailed production deployment instructions.
 
 ## Known Limitations
 
-1. **In-memory database** - All data is lost on server restart
-2. **Email-only auth** - No password protection, assumes trusted network
+1. **Single SQLite file** - No replication; back up `DATABASE_PATH` yourself
+2. **Email-only auth** - No password or token; any caller can act as any user by setting `x-user-email`
 3. **No user roles** - All users have equal access to all data
 4. **Single-server architecture** - Not designed for horizontal scaling
 5. **No real-time updates** - Changes require page refresh

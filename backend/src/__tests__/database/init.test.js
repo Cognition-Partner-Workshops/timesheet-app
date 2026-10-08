@@ -1,187 +1,118 @@
-const sqlite3 = require('sqlite3');
-const { getDatabase, initializeDatabase, closeDatabase } = require('../../database/init');
+jest.unmock('sqlite3');
 
-// Mock sqlite3
-jest.mock('sqlite3', () => {
-  const mockDatabase = {
-    serialize: jest.fn((callback) => callback()),
-    run: jest.fn((query, callback) => {
-      if (typeof callback === 'function') callback(null);
-    }),
-    close: jest.fn((callback) => callback(null))
-  };
+const sqlite3 = jest.requireActual('sqlite3').verbose();
+const { migrations, runMigrations, run, get, all } = require('../../database/migrations');
 
-  return {
-    verbose: jest.fn(() => ({
-      Database: jest.fn((path, callback) => {
-        callback(null);
-        return mockDatabase;
-      })
-    }))
-  };
-});
+function openMemoryDb() {
+  return new Promise((resolve, reject) => {
+    const db = new sqlite3.Database(':memory:', (err) => (err ? reject(err) : resolve(db)));
+  });
+}
 
-describe('Database Initialization', () => {
-  let consoleLogSpy, consoleErrorSpy;
+function closeDb(db) {
+  return new Promise((resolve) => db.close(() => resolve()));
+}
+
+describe('Database initialization', () => {
+  let consoleLogSpy;
 
   beforeEach(() => {
     consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-    
-    // Reset the database singleton
     jest.resetModules();
   });
 
   afterEach(() => {
     consoleLogSpy.mockRestore();
-    consoleErrorSpy.mockRestore();
-    jest.clearAllMocks();
+    delete process.env.DATABASE_PATH;
   });
 
-  describe('getDatabase', () => {
-    test('should create and return database instance', () => {
-      const db = getDatabase();
-      
-      expect(db).toBeDefined();
-      expect(consoleLogSpy).toHaveBeenCalledWith('Connected to SQLite in-memory database');
-    });
+  test('resolveDatabasePath honours DATABASE_PATH, then test env, then file default', () => {
+    const { resolveDatabasePath } = require('../../database/init');
+    process.env.DATABASE_PATH = '/tmp/custom.db';
+    expect(resolveDatabasePath()).toBe('/tmp/custom.db');
+    delete process.env.DATABASE_PATH;
+    expect(resolveDatabasePath()).toBe(':memory:');
 
-    test('should return same database instance on multiple calls', () => {
-      const db1 = getDatabase();
-      const db2 = getDatabase();
-      
-      expect(db1).toBe(db2);
-    });
-
-    test('should handle database connection error', () => {
-      jest.resetModules();
-      
-      jest.doMock('sqlite3', () => {
-        return {
-          verbose: jest.fn(() => ({
-            Database: jest.fn((path, callback) => {
-              callback(new Error('Connection failed'));
-              return {};
-            })
-          }))
-        };
-      });
-
-      const { getDatabase: getDatabaseWithError } = require('../../database/init');
-      
-      expect(() => getDatabaseWithError()).toThrow('Connection failed');
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error opening database:', expect.any(Error));
-    });
+    const originalEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
+    expect(resolveDatabasePath()).toMatch(/data[\\/]timesheet\.db$/);
+    process.env.NODE_ENV = originalEnv;
   });
 
-  describe('initializeDatabase', () => {
-    test('should create all required tables', async () => {
-      const db = getDatabase();
-      await initializeDatabase();
+  test('initializeDatabase enables foreign keys and applies all migrations', async () => {
+    const { getDatabase, initializeDatabase, closeDatabase } = require('../../database/init');
+    await initializeDatabase();
+    const db = getDatabase();
 
-      expect(db.serialize).toHaveBeenCalled();
-      expect(db.run).toHaveBeenCalled();
-      
-      // Check that run was called for each table and index
-      const runCalls = db.run.mock.calls;
-      const queries = runCalls.map(call => call[0]);
-      
-      expect(queries.some(q => q.includes('CREATE TABLE IF NOT EXISTS users'))).toBe(true);
-      expect(queries.some(q => q.includes('CREATE TABLE IF NOT EXISTS clients'))).toBe(true);
-      expect(queries.some(q => q.includes('CREATE TABLE IF NOT EXISTS work_entries'))).toBe(true);
-    });
+    expect((await get(db, 'PRAGMA foreign_keys')).foreign_keys).toBe(1);
+    expect((await get(db, 'PRAGMA user_version')).user_version).toBe(migrations.length);
+    const tables = (await all(db, "SELECT name FROM sqlite_master WHERE type = 'table'")).map((t) => t.name);
+    expect(tables).toEqual(expect.arrayContaining(['users', 'clients', 'work_entries']));
+    expect(consoleLogSpy).toHaveBeenCalledWith('Database tables created successfully');
 
-    test('should create indexes for performance', async () => {
-      const db = getDatabase();
-      await initializeDatabase();
-
-      const runCalls = db.run.mock.calls;
-      const queries = runCalls.map(call => call[0]);
-      
-      expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_clients_user_email'))).toBe(true);
-      expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_work_entries_client_id'))).toBe(true);
-      expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_work_entries_user_email'))).toBe(true);
-      expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_work_entries_date'))).toBe(true);
-    });
-
-    test('should log success message', async () => {
-      await initializeDatabase();
-      
-      expect(consoleLogSpy).toHaveBeenCalledWith('Database tables created successfully');
-    });
-
-    test('should resolve promise on success', async () => {
-      await expect(initializeDatabase()).resolves.toBeUndefined();
-    });
+    await closeDatabase();
+    await closeDatabase();
   });
 
-  describe('closeDatabase', () => {
-    test('should close database connection', () => {
-      const db = getDatabase();
-      closeDatabase();
+  test('getDatabase returns the same instance', () => {
+    const { getDatabase, closeDatabase } = require('../../database/init');
+    expect(getDatabase()).toBe(getDatabase());
+    return closeDatabase();
+  });
+});
 
-      expect(db.close).toHaveBeenCalled();
-      expect(consoleLogSpy).toHaveBeenCalledWith('Database connection closed');
-    });
+describe('Migrations', () => {
+  let db;
 
-    test('should handle close error gracefully', () => {
-      const db = getDatabase();
-      db.close.mockImplementation((callback) => callback(new Error('Close error')));
-
-      closeDatabase();
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Error closing database:', expect.any(Error));
-    });
-
-    test('should handle multiple close calls safely', () => {
-      const db = getDatabase();
-      // Reset close mock to default behavior (no error)
-      db.close.mockImplementation((callback) => callback(null));
-      closeDatabase();
-      closeDatabase(); // Second call should not throw
-
-      expect(consoleErrorSpy).not.toHaveBeenCalled();
-    });
+  beforeEach(async () => {
+    db = await openMemoryDb();
   });
 
-  describe('Database Schema', () => {
-    test('users table should have correct structure', async () => {
-      const db = getDatabase();
-      await initializeDatabase();
+  afterEach(async () => {
+    await closeDb(db);
+  });
 
-      const userTableQuery = db.run.mock.calls.find(call => 
-        call[0].includes('CREATE TABLE IF NOT EXISTS users')
-      );
+  test('are idempotent', async () => {
+    await runMigrations(db);
+    await runMigrations(db);
+    expect((await get(db, 'PRAGMA user_version')).user_version).toBe(migrations.length);
+  });
 
-      expect(userTableQuery).toBeDefined();
-      expect(userTableQuery[0]).toContain('email TEXT PRIMARY KEY');
-      expect(userTableQuery[0]).toContain('created_at DATETIME DEFAULT CURRENT_TIMESTAMP');
-    });
+  test('upgrade a database created by the old docker schema without losing data', async () => {
+    await run(db, 'CREATE TABLE users (email TEXT PRIMARY KEY, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)');
+    await run(db, `CREATE TABLE clients (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT,
+      user_email TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+    await run(db, `CREATE TABLE work_entries (id INTEGER PRIMARY KEY AUTOINCREMENT, client_id INTEGER NOT NULL,
+      user_email TEXT NOT NULL, hours DECIMAL(5,2) NOT NULL, description TEXT, date DATE NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+    await run(db, "INSERT INTO users (email) VALUES ('a@example.com')");
+    await run(db, "INSERT INTO clients (name, user_email) VALUES ('Acme', 'a@example.com')");
+    await run(db, "INSERT INTO work_entries (client_id, user_email, hours, date) VALUES (1, 'a@example.com', 2, ?)", [Date.UTC(2026, 5, 24)]);
+    await run(db, "INSERT INTO work_entries (client_id, user_email, hours, date) VALUES (1, 'a@example.com', 3, '2026-06-25T00:00:00.000Z')");
+    await run(db, "INSERT INTO work_entries (client_id, user_email, hours, date) VALUES (1, 'a@example.com', 4, '2026-06-26')");
 
-    test('clients table should have foreign key to users', async () => {
-      const db = getDatabase();
-      await initializeDatabase();
+    await runMigrations(db);
 
-      const clientTableQuery = db.run.mock.calls.find(call => 
-        call[0].includes('CREATE TABLE IF NOT EXISTS clients')
-      );
+    const columns = (await all(db, 'PRAGMA table_info(clients)')).map((c) => c.name);
+    expect(columns).toEqual(expect.arrayContaining(['department', 'email']));
+    const dates = (await all(db, 'SELECT date, typeof(date) AS t FROM work_entries ORDER BY id'));
+    expect(dates.map((d) => d.date)).toEqual(['2026-06-24', '2026-06-25', '2026-06-26']);
+    expect(dates.every((d) => d.t === 'text')).toBe(true);
+    expect((await get(db, 'SELECT COUNT(*) AS n FROM clients')).n).toBe(1);
+  });
 
-      expect(clientTableQuery).toBeDefined();
-      expect(clientTableQuery[0]).toContain('user_email TEXT NOT NULL');
-      expect(clientTableQuery[0]).toContain('FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE');
-    });
-
-    test('work_entries table should have foreign keys', async () => {
-      const db = getDatabase();
-      await initializeDatabase();
-
-      const workEntriesQuery = db.run.mock.calls.find(call => 
-        call[0].includes('CREATE TABLE IF NOT EXISTS work_entries')
-      );
-
-      expect(workEntriesQuery).toBeDefined();
-      expect(workEntriesQuery[0]).toContain('FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE');
-      expect(workEntriesQuery[0]).toContain('FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE');
-    });
+  test('roll back a failing migration and leave user_version unchanged', async () => {
+    const failing = [
+      async (conn) => run(conn, 'CREATE TABLE ok_table (id INTEGER)'),
+      async (conn) => {
+        await run(conn, 'CREATE TABLE partial (id INTEGER)');
+        throw new Error('boom');
+      },
+    ];
+    await expect(runMigrations(db, failing)).rejects.toThrow('boom');
+    expect((await get(db, 'PRAGMA user_version')).user_version).toBe(1);
+    const tables = (await all(db, "SELECT name FROM sqlite_master WHERE type = 'table'")).map((t) => t.name);
+    expect(tables).toContain('ok_table');
+    expect(tables).not.toContain('partial');
   });
 });

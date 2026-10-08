@@ -50,3 +50,6 @@ Thumbs.db
 # Build outputs
 dist/
 build/
+
+# Local SQLite database
+data/
