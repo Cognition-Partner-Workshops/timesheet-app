@@ -23,6 +23,7 @@ import {
   Select,
   MenuItem,
   Chip,
+  Tooltip,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -35,6 +36,20 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import apiClient from '../api/client';
 import { type WorkEntry } from '../types/api';
+
+const BILLING_LABELS = {
+  draft: { prefix: 'Draft', color: 'default' },
+  issued: { prefix: 'Invoiced', color: 'info' },
+  paid: { prefix: 'Paid', color: 'success' },
+} as const;
+
+const BillingChip: React.FC<{ entry: WorkEntry }> = ({ entry }) => {
+  if (!entry.invoice_number || !entry.invoice_status || entry.invoice_status === 'void') {
+    return <Chip label="Unbilled" size="small" variant="outlined" />;
+  }
+  const { prefix, color } = BILLING_LABELS[entry.invoice_status];
+  return <Chip label={`${prefix} #${entry.invoice_number}`} size="small" color={color} />;
+};
 
 const WorkEntriesPage: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -219,6 +234,7 @@ const WorkEntriesPage: React.FC = () => {
                     <TableCell>Date</TableCell>
                     <TableCell>Hours</TableCell>
                     <TableCell>Description</TableCell>
+                    <TableCell>Billing</TableCell>
                     <TableCell align="right">Actions</TableCell>
                   </TableRow>
                 </TableHead>
@@ -252,27 +268,40 @@ const WorkEntriesPage: React.FC = () => {
                             <Chip label="No description" size="small" variant="outlined" />
                           )}
                         </TableCell>
+                        <TableCell>
+                          <BillingChip entry={entry} />
+                        </TableCell>
                         <TableCell align="right">
-                          <IconButton
-                            onClick={() => handleOpen(entry)}
-                            color="primary"
-                            size="small"
+                          <Tooltip
+                            title={entry.invoice_number
+                              ? `Billed on ${entry.invoice_number}. Void the invoice to edit or delete this entry.`
+                              : ''}
                           >
-                            <EditIcon />
-                          </IconButton>
-                          <IconButton
-                            onClick={() => handleDelete(entry)}
-                            color="error"
-                            size="small"
-                          >
-                            <DeleteIcon />
-                          </IconButton>
+                            <span>
+                              <IconButton
+                                onClick={() => handleOpen(entry)}
+                                color="primary"
+                                size="small"
+                                disabled={Boolean(entry.invoice_number)}
+                              >
+                                <EditIcon />
+                              </IconButton>
+                              <IconButton
+                                onClick={() => handleDelete(entry)}
+                                color="error"
+                                size="small"
+                                disabled={Boolean(entry.invoice_number)}
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
                         </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={5} align="center">
+                      <TableCell colSpan={6} align="center">
                         <Typography color="text.secondary" sx={{ py: 3 }}>
                           No work entries found. Add your first work entry to get started.
                         </Typography>

@@ -5,6 +5,17 @@ const { workEntrySchema, updateWorkEntrySchema } = require('../validation/schema
 
 const router = express.Router();
 
+const BILLING_COLUMNS = 'ili.invoice_id, i.invoice_number, i.status AS invoice_status';
+const BILLING_JOINS = `
+  LEFT JOIN invoice_line_items ili ON ili.work_entry_id = we.id AND ili.user_email = ?
+  LEFT JOIN invoices i ON i.id = ili.invoice_id AND i.user_email = ?`;
+const BILLED_ENTRY_LOOKUP = `
+  SELECT we.id, i.invoice_number
+  FROM work_entries we
+  LEFT JOIN invoice_line_items ili ON ili.work_entry_id = we.id AND ili.user_email = we.user_email
+  LEFT JOIN invoices i ON i.id = ili.invoice_id AND i.user_email = we.user_email
+  WHERE we.id = ? AND we.user_email = ?`;
+
 // All routes require authentication
 router.use(authenticateUser);
 
@@ -15,13 +26,15 @@ router.get('/', (req, res) => {
   
   let query = `
     SELECT we.id, we.client_id, we.hours, we.description, we.date, 
-           we.created_at, we.updated_at, c.name as client_name
+           we.created_at, we.updated_at, c.name as client_name,
+           ${BILLING_COLUMNS}
     FROM work_entries we
     JOIN clients c ON we.client_id = c.id
+    ${BILLING_JOINS}
     WHERE we.user_email = ?
   `;
   
-  const params = [req.userEmail];
+  const params = [req.userEmail, req.userEmail, req.userEmail];
   
   if (clientId) {
     const clientIdNum = parseInt(clientId);
@@ -56,11 +69,13 @@ router.get('/:id', (req, res) => {
   
   db.get(
     `SELECT we.id, we.client_id, we.hours, we.description, we.date, 
-            we.created_at, we.updated_at, c.name as client_name
+            we.created_at, we.updated_at, c.name as client_name,
+            ${BILLING_COLUMNS}
      FROM work_entries we
      JOIN clients c ON we.client_id = c.id
+     ${BILLING_JOINS}
      WHERE we.id = ? AND we.user_email = ?`,
-    [workEntryId, req.userEmail],
+    [req.userEmail, req.userEmail, workEntryId, req.userEmail],
     (err, row) => {
       if (err) {
         console.error('Database error:', err);
@@ -158,7 +173,7 @@ router.put('/:id', (req, res, next) => {
 
     // Check if work entry exists and belongs to user
     db.get(
-      'SELECT id FROM work_entries WHERE id = ? AND user_email = ?',
+      BILLED_ENTRY_LOOKUP,
       [workEntryId, req.userEmail],
       (err, row) => {
         if (err) {
@@ -168,6 +183,10 @@ router.put('/:id', (req, res, next) => {
 
         if (!row) {
           return res.status(404).json({ error: 'Work entry not found' });
+        }
+
+        if (row.invoice_number) {
+          return res.status(409).json({ error: `Work entry is billed on invoice ${row.invoice_number}` });
         }
 
         // If clientId is being updated, verify it belongs to user
@@ -269,7 +288,7 @@ router.delete('/:id', (req, res) => {
   
   // Check if work entry exists and belongs to user
   db.get(
-    'SELECT id FROM work_entries WHERE id = ? AND user_email = ?',
+    BILLED_ENTRY_LOOKUP,
     [workEntryId, req.userEmail],
     (err, row) => {
       if (err) {
@@ -279,6 +298,10 @@ router.delete('/:id', (req, res) => {
       
       if (!row) {
         return res.status(404).json({ error: 'Work entry not found' });
+      }
+
+      if (row.invoice_number) {
+        return res.status(409).json({ error: `Work entry is billed on invoice ${row.invoice_number}` });
       }
       
       // Delete work entry

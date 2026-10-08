@@ -1,4 +1,15 @@
 import axios, { type AxiosInstance, type AxiosResponse } from 'axios';
+import type {
+  CreateClientRequest,
+  CreateInvoiceRequest,
+  Invoice,
+  InvoiceDetail,
+  InvoiceListFilters,
+  InvoicePreview,
+  InvoicePreviewParams,
+  InvoiceStatus,
+  UpdateClientRequest,
+} from '../types/api';
 
 // Use empty string to make requests relative to the current origin
 // Vite proxy will forward /api requests to the backend
@@ -66,12 +77,12 @@ class ApiClient {
     return response.data;
   }
 
-  async createClient(clientData: { name: string; description?: string; department?: string; email?: string }) {
+  async createClient(clientData: CreateClientRequest) {
     const response = await this.client.post('/api/clients', clientData);
     return response.data;
   }
 
-  async updateClient(id: number, clientData: { name?: string; description?: string; department?: string; email?: string }) {
+  async updateClient(id: number, clientData: UpdateClientRequest) {
     const response = await this.client.put(`/api/clients/${id}`, clientData);
     return response.data;
   }
@@ -128,6 +139,44 @@ class ApiClient {
 
   async exportClientReportPdf(clientId: number) {
     const response = await this.client.get(`/api/reports/export/pdf/${clientId}`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
+  // Invoice endpoints
+  async getInvoices(filters: InvoiceListFilters = {}): Promise<{ invoices: Invoice[] }> {
+    const response = await this.client.get('/api/invoices', { params: filters });
+    return response.data;
+  }
+
+  async getInvoice(id: number): Promise<InvoiceDetail> {
+    const response = await this.client.get(`/api/invoices/${id}`);
+    return response.data;
+  }
+
+  async previewInvoice(params: InvoicePreviewParams): Promise<InvoicePreview> {
+    const response = await this.client.get('/api/invoices/preview', { params });
+    return response.data;
+  }
+
+  async createInvoice(invoiceData: CreateInvoiceRequest): Promise<InvoiceDetail & { message: string }> {
+    const response = await this.client.post('/api/invoices', invoiceData);
+    return response.data;
+  }
+
+  async updateInvoiceStatus(id: number, status: Exclude<InvoiceStatus, 'draft'>): Promise<{ invoice: Invoice }> {
+    const response = await this.client.patch(`/api/invoices/${id}/status`, { status });
+    return response.data;
+  }
+
+  async deleteInvoice(id: number) {
+    const response = await this.client.delete(`/api/invoices/${id}`);
+    return response.data;
+  }
+
+  async downloadInvoicePdf(id: number): Promise<Blob> {
+    const response = await this.client.get(`/api/invoices/${id}/pdf`, {
       responseType: 'blob',
     });
     return response.data;
