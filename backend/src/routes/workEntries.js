@@ -140,6 +140,75 @@ router.post('/', (req, res, next) => {
   }
 });
 
+// Duplicate an existing work entry with today's date
+router.post('/:id/duplicate', (req, res, next) => {
+  try {
+    const workEntryId = parseInt(req.params.id);
+
+    if (isNaN(workEntryId)) {
+      return res.status(400).json({ error: 'Invalid work entry ID' });
+    }
+
+    const db = getDatabase();
+
+    // Look up by id alone so we can distinguish 404 from 403; ownership is checked right below
+    db.get(
+      'SELECT id, client_id, user_email, hours, description, date FROM work_entries WHERE id = ?',
+      [workEntryId],
+      (err, row) => {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ error: 'Internal server error' });
+        }
+
+        if (!row) {
+          return res.status(404).json({ error: 'Work entry not found' });
+        }
+
+        if (row.user_email !== req.userEmail) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+
+        const today = new Date().toISOString().split('T')[0];
+
+        db.run(
+          'INSERT INTO work_entries (client_id, user_email, hours, description, date) VALUES (?, ?, ?, ?, ?)',
+          [row.client_id, req.userEmail, row.hours, row.description, today],
+          function(err) {
+            if (err) {
+              console.error('Database error:', err);
+              return res.status(500).json({ error: 'Failed to duplicate work entry' });
+            }
+
+            // Return the duplicated work entry with client name
+            db.get(
+              `SELECT we.id, we.client_id, we.hours, we.description, we.date,
+                      we.created_at, we.updated_at, c.name as client_name
+               FROM work_entries we
+               JOIN clients c ON we.client_id = c.id
+               WHERE we.id = ?`,
+              [this.lastID],
+              (err, row) => {
+                if (err) {
+                  console.error('Database error:', err);
+                  return res.status(500).json({ error: 'Work entry duplicated but failed to retrieve' });
+                }
+
+                res.status(201).json({
+                  message: 'Work entry duplicated successfully',
+                  workEntry: row
+                });
+              }
+            );
+          }
+        );
+      }
+    );
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Update work entry
 router.put('/:id', (req, res, next) => {
   try {
