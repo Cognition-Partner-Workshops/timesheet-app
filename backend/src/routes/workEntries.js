@@ -5,19 +5,23 @@ const { workEntrySchema, updateWorkEntrySchema } = require('../validation/schema
 
 const router = express.Router();
 
+const LOCKED_MESSAGE = 'This work entry is on an invoice. Remove it from the draft invoice (or void the invoice) before changing it.';
+
 // All routes require authentication
 router.use(authenticateUser);
 
 // Get all work entries for authenticated user (with optional client filter)
 router.get('/', (req, res) => {
-  const { clientId } = req.query;
+  const { clientId, billed } = req.query;
   const db = getDatabase();
   
   let query = `
-    SELECT we.id, we.client_id, we.hours, we.description, we.date, 
-           we.created_at, we.updated_at, c.name as client_name
+    SELECT we.id, we.client_id, we.hours, we.description, we.date,
+           we.created_at, we.updated_at, c.name as client_name,
+           we.invoice_id, i.invoice_number, i.status as invoice_status
     FROM work_entries we
     JOIN clients c ON we.client_id = c.id
+    LEFT JOIN invoices i ON i.id = we.invoice_id
     WHERE we.user_email = ?
   `;
   
@@ -32,6 +36,12 @@ router.get('/', (req, res) => {
     params.push(clientIdNum);
   }
   
+  if (billed === 'true') {
+    query += ' AND we.invoice_id IS NOT NULL';
+  } else if (billed === 'false') {
+    query += ' AND we.invoice_id IS NULL';
+  }
+
   query += ' ORDER BY we.date DESC, we.created_at DESC';
   
   db.all(query, params, (err, rows) => {
@@ -55,10 +65,12 @@ router.get('/:id', (req, res) => {
   const db = getDatabase();
   
   db.get(
-    `SELECT we.id, we.client_id, we.hours, we.description, we.date, 
-            we.created_at, we.updated_at, c.name as client_name
+    `SELECT we.id, we.client_id, we.hours, we.description, we.date,
+            we.created_at, we.updated_at, c.name as client_name,
+            we.invoice_id, i.invoice_number, i.status as invoice_status
      FROM work_entries we
      JOIN clients c ON we.client_id = c.id
+     LEFT JOIN invoices i ON i.id = we.invoice_id
      WHERE we.id = ? AND we.user_email = ?`,
     [workEntryId, req.userEmail],
     (err, row) => {
@@ -113,10 +125,12 @@ router.post('/', (req, res, next) => {
 
             // Return the created work entry with client name
             db.get(
-              `SELECT we.id, we.client_id, we.hours, we.description, we.date, 
-                      we.created_at, we.updated_at, c.name as client_name
+              `SELECT we.id, we.client_id, we.hours, we.description, we.date,
+                      we.created_at, we.updated_at, c.name as client_name,
+                      we.invoice_id, i.invoice_number, i.status as invoice_status
                FROM work_entries we
                JOIN clients c ON we.client_id = c.id
+               LEFT JOIN invoices i ON i.id = we.invoice_id
                WHERE we.id = ?`,
               [this.lastID],
               (err, row) => {
@@ -158,7 +172,7 @@ router.put('/:id', (req, res, next) => {
 
     // Check if work entry exists and belongs to user
     db.get(
-      'SELECT id FROM work_entries WHERE id = ? AND user_email = ?',
+      'SELECT id, invoice_id FROM work_entries WHERE id = ? AND user_email = ?',
       [workEntryId, req.userEmail],
       (err, row) => {
         if (err) {
@@ -168,6 +182,10 @@ router.put('/:id', (req, res, next) => {
 
         if (!row) {
           return res.status(404).json({ error: 'Work entry not found' });
+        }
+
+        if (row.invoice_id) {
+          return res.status(409).json({ error: LOCKED_MESSAGE });
         }
 
         // If clientId is being updated, verify it belongs to user
@@ -220,7 +238,7 @@ router.put('/:id', (req, res, next) => {
           updates.push('updated_at = CURRENT_TIMESTAMP');
           values.push(workEntryId, req.userEmail);
 
-          const query = `UPDATE work_entries SET ${updates.join(', ')} WHERE id = ? AND user_email = ?`;
+          const query = `UPDATE work_entries SET ${updates.join(', ')} WHERE id = ? AND user_email = ? AND invoice_id IS NULL`;
 
           db.run(query, values, function(err) {
             if (err) {
@@ -230,10 +248,12 @@ router.put('/:id', (req, res, next) => {
 
             // Return updated work entry with client name
             db.get(
-              `SELECT we.id, we.client_id, we.hours, we.description, we.date, 
-                      we.created_at, we.updated_at, c.name as client_name
+              `SELECT we.id, we.client_id, we.hours, we.description, we.date,
+                      we.created_at, we.updated_at, c.name as client_name,
+                      we.invoice_id, i.invoice_number, i.status as invoice_status
                FROM work_entries we
                JOIN clients c ON we.client_id = c.id
+               LEFT JOIN invoices i ON i.id = we.invoice_id
                WHERE we.id = ?`,
               [workEntryId],
               (err, row) => {
@@ -269,7 +289,7 @@ router.delete('/:id', (req, res) => {
   
   // Check if work entry exists and belongs to user
   db.get(
-    'SELECT id FROM work_entries WHERE id = ? AND user_email = ?',
+    'SELECT id, invoice_id FROM work_entries WHERE id = ? AND user_email = ?',
     [workEntryId, req.userEmail],
     (err, row) => {
       if (err) {
@@ -280,10 +300,14 @@ router.delete('/:id', (req, res) => {
       if (!row) {
         return res.status(404).json({ error: 'Work entry not found' });
       }
+
+      if (row.invoice_id) {
+        return res.status(409).json({ error: LOCKED_MESSAGE });
+      }
       
       // Delete work entry
       db.run(
-        'DELETE FROM work_entries WHERE id = ? AND user_email = ?',
+        'DELETE FROM work_entries WHERE id = ? AND user_email = ? AND invoice_id IS NULL',
         [workEntryId, req.userEmail],
         function(err) {
           if (err) {
