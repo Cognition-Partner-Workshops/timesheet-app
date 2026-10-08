@@ -205,6 +205,22 @@ describe('Validation Schemas', () => {
       const { error } = workEntrySchema.validate(entry);
       expect(error).toBeDefined();
     });
+
+    test('should keep date as a YYYY-MM-DD string', () => {
+      const { error, value } = workEntrySchema.validate({ clientId: 1, hours: 5, date: '2024-01-15' });
+      expect(error).toBeUndefined();
+      expect(value.date).toBe('2024-01-15');
+    });
+
+    test('should reject non-existent calendar dates', () => {
+      const { error } = workEntrySchema.validate({ clientId: 1, hours: 5, date: '2023-02-29' });
+      expect(error).toBeDefined();
+    });
+
+    test('should reject full ISO timestamps', () => {
+      const { error } = workEntrySchema.validate({ clientId: 1, hours: 5, date: '2024-01-15T10:00:00Z' });
+      expect(error).toBeDefined();
+    });
   });
 
   describe('updateWorkEntrySchema', () => {
@@ -231,6 +247,22 @@ describe('Validation Schemas', () => {
       const update = {};
 
       const { error } = updateWorkEntrySchema.validate(update);
+      expect(error).toBeDefined();
+    });
+
+    test('should keep updated date as a YYYY-MM-DD string', () => {
+      const { error, value } = updateWorkEntrySchema.validate({ date: '2024-02-29' });
+      expect(error).toBeUndefined();
+      expect(value.date).toBe('2024-02-29');
+    });
+
+    test('should reject non-existent calendar dates on update', () => {
+      const { error } = updateWorkEntrySchema.validate({ date: '2023-02-29' });
+      expect(error).toBeDefined();
+    });
+
+    test('should reject full ISO timestamps on update', () => {
+      const { error } = updateWorkEntrySchema.validate({ date: '2024-01-15T10:00:00Z' });
       expect(error).toBeDefined();
     });
 

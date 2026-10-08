@@ -22,7 +22,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Chip,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -34,6 +33,8 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import apiClient from '../api/client';
+import WorkEntryCells from '../components/WorkEntryCells';
+import { parseCalendarDate, toCalendarDateString } from '../utils/date';
 import { type WorkEntry } from '../types/api';
 
 const WorkEntriesPage: React.FC = () => {
@@ -106,7 +107,7 @@ const WorkEntriesPage: React.FC = () => {
         clientId: entry.client_id,
         hours: entry.hours.toString(),
         description: entry.description || '',
-        date: new Date(entry.date),
+        date: parseCalendarDate(entry.date),
       });
     } else {
       setEditingEntry(null);
@@ -157,7 +158,7 @@ const WorkEntriesPage: React.FC = () => {
       clientId: formData.clientId,
       hours,
       description: formData.description || undefined,
-      date: formData.date.toISOString().split('T')[0],
+      date: toCalendarDateString(formData.date),
     };
 
     if (editingEntry) {
@@ -231,27 +232,7 @@ const WorkEntriesPage: React.FC = () => {
                             {entry.client_name}
                           </Typography>
                         </TableCell>
-                        <TableCell>
-                          <Typography variant="body2">
-                            {new Date(entry.date).toLocaleDateString()}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Chip 
-                            label={`${entry.hours} hours`} 
-                            color="primary" 
-                            variant="outlined" 
-                          />
-                        </TableCell>
-                        <TableCell>
-                          {entry.description ? (
-                            <Typography variant="body2" color="text.secondary">
-                              {entry.description}
-                            </Typography>
-                          ) : (
-                            <Chip label="No description" size="small" variant="outlined" />
-                          )}
-                        </TableCell>
+                        <WorkEntryCells date={entry.date} hours={entry.hours} description={entry.description} />
                         <TableCell align="right">
                           <IconButton
                             onClick={() => handleOpen(entry)}

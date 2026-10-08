@@ -19,7 +19,6 @@ import {
   Grid,
   Alert,
   CircularProgress,
-  Chip,
   IconButton,
   Tooltip,
 } from '@mui/material';
@@ -29,6 +28,8 @@ import {
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
+import WorkEntryCells from '../components/WorkEntryCells';
+import { toCalendarDateString } from '../utils/date';
 import { type ClientReport } from '../types/api';
 
 const ReportsPage: React.FC = () => {
@@ -58,7 +59,7 @@ const ReportsPage: React.FC = () => {
       const a = document.createElement('a');
       a.href = url;
       const client = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
-      a.download = `${client?.name?.replace(/[^a-zA-Z0-9]/g, '_')}_report_${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = `${client?.name?.replace(/[^a-zA-Z0-9]/g, '_')}_report_${toCalendarDateString(new Date())}.csv`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -78,7 +79,7 @@ const ReportsPage: React.FC = () => {
       const a = document.createElement('a');
       a.href = url;
       const client = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
-      a.download = `${client?.name?.replace(/[^a-zA-Z0-9]/g, '_')}_report_${new Date().toISOString().split('T')[0]}.pdf`;
+      a.download = `${client?.name?.replace(/[^a-zA-Z0-9]/g, '_')}_report_${toCalendarDateString(new Date())}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -230,27 +231,7 @@ const ReportsPage: React.FC = () => {
                       {report.workEntries.length > 0 ? (
                         report.workEntries.map((entry) => (
                           <TableRow key={entry.id}>
-                            <TableCell>
-                              <Typography variant="body2">
-                                {new Date(entry.date).toLocaleDateString()}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Chip 
-                                label={`${entry.hours} hours`} 
-                                color="primary" 
-                                variant="outlined" 
-                              />
-                            </TableCell>
-                            <TableCell>
-                              {entry.description ? (
-                                <Typography variant="body2" color="text.secondary">
-                                  {entry.description}
-                                </Typography>
-                              ) : (
-                                <Chip label="No description" size="small" variant="outlined" />
-                              )}
-                            </TableCell>
+                            <WorkEntryCells date={entry.date} hours={entry.hours} description={entry.description} />
                             <TableCell>
                               <Typography variant="body2" color="text.secondary">
                                 {new Date(entry.created_at).toLocaleDateString()}
