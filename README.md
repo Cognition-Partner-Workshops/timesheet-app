@@ -20,6 +20,7 @@ A full-stack web application for tracking and reporting employee hourly work acr
 
 - ✅ User authentication (email-based with JWT tokens)
 - ✅ Add, edit, and delete clients
+- ✅ Add, edit, and delete projects assigned to clients (active/completed/on-hold status)
 - ✅ Add, edit, and delete hourly work entries for each client
 - ✅ View hourly reports for each client
 - ✅ Export hourly reports to CSV or PDF
@@ -56,6 +57,7 @@ A full-stack web application for tracking and reporting employee hourly work acr
 │   │   ├── routes/
 │   │   │   ├── auth.js           # Authentication endpoints
 │   │   │   ├── clients.js        # Client CRUD
+│   │   │   ├── projects.js       # Project CRUD
 │   │   │   ├── workEntries.js    # Work entry CRUD
 │   │   │   └── reports.js        # Reporting & export
 │   │   ├── validation/
@@ -76,6 +78,7 @@ A full-stack web application for tracking and reporting employee hourly work acr
     │   │   ├── LoginPage.tsx     # Login page
     │   │   ├── DashboardPage.tsx # Dashboard
     │   │   ├── ClientsPage.tsx   # Client management
+    │   │   ├── ProjectsPage.tsx  # Project management
     │   │   ├── WorkEntriesPage.tsx # Work entry management
     │   │   └── ReportsPage.tsx   # Reports & exports
     │   ├── types/
@@ -170,6 +173,13 @@ Frontend will be running at `http://localhost:5173`
 - `GET /api/clients/:id` - Get specific client
 - `PUT /api/clients/:id` - Update client
 - `DELETE /api/clients/:id` - Delete client
+
+### Projects
+- `GET /api/projects` - Get all projects (optional ?clientId and ?status filters)
+- `POST /api/projects` - Create new project
+- `GET /api/projects/:id` - Get specific project
+- `PUT /api/projects/:id` - Update project
+- `DELETE /api/projects/:id` - Delete project
 
 ### Work Entries
 - `GET /api/work-entries` - Get all work entries (optional ?clientId filter)
