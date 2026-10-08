@@ -265,8 +265,9 @@ describe('Validation Schemas', () => {
     };
 
     test('should validate valid project data', () => {
-      const { error } = projectSchema.validate(validProject);
+      const { error, value } = projectSchema.validate(validProject);
       expect(error).toBeUndefined();
+      expect(value.startDate).toBe('2024-01-15');
     });
 
     test('should default status to active', () => {
@@ -312,6 +313,17 @@ describe('Validation Schemas', () => {
     test('should reject invalid startDate', () => {
       const { error } = projectSchema.validate({ ...validProject, startDate: 'not-a-date' });
       expect(error).toBeDefined();
+    });
+
+    test.each([
+      '2024-02-30',
+      '2024-13-01',
+      '2024-01-01T00:30:00+02:00',
+      '01/15/2024',
+      new Date('2024-01-15T00:00:00Z')
+    ])('should reject invalid date-only startDate %p', (startDate) => {
+      expect(projectSchema.validate({ ...validProject, startDate }).error).toBeDefined();
+      expect(updateProjectSchema.validate({ startDate }).error).toBeDefined();
     });
 
     test('should reject description longer than 1000 characters', () => {

@@ -82,10 +82,12 @@ describe('Project Routes', () => {
     });
 
     test('should return 400 for invalid client ID filter', async () => {
-      const response = await request(app).get('/api/projects?clientId=abc');
+      const response = await request(app).get('/api/projects?clientId=1abc');
 
       expectJson(response, 400, { error: 'Invalid client ID' });
       expect(mockDb.all).not.toHaveBeenCalled();
+      expect(mockDb.get).not.toHaveBeenCalled();
+      expect(mockDb.run).not.toHaveBeenCalled();
     });
 
     test('should return 400 for invalid status filter', async () => {
@@ -127,9 +129,12 @@ describe('Project Routes', () => {
     });
 
     test('should return 400 for invalid project ID', async () => {
-      const response = await request(app).get('/api/projects/invalid');
+      const response = await request(app).get('/api/projects/1.5');
 
       expectJson(response, 400, { error: 'Invalid project ID' });
+      expect(mockDb.all).not.toHaveBeenCalled();
+      expect(mockDb.get).not.toHaveBeenCalled();
+      expect(mockDb.run).not.toHaveBeenCalled();
     });
 
     test('should handle database error', async () => {
@@ -338,9 +343,12 @@ describe('Project Routes', () => {
     });
 
     test('should return 400 for invalid project ID', async () => {
-      const response = await request(app).put('/api/projects/abc').send({ name: 'X' });
+      const response = await request(app).put('/api/projects/0').send({ name: 'X' });
 
       expectJson(response, 400, { error: 'Invalid project ID' });
+      expect(mockDb.all).not.toHaveBeenCalled();
+      expect(mockDb.get).not.toHaveBeenCalled();
+      expect(mockDb.run).not.toHaveBeenCalled();
     });
 
     test('should return 400 for empty update', async () => {
@@ -408,9 +416,12 @@ describe('Project Routes', () => {
     });
 
     test('should return 400 for invalid project ID', async () => {
-      const response = await request(app).delete('/api/projects/abc');
+      const response = await request(app).delete('/api/projects/1garbage');
 
       expectJson(response, 400, { error: 'Invalid project ID' });
+      expect(mockDb.all).not.toHaveBeenCalled();
+      expect(mockDb.get).not.toHaveBeenCalled();
+      expect(mockDb.run).not.toHaveBeenCalled();
     });
 
     test('should handle lookup database error', async () => {

@@ -79,10 +79,18 @@ const ProjectsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | ''>('');
   const [error, setError] = useState('');
 
-  const { data: projects = [], isLoading: projectsLoading } = useProjects(
-    statusFilter ? { status: statusFilter } : {}
-  );
-  const { data: clients = [], isLoading: clientsLoading } = useProjectClients();
+  const {
+    data: projects = [],
+    isLoading: projectsLoading,
+    isError: projectsError,
+    refetch: refetchProjects,
+  } = useProjects(statusFilter ? { status: statusFilter } : {});
+  const {
+    data: clients = [],
+    isLoading: clientsLoading,
+    isError: clientsError,
+    refetch: refetchClients,
+  } = useProjectClients();
 
   const createMutation = useCreateProject();
   const updateMutation = useUpdateProject();
@@ -202,7 +210,7 @@ const ProjectsPage: React.FC = () => {
               variant="contained"
               startIcon={<AddIcon />}
               onClick={() => handleOpen()}
-              disabled={clients.length === 0}
+              disabled={clientsError || clients.length === 0}
             >
               Add Project
             </Button>
@@ -215,7 +223,18 @@ const ProjectsPage: React.FC = () => {
           </Alert>
         )}
 
-        {clients.length === 0 ? (
+        {clientsError ? (
+          <Alert
+            severity="error"
+            action={
+              <Button color="inherit" size="small" onClick={() => refetchClients()}>
+                Retry
+              </Button>
+            }
+          >
+            Failed to load clients.
+          </Alert>
+        ) : clients.length === 0 ? (
           <Paper sx={{ p: 3, textAlign: 'center' }}>
             <Typography color="text.secondary" sx={{ mb: 2 }}>
               You need to create at least one client before adding projects.
@@ -224,6 +243,17 @@ const ProjectsPage: React.FC = () => {
               Create Client
             </Button>
           </Paper>
+        ) : projectsError ? (
+          <Alert
+            severity="error"
+            action={
+              <Button color="inherit" size="small" onClick={() => refetchProjects()}>
+                Retry
+              </Button>
+            }
+          >
+            Failed to load projects.
+          </Alert>
         ) : (
           <Paper>
             <TableContainer>

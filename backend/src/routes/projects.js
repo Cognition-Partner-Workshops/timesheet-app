@@ -17,7 +17,7 @@ const PROJECT_COLUMNS = {
   name: { column: 'name', toDb: (v) => v },
   description: { column: 'description', toDb: (v) => v || null },
   clientId: { column: 'client_id', toDb: (v) => v },
-  startDate: { column: 'start_date', toDb: (v) => v.toISOString().split('T')[0] },
+  startDate: { column: 'start_date', toDb: (v) => v },
   status: { column: 'status', toDb: (v) => v }
 };
 
@@ -55,11 +55,16 @@ const validate = (schema, body) => {
   return value;
 };
 
-const parseProjectId = (rawId) => {
-  const projectId = parseInt(rawId);
-  if (isNaN(projectId)) {
-    throw new HttpError(400, 'Invalid project ID');
+const parseStrictId = (rawId, message) => {
+  if (typeof rawId !== 'string' || !/^[1-9]\d*$/.test(rawId)) {
+    throw new HttpError(400, message);
   }
+
+  const projectId = Number(rawId);
+  if (!Number.isSafeInteger(projectId)) {
+    throw new HttpError(400, message);
+  }
+
   return projectId;
 };
 
@@ -100,10 +105,7 @@ router.get('/', asyncHandler(async (req, res) => {
   const params = [req.userEmail];
 
   if (clientId) {
-    const clientIdNum = parseInt(clientId);
-    if (isNaN(clientIdNum)) {
-      throw new HttpError(400, 'Invalid client ID');
-    }
+    const clientIdNum = parseStrictId(clientId, 'Invalid client ID');
     conditions.push('p.client_id = ?');
     params.push(clientIdNum);
   }
@@ -127,7 +129,7 @@ router.get('/', asyncHandler(async (req, res) => {
 
 // Get specific project
 router.get('/:id', asyncHandler(async (req, res) => {
-  const projectId = parseProjectId(req.params.id);
+  const projectId = parseStrictId(req.params.id, 'Invalid project ID');
   const project = await fetchProject(projectId, req.userEmail, 'Internal server error');
   if (!project) {
     throw new HttpError(404, 'Project not found');
@@ -157,7 +159,7 @@ router.post('/', asyncHandler(async (req, res) => {
 
 // Update project
 router.put('/:id', asyncHandler(async (req, res) => {
-  const projectId = parseProjectId(req.params.id);
+  const projectId = parseStrictId(req.params.id, 'Invalid project ID');
   const value = validate(updateProjectSchema, req.body);
 
   await assertProjectExists(projectId, req.userEmail);
@@ -182,7 +184,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
 
 // Delete project
 router.delete('/:id', asyncHandler(async (req, res) => {
-  const projectId = parseProjectId(req.params.id);
+  const projectId = parseStrictId(req.params.id, 'Invalid project ID');
   await assertProjectExists(projectId, req.userEmail);
   await query(
     'run',
