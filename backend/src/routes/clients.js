@@ -5,6 +5,24 @@ const { clientSchema, updateClientSchema } = require('../validation/schemas');
 
 const router = express.Router();
 
+const BILLING_COLUMNS = {
+  hourlyRateCents: 'hourly_rate_cents',
+  currency: 'currency',
+  billingAddress: 'billing_address',
+  billingEmail: 'billing_email',
+  paymentTermsDays: 'payment_terms_days'
+};
+
+function billingValue(value) {
+  return value === '' || value === undefined ? null : value;
+}
+
+function isConstraintError(err) {
+  return Boolean(err && err.code === 'SQLITE_CONSTRAINT');
+}
+
+const CLIENT_HAS_INVOICES = 'This client has invoices. Delete its draft invoices first; clients with issued invoices are kept for your records.';
+
 // All routes require authentication
 router.use(authenticateUser);
 
@@ -13,7 +31,7 @@ router.get('/', (req, res) => {
   const db = getDatabase();
   
   db.all(
-    'SELECT id, name, description, department, email, created_at, updated_at FROM clients WHERE user_email = ? ORDER BY name',
+    'SELECT id, name, description, department, email, hourly_rate_cents, currency, billing_address, billing_email, payment_terms_days, created_at, updated_at FROM clients WHERE user_email = ? ORDER BY name',
     [req.userEmail],
     (err, rows) => {
       if (err) {
@@ -37,7 +55,7 @@ router.get('/:id', (req, res) => {
   const db = getDatabase();
   
   db.get(
-    'SELECT id, name, description, department, email, created_at, updated_at FROM clients WHERE id = ? AND user_email = ?',
+    'SELECT id, name, description, department, email, hourly_rate_cents, currency, billing_address, billing_email, payment_terms_days, created_at, updated_at FROM clients WHERE id = ? AND user_email = ?',
     [clientId, req.userEmail],
     (err, row) => {
       if (err) {
@@ -64,10 +82,13 @@ router.post('/', (req, res, next) => {
 
     const { name, description, department, email } = value;
     const db = getDatabase();
+    const billingColumns = Object.values(BILLING_COLUMNS);
+    const billingValues = Object.keys(BILLING_COLUMNS).map((key) => billingValue(value[key]));
 
     db.run(
-      'INSERT INTO clients (name, description, department, email, user_email) VALUES (?, ?, ?, ?, ?)',
-      [name, description || null, department || null, email || null, req.userEmail],
+      `INSERT INTO clients (name, description, department, email, ${billingColumns.join(', ')}, user_email)
+       VALUES (?, ?, ?, ?, ${billingColumns.map(() => '?').join(', ')}, ?)`,
+      [name, description || null, department || null, email || null, ...billingValues, req.userEmail],
       function(err) {
         if (err) {
           console.error('Database error:', err);
@@ -76,7 +97,7 @@ router.post('/', (req, res, next) => {
 
         // Return the created client
         db.get(
-          'SELECT id, name, description, department, email, created_at, updated_at FROM clients WHERE id = ?',
+          'SELECT id, name, description, department, email, hourly_rate_cents, currency, billing_address, billing_email, payment_terms_days, created_at, updated_at FROM clients WHERE id = ?',
           [this.lastID],
           (err, row) => {
             if (err) {
@@ -151,6 +172,13 @@ router.put('/:id', (req, res, next) => {
           values.push(value.email || null);
         }
 
+        Object.entries(BILLING_COLUMNS).forEach(([key, column]) => {
+          if (value[key] !== undefined) {
+            updates.push(`${column} = ?`);
+            values.push(billingValue(value[key]));
+          }
+        });
+
         updates.push('updated_at = CURRENT_TIMESTAMP');
         values.push(clientId, req.userEmail);
 
@@ -164,7 +192,7 @@ router.put('/:id', (req, res, next) => {
 
           // Return updated client
           db.get(
-            'SELECT id, name, description, department, email, created_at, updated_at FROM clients WHERE id = ?',
+            'SELECT id, name, description, department, email, hourly_rate_cents, currency, billing_address, billing_email, payment_terms_days, created_at, updated_at FROM clients WHERE id = ?',
             [clientId],
             (err, row) => {
               if (err) {
@@ -194,6 +222,9 @@ router.delete('/', (req, res) => {
     'DELETE FROM clients WHERE user_email = ?',
     [req.userEmail],
     function(err) {
+      if (isConstraintError(err)) {
+        return res.status(409).json({ error: CLIENT_HAS_INVOICES });
+      }
       if (err) {
         console.error('Database error:', err);
         return res.status(500).json({ error: 'Failed to delete clients' });
@@ -236,6 +267,9 @@ router.delete('/:id', (req, res) => {
         'DELETE FROM clients WHERE id = ? AND user_email = ?',
         [clientId, req.userEmail],
         function(err) {
+          if (isConstraintError(err)) {
+            return res.status(409).json({ error: CLIENT_HAS_INVOICES });
+          }
           if (err) {
             console.error('Database error:', err);
             return res.status(500).json({ error: 'Failed to delete client' });

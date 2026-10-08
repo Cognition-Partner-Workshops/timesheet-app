@@ -5,6 +5,7 @@ const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 const PDFDocument = require('pdfkit');
 const path = require('path');
 const fs = require('fs');
+const { lineAmountCents } = require('../services/invoices');
 
 const router = express.Router();
 
@@ -23,7 +24,7 @@ router.get('/client/:clientId', (req, res) => {
   
   // Verify client belongs to user
   db.get(
-    'SELECT id, name FROM clients WHERE id = ? AND user_email = ?',
+    'SELECT id, name, hourly_rate_cents, currency FROM clients WHERE id = ? AND user_email = ?',
     [clientId, req.userEmail],
     (err, client) => {
       if (err) {
@@ -37,7 +38,7 @@ router.get('/client/:clientId', (req, res) => {
       
       // Get work entries for this client
       db.all(
-        `SELECT id, hours, description, date, created_at, updated_at
+        `SELECT id, hours, description, date, invoice_id, created_at, updated_at
          FROM work_entries 
          WHERE client_id = ? AND user_email = ? 
          ORDER BY date DESC`,
@@ -51,11 +52,20 @@ router.get('/client/:clientId', (req, res) => {
           // Calculate total hours
           const totalHours = workEntries.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
           
+          const unbilled = workEntries.filter((entry) => !entry.invoice_id);
+          const unbilledHours = unbilled.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
+          const unbilledAmountCents = client.hourly_rate_cents == null
+            ? null
+            : unbilled.reduce((sum, entry) => sum + lineAmountCents(entry.hours, client.hourly_rate_cents), 0);
+
           res.json({
             client: client,
             workEntries: workEntries,
             totalHours: totalHours,
-            entryCount: workEntries.length
+            entryCount: workEntries.length,
+            unbilledHours,
+            unbilledEntryCount: unbilled.length,
+            unbilledAmountCents
           });
         }
       );

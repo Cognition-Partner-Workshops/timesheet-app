@@ -86,6 +86,86 @@ const migrations = [
       WHERE typeof(date) = 'text' AND length(date) > 10
     `);
   },
+
+  async function invoicing(db) {
+    await run(db, `
+      CREATE TABLE IF NOT EXISTS billing_profiles (
+        user_email TEXT PRIMARY KEY,
+        business_name TEXT,
+        address TEXT,
+        tax_id TEXT,
+        invoice_prefix TEXT NOT NULL DEFAULT 'INV',
+        next_invoice_seq INTEGER NOT NULL DEFAULT 1,
+        default_currency TEXT NOT NULL DEFAULT 'USD',
+        default_tax_rate_bp INTEGER NOT NULL DEFAULT 0,
+        default_payment_terms_days INTEGER NOT NULL DEFAULT 30,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE
+      )
+    `);
+
+    await addColumnIfMissing(db, 'clients', 'hourly_rate_cents', 'INTEGER');
+    await addColumnIfMissing(db, 'clients', 'currency', 'TEXT');
+    await addColumnIfMissing(db, 'clients', 'billing_address', 'TEXT');
+    await addColumnIfMissing(db, 'clients', 'billing_email', 'TEXT');
+    await addColumnIfMissing(db, 'clients', 'payment_terms_days', 'INTEGER');
+
+    await run(db, `
+      CREATE TABLE IF NOT EXISTS invoices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_email TEXT NOT NULL,
+        client_id INTEGER NOT NULL,
+        invoice_number TEXT,
+        status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'issued', 'paid', 'void')),
+        period_start TEXT,
+        period_end TEXT,
+        issue_date TEXT NOT NULL,
+        due_date TEXT NOT NULL,
+        currency TEXT NOT NULL DEFAULT 'USD',
+        subtotal_cents INTEGER NOT NULL DEFAULT 0,
+        tax_rate_bp INTEGER NOT NULL DEFAULT 0,
+        tax_cents INTEGER NOT NULL DEFAULT 0,
+        total_cents INTEGER NOT NULL DEFAULT 0,
+        notes TEXT,
+        sender_snapshot TEXT,
+        client_snapshot TEXT,
+        issued_at DATETIME,
+        paid_at TEXT,
+        voided_at DATETIME,
+        void_reason TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE,
+        FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE RESTRICT
+      )
+    `);
+    await run(db, `
+      CREATE TABLE IF NOT EXISTS invoice_line_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        invoice_id INTEGER NOT NULL,
+        work_entry_id INTEGER,
+        date TEXT,
+        description TEXT NOT NULL,
+        quantity REAL NOT NULL,
+        unit_price_cents INTEGER,
+        amount_cents INTEGER NOT NULL DEFAULT 0,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (invoice_id) REFERENCES invoices (id) ON DELETE CASCADE,
+        FOREIGN KEY (work_entry_id) REFERENCES work_entries (id) ON DELETE SET NULL
+      )
+    `);
+    await addColumnIfMissing(db, 'work_entries', 'invoice_id',
+      'INTEGER REFERENCES invoices (id) ON DELETE SET NULL');
+
+    await run(db, 'CREATE INDEX IF NOT EXISTS idx_invoices_user_status ON invoices (user_email, status)');
+    await run(db, 'CREATE INDEX IF NOT EXISTS idx_invoices_client_id ON invoices (client_id)');
+    await run(db, 'CREATE INDEX IF NOT EXISTS idx_invoices_issue_date ON invoices (issue_date)');
+    await run(db, `CREATE UNIQUE INDEX IF NOT EXISTS idx_invoices_user_number
+      ON invoices (user_email, invoice_number) WHERE invoice_number IS NOT NULL`);
+    await run(db, 'CREATE INDEX IF NOT EXISTS idx_invoice_line_items_invoice_id ON invoice_line_items (invoice_id)');
+    await run(db, 'CREATE INDEX IF NOT EXISTS idx_work_entries_invoice_id ON work_entries (invoice_id)');
+  },
 ];
 
 async function runMigrations(db, migrationList = migrations) {
