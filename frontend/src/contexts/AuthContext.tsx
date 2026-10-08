@@ -1,6 +1,8 @@
 import React, { useState, useEffect, type ReactNode } from 'react';
 import { type User } from '../types/api';
+import { useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
+import { describeError } from '../utils/describeError';
 import { AuthContext, type AuthContextType } from './AuthContextValue';
 
 interface AuthProviderProps {
@@ -10,6 +12,7 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -20,7 +23,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const response = await apiClient.getCurrentUser();
           setUser(response.user);
         } catch (error) {
-          console.error('Auth check failed:', error);
+          console.error('Auth check failed:', describeError(error));
           localStorage.removeItem('userEmail');
         }
       }
@@ -36,7 +39,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(response.user);
       localStorage.setItem('userEmail', email);
     } catch (error) {
-      console.error('Login failed:', error);
+      console.error('Login failed:', describeError(error));
       throw error;
     }
   };
@@ -44,6 +47,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('userEmail');
+    queryClient.clear();
   };
 
   const value: AuthContextType = {

@@ -86,6 +86,11 @@ const LoginPage: React.FC = () => {
           >
             {isLoading ? <CircularProgress size={24} /> : 'Log In'}
           </Button>
+          <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 1 }}>
+            Privacy notice: your email address is used only to identify your account and is stored with the
+            clients and work entries you create. You can download or permanently delete all of your data at any
+            time from the Privacy menu after logging in.
+          </Typography>
         </Box>
       </Paper>
     </Box>

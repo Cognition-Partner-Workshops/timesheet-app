@@ -199,4 +199,97 @@ describe('Auth Routes', () => {
       expect(response.body).toEqual({ error: 'Internal server error' });
     });
   });
+  describe('GET /api/auth/me/export', () => {
+    test('should export all personal data for the user', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { email: 'test@example.com', created_at: '2024-01-01' });
+      });
+      mockDb.all = jest.fn((query, params, callback) => {
+        expect(params).toEqual(['test@example.com']);
+        if (query.includes('FROM clients')) {
+          callback(null, [{ id: 1, name: 'Acme', email: 'contact@acme.com' }]);
+        } else {
+          callback(null, [{ id: 2, client_id: 1, hours: 3 }]);
+        }
+      });
+
+      const response = await request(app)
+        .get('/api/auth/me/export')
+        .set('x-user-email', 'test@example.com');
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-disposition']).toContain('attachment');
+      expect(response.body.user).toEqual({ email: 'test@example.com', createdAt: '2024-01-01' });
+      expect(response.body.clients).toHaveLength(1);
+      expect(response.body.workEntries).toHaveLength(1);
+      expect(response.body.exportedAt).toBeDefined();
+    });
+
+    test('should return 404 if user not found', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        if (query.includes('SELECT email FROM users WHERE email = ?')) {
+          callback(null, { email: 'test@example.com' });
+        } else {
+          callback(null, null);
+        }
+      });
+
+      const response = await request(app)
+        .get('/api/auth/me/export')
+        .set('x-user-email', 'test@example.com');
+
+      expect(response.status).toBe(404);
+    });
+
+    test('should handle database error', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { email: 'test@example.com', created_at: '2024-01-01' });
+      });
+      mockDb.all = jest.fn((query, params, callback) => callback(new Error('fail'), null));
+
+      const response = await request(app)
+        .get('/api/auth/me/export')
+        .set('x-user-email', 'test@example.com');
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Internal server error' });
+    });
+  });
+
+  describe('DELETE /api/auth/me', () => {
+    test('should erase work entries, clients and the user record', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { email: 'test@example.com' });
+      });
+      mockDb.run.mockImplementation((query, params, callback) => callback(null));
+
+      const response = await request(app)
+        .delete('/api/auth/me')
+        .set('x-user-email', 'test@example.com');
+
+      expect(response.status).toBe(200);
+      const queries = mockDb.run.mock.calls.map(call => call[0]);
+      expect(queries).toEqual([
+        'DELETE FROM work_entries WHERE user_email = ?',
+        'DELETE FROM clients WHERE user_email = ?',
+        'DELETE FROM users WHERE email = ?'
+      ]);
+      mockDb.run.mock.calls.forEach(call => expect(call[1]).toEqual(['test@example.com']));
+    });
+
+    test('should return 500 and stop if a delete fails', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { email: 'test@example.com' });
+      });
+      mockDb.run.mockImplementation((query, params, callback) => callback(new Error('fail')));
+
+      const response = await request(app)
+        .delete('/api/auth/me')
+        .set('x-user-email', 'test@example.com');
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Failed to delete account' });
+      expect(mockDb.run).toHaveBeenCalledTimes(1);
+    });
+  });
 });

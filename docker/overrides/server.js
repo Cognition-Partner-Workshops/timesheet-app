@@ -12,6 +12,7 @@ const reportRoutes = require('./routes/reports');
 
 const { initializeDatabase } = require('./database/init');
 const { errorHandler } = require('./middleware/errorHandler');
+const { registerPrivacyLogFormat } = require('./utils/logger');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -48,8 +49,8 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Logging
-app.use(morgan('combined'));
+// Logging (privacy-preserving: truncated IP, no referrer/user-agent)
+app.use(morgan(registerPrivacyLogFormat(morgan)));
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));

@@ -29,6 +29,7 @@ import {
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
+import { describeError } from '../utils/describeError';
 import { type ClientReport } from '../types/api';
 
 const ReportsPage: React.FC = () => {
@@ -65,7 +66,7 @@ const ReportsPage: React.FC = () => {
       document.body.removeChild(a);
     } catch (err: unknown) {
       setError('Failed to export CSV report');
-      console.error('Export error:', err);
+      console.error('Export error:', describeError(err));
     }
   };
 
@@ -85,7 +86,7 @@ const ReportsPage: React.FC = () => {
       document.body.removeChild(a);
     } catch (err: unknown) {
       setError('Failed to export PDF report');
-      console.error('Export error:', err);
+      console.error('Export error:', describeError(err));
     }
   };
 

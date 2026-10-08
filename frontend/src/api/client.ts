@@ -55,6 +55,18 @@ class ApiClient {
     return response.data;
   }
 
+  async exportMyData() {
+    const response = await this.client.get('/api/auth/me/export', {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
+  async deleteMyAccount() {
+    const response = await this.client.delete('/api/auth/me');
+    return response.data;
+  }
+
   // Client endpoints
   async getClients() {
     const response = await this.client.get('/api/clients');
