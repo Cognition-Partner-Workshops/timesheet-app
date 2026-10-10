@@ -1,3 +1,4 @@
+// Database initialization: sets up the SQLite connection and schema.
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
