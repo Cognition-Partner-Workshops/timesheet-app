@@ -11,6 +11,7 @@ const reportRoutes = require('./routes/reports');
 
 const { initializeDatabase } = require('./database/init');
 const { errorHandler } = require('./middleware/errorHandler');
+const { requireJsonContentType } = require('./middleware/csrfProtection');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -35,6 +36,9 @@ app.use(morgan('combined'));
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// CSRF protection: require JSON Content-Type on state-changing requests
+app.use(requireJsonContentType);
 
 // Health check
 app.get('/health', (req, res) => {
