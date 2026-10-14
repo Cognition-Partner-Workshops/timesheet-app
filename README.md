@@ -2,6 +2,8 @@
 
 A full-stack web application for tracking and reporting employee hourly work across different clients.
 
+> Maintained by Alexandru Iacob
+
 ## ⚠️ Important Notes
 
 ### Data Persistence
