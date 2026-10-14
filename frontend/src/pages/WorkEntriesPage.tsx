@@ -296,6 +296,7 @@ const WorkEntriesPage: React.FC = () => {
                 <Select
                   value={formData.clientId}
                   onChange={(e) => setFormData({ ...formData, clientId: Number(e.target.value) })}
+                  label="Client"
                   disabled={createMutation.isPending || updateMutation.isPending}
                 >
                   {clients.map((client: { id: number; name: string }) => (
