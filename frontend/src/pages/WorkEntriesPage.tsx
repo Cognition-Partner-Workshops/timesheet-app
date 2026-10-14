@@ -292,8 +292,10 @@ const WorkEntriesPage: React.FC = () => {
           <form onSubmit={handleSubmit}>
             <DialogContent>
               <FormControl fullWidth margin="dense" required>
-                <InputLabel>Client</InputLabel>
+                <InputLabel id="client-select-label">Client</InputLabel>
                 <Select
+                  labelId="client-select-label"
+                  label="Client"
                   value={formData.clientId}
                   onChange={(e) => setFormData({ ...formData, clientId: Number(e.target.value) })}
                   disabled={createMutation.isPending || updateMutation.isPending}
