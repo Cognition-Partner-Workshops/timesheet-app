@@ -1,6 +1,7 @@
 import React, { useState, useEffect, type ReactNode } from 'react';
 import { type User } from '../types/api';
 import apiClient from '../api/client';
+import { USER_EMAIL_STORAGE_KEY } from '../constants';
 import { AuthContext, type AuthContextType } from './AuthContextValue';
 
 interface AuthProviderProps {
@@ -13,7 +14,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const storedEmail = localStorage.getItem('userEmail');
+      const storedEmail = localStorage.getItem(USER_EMAIL_STORAGE_KEY);
       
       if (storedEmail) {
         try {
@@ -21,7 +22,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setUser(response.user);
         } catch (error) {
           console.error('Auth check failed:', error);
-          localStorage.removeItem('userEmail');
+          localStorage.removeItem(USER_EMAIL_STORAGE_KEY);
         }
       }
       setIsLoading(false);
@@ -34,7 +35,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const response = await apiClient.login(email);
       setUser(response.user);
-      localStorage.setItem('userEmail', email);
+      localStorage.setItem(USER_EMAIL_STORAGE_KEY, email);
     } catch (error) {
       console.error('Login failed:', error);
       throw error;
@@ -43,7 +44,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('userEmail');
+    localStorage.removeItem(USER_EMAIL_STORAGE_KEY);
   };
 
   const value: AuthContextType = {

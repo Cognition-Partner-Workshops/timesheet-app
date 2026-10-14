@@ -5,8 +5,20 @@ const { authenticateUser } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Login endpoint - creates user if doesn't exist
-router.post('/login', async (req, res, next) => {
+/** Maps a `users` row to the camelCased shape returned by the auth API. */
+function toUserResponse(row) {
+  return {
+    email: row.email,
+    createdAt: row.created_at
+  };
+}
+
+/**
+ * POST /api/auth/login
+ * Passwordless login: returns the existing user for `email`, or creates one
+ * (201) on first login. Responds with `{ message, user: { email, createdAt } }`.
+ */
+router.post('/login', (req, res, next) => {
   try {
     const { error, value } = emailSchema.validate(req.body);
     if (error) {
@@ -24,38 +36,33 @@ router.post('/login', async (req, res, next) => {
       }
 
       if (row) {
-        // User exists
         return res.json({
           message: 'Login successful',
-          user: {
-            email: row.email,
-            createdAt: row.created_at
-          }
-        });
-      } else {
-        // Create new user
-        db.run('INSERT INTO users (email) VALUES (?)', [email], function(err) {
-          if (err) {
-            console.error('Error creating user:', err);
-            return res.status(500).json({ error: 'Failed to create user' });
-          }
-
-          res.status(201).json({
-            message: 'User created and logged in successfully',
-            user: {
-              email: email,
-              createdAt: new Date().toISOString()
-            }
-          });
+          user: toUserResponse(row)
         });
       }
+
+      db.run('INSERT INTO users (email) VALUES (?)', [email], function(err) {
+        if (err) {
+          console.error('Error creating user:', err);
+          return res.status(500).json({ error: 'Failed to create user' });
+        }
+
+        res.status(201).json({
+          message: 'User created and logged in successfully',
+          user: { email, createdAt: new Date().toISOString() }
+        });
+      });
     });
   } catch (error) {
     next(error);
   }
 });
 
-// Get current user info
+/**
+ * GET /api/auth/me
+ * Returns the authenticated user's profile as `{ user: { email, createdAt } }`.
+ */
 router.get('/me', authenticateUser, (req, res) => {
   const db = getDatabase();
   
@@ -69,12 +76,7 @@ router.get('/me', authenticateUser, (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json({
-      user: {
-        email: row.email,
-        createdAt: row.created_at
-      }
-    });
+    res.json({ user: toUserResponse(row) });
   });
 });
 
