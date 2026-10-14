@@ -34,7 +34,16 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import apiClient from '../api/client';
-import { type WorkEntry } from '../types/api';
+import {
+  type Client,
+  type WorkEntry,
+  type CreateWorkEntryRequest,
+  type UpdateWorkEntryRequest,
+} from '../types/api';
+import { getApiErrorMessage } from '../utils/apiError';
+
+const MIN_HOURS = 0.01;
+const MAX_HOURS = 24;
 
 const WorkEntriesPage: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -60,28 +69,25 @@ const WorkEntriesPage: React.FC = () => {
   });
 
   const createMutation = useMutation({
-    mutationFn: (entryData: { clientId: number; hours: number; description?: string; date: string }) =>
-      apiClient.createWorkEntry(entryData),
+    mutationFn: (entryData: CreateWorkEntryRequest) => apiClient.createWorkEntry(entryData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workEntries'] });
       handleClose();
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to create work entry');
+      setError(getApiErrorMessage(err, 'Failed to create work entry'));
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { clientId?: number; hours?: number; description?: string; date?: string } }) =>
+    mutationFn: ({ id, data }: { id: number; data: UpdateWorkEntryRequest }) =>
       apiClient.updateWorkEntry(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workEntries'] });
       handleClose();
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to update work entry');
+      setError(getApiErrorMessage(err, 'Failed to update work entry'));
     },
   });
 
@@ -91,8 +97,7 @@ const WorkEntriesPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['workEntries'] });
     },
     onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to delete work entry');
+      setError(getApiErrorMessage(err, 'Failed to delete work entry'));
     },
   });
 
@@ -143,8 +148,8 @@ const WorkEntriesPage: React.FC = () => {
     }
 
     const hours = parseFloat(formData.hours);
-    if (!hours || hours <= 0 || hours > 24) {
-      setError('Hours must be between 0 and 24');
+    if (!hours || hours <= 0 || hours > MAX_HOURS) {
+      setError(`Hours must be between 0 and ${MAX_HOURS}`);
       return;
     }
 
@@ -298,7 +303,7 @@ const WorkEntriesPage: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, clientId: Number(e.target.value) })}
                   disabled={createMutation.isPending || updateMutation.isPending}
                 >
-                  {clients.map((client: { id: number; name: string }) => (
+                  {clients.map((client: Client) => (
                     <MenuItem key={client.id} value={client.id}>
                       {client.name}
                     </MenuItem>
@@ -312,7 +317,7 @@ const WorkEntriesPage: React.FC = () => {
                 type="number"
                 fullWidth
                 required
-                inputProps={{ min: 0.01, max: 24, step: 0.01 }}
+                inputProps={{ min: MIN_HOURS, max: MAX_HOURS, step: 0.01 }}
                 value={formData.hours}
                 onChange={(e) => setFormData({ ...formData, hours: e.target.value })}
                 disabled={createMutation.isPending || updateMutation.isPending}
