@@ -1,5 +1,4 @@
 const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
 
 let db = null;
 let isClosing = false;
