@@ -133,6 +133,27 @@ class ApiClient {
     return response.data;
   }
 
+  // Timer endpoints
+  async getActiveTimer() {
+    const response = await this.client.get('/api/timers/active');
+    return response.data;
+  }
+
+  async startTimer(data: { clientId: number; description?: string }) {
+    const response = await this.client.post('/api/timers/start', data);
+    return response.data;
+  }
+
+  async stopTimer() {
+    const response = await this.client.post('/api/timers/stop');
+    return response.data;
+  }
+
+  async discardTimer() {
+    const response = await this.client.delete('/api/timers/discard');
+    return response.data;
+  }
+
   // Health check
   async healthCheck() {
     const response = await this.client.get('/health');
