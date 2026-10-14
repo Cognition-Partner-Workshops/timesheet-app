@@ -19,7 +19,7 @@ class ApiClient {
     // Request interceptor to add email header
     this.client.interceptors.request.use(
       (config) => {
-        const userEmail = localStorage.getItem('userEmail');
+        const userEmail = sessionStorage.getItem('userEmail');
         if (userEmail) {
           config.headers['x-user-email'] = userEmail;
         }
@@ -36,7 +36,7 @@ class ApiClient {
       (error) => {
         if (error.response?.status === 401) {
           // Clear stored email on auth error
-          localStorage.removeItem('userEmail');
+          sessionStorage.removeItem('userEmail');
           window.location.href = '/login';
         }
         return Promise.reject(error);
