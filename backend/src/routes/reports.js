@@ -3,8 +3,8 @@ const { getDatabase } = require('../database/init');
 const { authenticateUser } = require('../middleware/auth');
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 const PDFDocument = require('pdfkit');
-const path = require('path');
-const fs = require('fs');
+const path = require('node:path');
+const fs = require('node:fs');
 
 const router = express.Router();
 
@@ -101,8 +101,8 @@ router.get('/export/csv/:clientId', (req, res) => {
           }
           
           // Create temporary CSV file
-          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-          const filename = `${client.name.replace(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.csv`;
+          const timestamp = new Date().toISOString().replaceAll(/[:.]/g, '-');
+          const filename = `${client.name.replaceAll(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.csv`;
           const tempPath = path.join(__dirname, '../../temp', filename);
           
           // Ensure temp directory exists
@@ -185,8 +185,8 @@ router.get('/export/pdf/:clientId', (req, res) => {
           
           // Create PDF
           const doc = new PDFDocument();
-          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-          const filename = `${client.name.replace(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.pdf`;
+          const timestamp = new Date().toISOString().replaceAll(/[:.]/g, '-');
+          const filename = `${client.name.replaceAll(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.pdf`;
           
           // Set response headers
           res.setHeader('Content-Type', 'application/pdf');
