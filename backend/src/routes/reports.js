@@ -206,9 +206,11 @@ router.get('/export/pdf/:clientId', (req, res) => {
           doc.moveDown();
           
           // Add table header
-          doc.fontSize(12).text('Date', 50, doc.y, { width: 100 });
-          doc.text('Hours', 150, doc.y - 15, { width: 80 });
-          doc.text('Description', 230, doc.y - 15, { width: 300 });
+          const headerY = doc.y;
+          doc.fontSize(12);
+          doc.text('Date', 50, headerY, { width: 100 });
+          doc.text('Hours', 150, headerY, { width: 80 });
+          doc.text('Description', 230, headerY, { width: 300 });
           doc.moveDown();
           
           // Add horizontal line
@@ -217,16 +219,15 @@ router.get('/export/pdf/:clientId', (req, res) => {
           
           // Add work entries
           workEntries.forEach((entry, index) => {
-            const y = doc.y;
-            
             // Check if we need a new page
-            if (y > 700) {
+            if (doc.y > 700) {
               doc.addPage();
             }
             
-            doc.text(entry.date, 50, doc.y, { width: 100 });
-            doc.text(entry.hours.toString(), 150, y, { width: 80 });
-            doc.text(entry.description || 'No description', 230, y, { width: 300 });
+            const rowY = doc.y;
+            doc.text(entry.date, 50, rowY, { width: 100 });
+            doc.text(entry.hours.toString(), 150, rowY, { width: 80 });
+            doc.text(entry.description || 'No description', 230, rowY, { width: 300 });
             doc.moveDown();
             
             // Add separator line every 5 entries
