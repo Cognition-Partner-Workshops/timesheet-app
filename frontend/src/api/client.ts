@@ -133,6 +133,12 @@ class ApiClient {
     return response.data;
   }
 
+  // Feature flags
+  async getFeatureFlags() {
+    const response = await this.client.get('/api/feature-flags');
+    return response.data;
+  }
+
   // Health check
   async healthCheck() {
     const response = await this.client.get('/health');
