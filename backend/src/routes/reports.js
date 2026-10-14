@@ -11,12 +11,44 @@ const router = express.Router();
 // All routes require authentication
 router.use(authenticateUser);
 
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseDateRange(query) {
+  const { from, to } = query;
+  if (from && !DATE_REGEX.test(from)) {
+    return { error: 'Invalid "from" date format. Use YYYY-MM-DD.' };
+  }
+  if (to && !DATE_REGEX.test(to)) {
+    return { error: 'Invalid "to" date format. Use YYYY-MM-DD.' };
+  }
+  return { from: from || null, to: to || null };
+}
+
+function buildDateFilter(from, to) {
+  let clause = '';
+  const params = [];
+  if (from) {
+    clause += ' AND date >= ?';
+    params.push(from);
+  }
+  if (to) {
+    clause += ' AND date <= ?';
+    params.push(to);
+  }
+  return { clause, params };
+}
+
 // Get hourly report for specific client
 router.get('/client/:clientId', (req, res) => {
   const clientId = parseInt(req.params.clientId);
   
   if (isNaN(clientId)) {
     return res.status(400).json({ error: 'Invalid client ID' });
+  }
+
+  const dateRange = parseDateRange(req.query);
+  if (dateRange.error) {
+    return res.status(400).json({ error: dateRange.error });
   }
   
   const db = getDatabase();
@@ -34,14 +66,16 @@ router.get('/client/:clientId', (req, res) => {
       if (!client) {
         return res.status(404).json({ error: 'Client not found' });
       }
+
+      const { clause, params } = buildDateFilter(dateRange.from, dateRange.to);
       
       // Get work entries for this client
       db.all(
         `SELECT id, hours, description, date, created_at, updated_at
          FROM work_entries 
-         WHERE client_id = ? AND user_email = ? 
+         WHERE client_id = ? AND user_email = ?${clause}
          ORDER BY date DESC`,
-        [clientId, req.userEmail],
+        [clientId, req.userEmail, ...params],
         (err, workEntries) => {
           if (err) {
             console.error('Database error:', err);
@@ -70,6 +104,11 @@ router.get('/export/csv/:clientId', (req, res) => {
   if (isNaN(clientId)) {
     return res.status(400).json({ error: 'Invalid client ID' });
   }
+
+  const dateRange = parseDateRange(req.query);
+  if (dateRange.error) {
+    return res.status(400).json({ error: dateRange.error });
+  }
   
   const db = getDatabase();
   
@@ -86,14 +125,16 @@ router.get('/export/csv/:clientId', (req, res) => {
       if (!client) {
         return res.status(404).json({ error: 'Client not found' });
       }
+
+      const { clause, params } = buildDateFilter(dateRange.from, dateRange.to);
       
       // Get work entries
       db.all(
         `SELECT hours, description, date, created_at
          FROM work_entries 
-         WHERE client_id = ? AND user_email = ? 
+         WHERE client_id = ? AND user_email = ?${clause}
          ORDER BY date DESC`,
-        [clientId, req.userEmail],
+        [clientId, req.userEmail, ...params],
         (err, workEntries) => {
           if (err) {
             console.error('Database error:', err);
@@ -153,6 +194,11 @@ router.get('/export/pdf/:clientId', (req, res) => {
   if (isNaN(clientId)) {
     return res.status(400).json({ error: 'Invalid client ID' });
   }
+
+  const dateRange = parseDateRange(req.query);
+  if (dateRange.error) {
+    return res.status(400).json({ error: dateRange.error });
+  }
   
   const db = getDatabase();
   
@@ -169,14 +215,16 @@ router.get('/export/pdf/:clientId', (req, res) => {
       if (!client) {
         return res.status(404).json({ error: 'Client not found' });
       }
+
+      const { clause, params } = buildDateFilter(dateRange.from, dateRange.to);
       
       // Get work entries
       db.all(
         `SELECT hours, description, date, created_at
          FROM work_entries 
-         WHERE client_id = ? AND user_email = ? 
+         WHERE client_id = ? AND user_email = ?${clause}
          ORDER BY date DESC`,
-        [clientId, req.userEmail],
+        [clientId, req.userEmail, ...params],
         (err, workEntries) => {
           if (err) {
             console.error('Database error:', err);
@@ -203,6 +251,9 @@ router.get('/export/pdf/:clientId', (req, res) => {
           doc.fontSize(14).text(`Total Hours: ${totalHours.toFixed(2)}`);
           doc.text(`Total Entries: ${workEntries.length}`);
           doc.text(`Generated: ${new Date().toLocaleString()}`);
+          if (dateRange.from || dateRange.to) {
+            doc.text(`Date Range: ${dateRange.from || 'Start'} to ${dateRange.to || 'Present'}`);
+          }
           doc.moveDown();
           
           // Add table header
