@@ -405,6 +405,173 @@ describe('Report Routes', () => {
 
 
   describe('PDF Export Success Path', () => {
+    function createPdfMock(yValue) {
+      const mockDoc = {
+        fontSize: jest.fn().mockReturnThis(),
+        text: jest.fn().mockReturnThis(),
+        moveDown: jest.fn().mockReturnThis(),
+        moveTo: jest.fn().mockReturnThis(),
+        lineTo: jest.fn().mockReturnThis(),
+        stroke: jest.fn().mockReturnThis(),
+        addPage: jest.fn().mockReturnThis(),
+        pipe: jest.fn(function (stream) { mockDoc._stream = stream; }),
+        end: jest.fn(function () { if (mockDoc._stream && mockDoc._stream.end) mockDoc._stream.end(); }),
+        y: yValue || 100
+      };
+      return mockDoc;
+    }
+
+    test('should generate PDF with work entries', async () => {
+      const mockClient = { id: 1, name: 'Test Client' };
+      const mockWorkEntries = [
+        { date: '2024-01-01', hours: 5, description: 'Work 1', created_at: '2024-01-01' },
+        { date: '2024-01-02', hours: 3.5, description: 'Work 2', created_at: '2024-01-02' }
+      ];
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, mockClient);
+      });
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, mockWorkEntries);
+      });
+
+      const PDFDocument = require('pdfkit');
+      const mockDoc = createPdfMock(100);
+      PDFDocument.mockImplementation(() => mockDoc);
+
+      const response = await request(app).get('/api/reports/export/pdf/1');
+
+      expect(mockDoc.pipe).toHaveBeenCalled();
+      expect(mockDoc.fontSize).toHaveBeenCalledWith(20);
+      expect(mockDoc.text).toHaveBeenCalledWith(
+        'Time Report for Test Client',
+        expect.objectContaining({ align: 'center' })
+      );
+      expect(mockDoc.end).toHaveBeenCalled();
+    });
+
+    test('should generate PDF with empty work entries', async () => {
+      const mockClient = { id: 1, name: 'Test Client' };
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, mockClient);
+      });
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, []);
+      });
+
+      const PDFDocument = require('pdfkit');
+      const mockDoc = createPdfMock(100);
+      PDFDocument.mockImplementation(() => mockDoc);
+
+      const response = await request(app).get('/api/reports/export/pdf/1');
+
+      expect(mockDoc.pipe).toHaveBeenCalled();
+      expect(mockDoc.end).toHaveBeenCalled();
+      expect(mockDoc.text).toHaveBeenCalledWith('Total Hours: 0.00');
+      expect(mockDoc.text).toHaveBeenCalledWith('Total Entries: 0');
+    });
+
+    test('should add new page when content exceeds page height', async () => {
+      const mockClient = { id: 1, name: 'Test Client' };
+      const mockWorkEntries = [
+        { date: '2024-01-01', hours: 5, description: 'Work 1', created_at: '2024-01-01' }
+      ];
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, mockClient);
+      });
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, mockWorkEntries);
+      });
+
+      const PDFDocument = require('pdfkit');
+      const mockDoc = createPdfMock(750);
+      PDFDocument.mockImplementation(() => mockDoc);
+
+      const response = await request(app).get('/api/reports/export/pdf/1');
+
+      expect(mockDoc.addPage).toHaveBeenCalled();
+    });
+
+    test('should add separator line every 5 entries', async () => {
+      const mockClient = { id: 1, name: 'Test Client' };
+      const mockWorkEntries = [];
+      for (let i = 0; i < 6; i++) {
+        mockWorkEntries.push({
+          date: `2024-01-0${i + 1}`,
+          hours: 2,
+          description: `Work ${i + 1}`,
+          created_at: `2024-01-0${i + 1}`
+        });
+      }
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, mockClient);
+      });
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, mockWorkEntries);
+      });
+
+      const PDFDocument = require('pdfkit');
+      const mockDoc = createPdfMock(100);
+      PDFDocument.mockImplementation(() => mockDoc);
+
+      const response = await request(app).get('/api/reports/export/pdf/1');
+
+      expect(mockDoc.moveTo).toHaveBeenCalled();
+      expect(mockDoc.lineTo).toHaveBeenCalled();
+      expect(mockDoc.stroke).toHaveBeenCalled();
+    });
+
+    test('should handle entry with no description', async () => {
+      const mockClient = { id: 1, name: 'Test Client' };
+      const mockWorkEntries = [
+        { date: '2024-01-01', hours: 5, description: null, created_at: '2024-01-01' }
+      ];
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, mockClient);
+      });
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, mockWorkEntries);
+      });
+
+      const PDFDocument = require('pdfkit');
+      const mockDoc = createPdfMock(100);
+      PDFDocument.mockImplementation(() => mockDoc);
+
+      const response = await request(app).get('/api/reports/export/pdf/1');
+
+      expect(mockDoc.text).toHaveBeenCalledWith('No description', 230, 100, { width: 300 });
+    });
+
+    test('should set correct PDF response headers', async () => {
+      const mockClient = { id: 1, name: 'Test Client' };
+      const mockWorkEntries = [];
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, mockClient);
+      });
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, mockWorkEntries);
+      });
+
+      const PDFDocument = require('pdfkit');
+      const mockDoc = createPdfMock(100);
+      PDFDocument.mockImplementation(() => mockDoc);
+
+      const response = await request(app).get('/api/reports/export/pdf/1');
+
+      expect(response.headers['content-type']).toContain('application/pdf');
+    });
+
     test('should handle database error when fetching work entries for PDF', async () => {
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(null, { id: 1, name: 'Test Client' });
