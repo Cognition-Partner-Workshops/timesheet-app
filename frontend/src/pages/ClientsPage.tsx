@@ -286,6 +286,11 @@ const ClientsPage: React.FC = () => {
         </DialogTitle>
         <form onSubmit={handleSubmit}>
           <DialogContent>
+            {error && (
+              <Alert severity="error" sx={{ mb: 1 }} onClose={() => setError('')}>
+                {error}
+              </Alert>
+            )}
             <TextField
               autoFocus
               margin="dense"
