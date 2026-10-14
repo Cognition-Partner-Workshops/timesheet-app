@@ -186,8 +186,12 @@ router.put('/:id', (req, res, next) => {
   }
 });
 
-// Delete all clients for authenticated user
+// Delete all clients for authenticated user (requires confirmation)
 router.delete('/', (req, res) => {
+  if (!req.body || req.body.confirm !== true) {
+    return res.status(400).json({ error: 'Bulk delete requires confirmation. Send { "confirm": true } in the request body.' });
+  }
+
   const db = getDatabase();
   
   db.run(

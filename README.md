@@ -11,9 +11,9 @@ A full-stack web application for tracking and reporting employee hourly work acr
 - For production use, modify `backend/src/database/init.js` to use file-based SQLite instead of `:memory:`
 
 ### Authentication
-- Email-only authentication with JWT tokens
-- No password required - assumes trusted internal network
-- Anyone with a valid email can create an account and log in
+- JWT-based authentication with email and password
+- Passwords hashed with bcrypt (12 salt rounds)
+- JWT tokens stored in httpOnly, Secure, SameSite=Strict cookies
 - Consider integrating with company SSO for production use
 
 ## Features
@@ -188,11 +188,15 @@ All authenticated endpoints require `Authorization: Bearer <token>` header.
 ## Security Features
 
 - JWT-based authentication with 24-hour token expiration
-- Rate limiting on authentication endpoints (5 attempts per 15 minutes)
+- Rate limiting: 5 attempts per 15 minutes on auth endpoints, 100 requests per 15 minutes globally
+- CSRF protection using double-submit cookie pattern
 - CORS protection
 - Helmet security headers
 - Input validation with Joi schemas
 - SQL injection protection with parameterized queries
+- Request body size limited to 100KB
+- Error messages sanitized in production (no stack traces or internal details leaked)
+- Bulk delete operations require explicit confirmation
 
 ## Development
 
@@ -272,10 +276,9 @@ See `backend/DEPLOYMENT.md` for detailed production deployment instructions.
 ## Known Limitations
 
 1. **In-memory database** - All data is lost on server restart
-2. **Email-only auth** - No password protection, assumes trusted network
-3. **No user roles** - All users have equal access to all data
-4. **Single-server architecture** - Not designed for horizontal scaling
-5. **No real-time updates** - Changes require page refresh
+2. **No user roles** - All users have equal access to their own data
+3. **Single-server architecture** - Not designed for horizontal scaling
+4. **No real-time updates** - Changes require page refresh
 
 ## Future Enhancements
 

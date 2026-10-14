@@ -13,6 +13,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const checkAuth = async () => {
+      // Fetch CSRF token on app initialization
+      try {
+        await apiClient.fetchCsrfToken();
+      } catch (error) {
+        console.error('Failed to fetch CSRF token:', error);
+      }
+
       const storedEmail = localStorage.getItem('userEmail');
       
       if (storedEmail) {
