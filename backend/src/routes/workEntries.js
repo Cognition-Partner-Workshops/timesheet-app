@@ -5,6 +5,15 @@ const { workEntrySchema, updateWorkEntrySchema } = require('../validation/schema
 
 const router = express.Router();
 
+// Helper to format date values that may be stored as timestamps or ISO strings
+function formatDate(dateValue) {
+  if (!dateValue) return '';
+  if (typeof dateValue === 'number') {
+    return new Date(dateValue).toISOString().split('T')[0];
+  }
+  return String(dateValue);
+}
+
 // All routes require authentication
 router.use(authenticateUser);
 
@@ -40,7 +49,8 @@ router.get('/', (req, res) => {
       return res.status(500).json({ error: 'Internal server error' });
     }
     
-    res.json({ workEntries: rows });
+    const formattedRows = rows.map(row => ({ ...row, date: formatDate(row.date) }));
+    res.json({ workEntries: formattedRows });
   });
 });
 
@@ -87,6 +97,9 @@ router.post('/', (req, res, next) => {
     const { clientId, hours, description, date } = value;
     const db = getDatabase();
 
+    // Convert date to ISO string format (YYYY-MM-DD) for consistent storage
+    const dateStr = date instanceof Date ? date.toISOString().split('T')[0] : date;
+
     // Verify client exists and belongs to user
     db.get(
       'SELECT id FROM clients WHERE id = ? AND user_email = ?',
@@ -104,7 +117,7 @@ router.post('/', (req, res, next) => {
         // Create work entry
         db.run(
           'INSERT INTO work_entries (client_id, user_email, hours, description, date) VALUES (?, ?, ?, ?, ?)',
-          [clientId, req.userEmail, hours, description || null, date],
+          [clientId, req.userEmail, hours, description || null, dateStr],
           function(err) {
             if (err) {
               console.error('Database error:', err);
@@ -214,7 +227,8 @@ router.put('/:id', (req, res, next) => {
 
           if (value.date !== undefined) {
             updates.push('date = ?');
-            values.push(value.date);
+            const dateStr = value.date instanceof Date ? value.date.toISOString().split('T')[0] : value.date;
+            values.push(dateStr);
           }
 
           updates.push('updated_at = CURRENT_TIMESTAMP');
