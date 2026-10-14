@@ -1,0 +1,92 @@
+name: Security Scanning
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+# Least-privilege default; jobs that need more request it explicitly.
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    name: Dependency Review (PR)
+    # The dependency-review action requires a PR diff, so it only runs on
+    # pull_request events.
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: critical
+          comment-summary-in-pr: on-failure
+
+  sbom:
+    name: SBOM Generation (CycloneDX)
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [frontend, backend]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.component }}
+        run: npm ci
+
+      - name: Generate CycloneDX SBOM
+        working-directory: ${{ matrix.component }}
+        run: |
+          npx --yes @cyclonedx/cyclonedx-npm@^1.19.0 \
+            --output-format JSON \
+            --output-file "sbom-${{ matrix.component }}.cdx.json"
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ matrix.component }}-cyclonedx
+          path: ${{ matrix.component }}/sbom-${{ matrix.component }}.cdx.json
+          if-no-files-found: error
+
+  trivy-container-scan:
+    name: Trivy Container Scan
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -f docker/Dockerfile -t timesheet-app:scan .
+
+      - name: Run Trivy vulnerability scanner (fail on CRITICAL)
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: timesheet-app:scan
+          format: table
+          severity: CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
