@@ -72,6 +72,34 @@ export interface LoginResponse {
   user: User;
 }
 
+export interface Note {
+  _id: string;
+  title: string;
+  content: string;
+  tags: string[];
+  category: string;
+  pinned: boolean;
+  user_email: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateNoteRequest {
+  title: string;
+  content?: string;
+  tags?: string[];
+  category?: string;
+  pinned?: boolean;
+}
+
+export interface UpdateNoteRequest {
+  title?: string;
+  content?: string;
+  tags?: string[];
+  category?: string;
+  pinned?: boolean;
+}
+
 export interface ApiResponse<T> {
   data?: T;
   error?: string;
