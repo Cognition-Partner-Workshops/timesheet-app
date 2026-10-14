@@ -63,6 +63,51 @@ router.get('/client/:clientId', (req, res) => {
   );
 });
 
+// Send file and clean up temp file after download
+function sendAndCleanup(res, tempPath, filename) {
+  res.download(tempPath, filename, (err) => {
+    if (err) {
+      console.error('Error sending file:', err);
+    }
+    fs.unlink(tempPath, (unlinkErr) => {
+      if (unlinkErr) {
+        console.error('Error deleting temp file:', unlinkErr);
+      }
+    });
+  });
+}
+
+// Build CSV from work entries, send to client, and clean up
+function generateAndSendCsv(res, client, workEntries) {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const filename = `${client.name.replace(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.csv`;
+  const tempPath = path.join(__dirname, '../../temp', filename);
+
+  const tempDir = path.dirname(tempPath);
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
+  }
+
+  const csvWriter = createCsvWriter({
+    path: tempPath,
+    header: [
+      { id: 'date', title: 'Date' },
+      { id: 'hours', title: 'Hours' },
+      { id: 'description', title: 'Description' },
+      { id: 'created_at', title: 'Created At' }
+    ]
+  });
+
+  csvWriter.writeRecords(workEntries)
+    .then(() => {
+      sendAndCleanup(res, tempPath, filename);
+    })
+    .catch((error) => {
+      console.error('Error creating CSV:', error);
+      res.status(500).json({ error: 'Failed to generate CSV report' });
+    });
+}
+
 // Export client report as CSV
 router.get('/export/csv/:clientId', (req, res) => {
   const clientId = parseInt(req.params.clientId);
@@ -100,46 +145,7 @@ router.get('/export/csv/:clientId', (req, res) => {
             return res.status(500).json({ error: 'Internal server error' });
           }
           
-          // Create temporary CSV file
-          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-          const filename = `${client.name.replace(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.csv`;
-          const tempPath = path.join(__dirname, '../../temp', filename);
-          
-          // Ensure temp directory exists
-          const tempDir = path.dirname(tempPath);
-          if (!fs.existsSync(tempDir)) {
-            fs.mkdirSync(tempDir, { recursive: true });
-          }
-          
-          const csvWriter = createCsvWriter({
-            path: tempPath,
-            header: [
-              { id: 'date', title: 'Date' },
-              { id: 'hours', title: 'Hours' },
-              { id: 'description', title: 'Description' },
-              { id: 'created_at', title: 'Created At' }
-            ]
-          });
-          
-          csvWriter.writeRecords(workEntries)
-            .then(() => {
-              // Send file and clean up
-              res.download(tempPath, filename, (err) => {
-                if (err) {
-                  console.error('Error sending file:', err);
-                }
-                // Clean up temp file
-                fs.unlink(tempPath, (unlinkErr) => {
-                  if (unlinkErr) {
-                    console.error('Error deleting temp file:', unlinkErr);
-                  }
-                });
-              });
-            })
-            .catch((error) => {
-              console.error('Error creating CSV:', error);
-              res.status(500).json({ error: 'Failed to generate CSV report' });
-            });
+          generateAndSendCsv(res, client, workEntries);
         }
       );
     }
