@@ -1,0 +1,25 @@
+# SonarQube Community Edition — local static analysis server
+# Usage:
+#   docker compose -f docker-compose.sonarqube.yml up -d
+#   Open http://localhost:9000  (default login: admin / admin)
+#
+# After first login, create a project token and run:
+#   npx sonar-scanner -Dsonar.login=<YOUR_TOKEN>
+
+services:
+  sonarqube:
+    image: sonarqube:community
+    container_name: sonarqube
+    ports:
+      - "9000:9000"
+    environment:
+      - SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_logs:/opt/sonarqube/logs
+      - sonarqube_extensions:/opt/sonarqube/extensions
+
+volumes:
+  sonarqube_data:
+  sonarqube_logs:
+  sonarqube_extensions:
