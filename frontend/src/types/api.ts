@@ -35,6 +35,34 @@ export interface ClientReport {
   entryCount: number;
 }
 
+export interface Project {
+  id: number;
+  name: string;
+  description: string | null;
+  client_id: number | null;
+  start_date: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  client_name?: string | null;
+}
+
+export interface CreateProjectRequest {
+  name: string;
+  description?: string;
+  clientId?: number | null;
+  startDate?: string | null;
+  status?: string;
+}
+
+export interface UpdateProjectRequest {
+  name?: string;
+  description?: string;
+  clientId?: number | null;
+  startDate?: string | null;
+  status?: string;
+}
+
 export interface CreateClientRequest {
   name: string;
   description?: string;
