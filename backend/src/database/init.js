@@ -72,6 +72,10 @@ async function initializeDatabase() {
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_user_email ON work_entries (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_date ON work_entries (date)`);
 
+      // Compound indexes for common query patterns (client + user filtering)
+      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_client_user ON work_entries (client_id, user_email)`);
+      database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_user_date ON work_entries (user_email, date)`);
+
       console.log('Database tables created successfully');
       resolve();
     });
