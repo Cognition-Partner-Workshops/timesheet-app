@@ -182,4 +182,72 @@ describe('Authentication Middleware', () => {
       expect(mockDb.get).toHaveBeenCalled();
     });
   });
+
+  describe('Mutation Testing - SQL and Parameter Verification', () => {
+    test('should query users table with exact email param', () => {
+      req.headers['x-user-email'] = 'test@example.com';
+      
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { email: 'test@example.com' });
+      });
+
+      authenticateUser(req, res, next);
+
+      const query = mockDb.get.mock.calls[0][0];
+      const params = mockDb.get.mock.calls[0][1];
+      expect(query).toContain('SELECT email FROM users');
+      expect(query).toContain('WHERE email = ?');
+      expect(params).toEqual(['test@example.com']);
+    });
+
+    test('should INSERT with correct SQL and email param for new user', () => {
+      req.headers['x-user-email'] = 'new@example.com';
+      
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, null);
+      });
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+
+      authenticateUser(req, res, next);
+
+      const insertQuery = mockDb.run.mock.calls[0][0];
+      const insertParams = mockDb.run.mock.calls[0][1];
+      expect(insertQuery).toContain('INSERT INTO users');
+      expect(insertQuery).toContain('email');
+      expect(insertParams).toEqual(['new@example.com']);
+    });
+
+    test('should set req.userEmail to the exact header value', () => {
+      req.headers['x-user-email'] = 'specific@test.com';
+      
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { email: 'specific@test.com' });
+      });
+
+      authenticateUser(req, res, next);
+
+      expect(req.userEmail).toBe('specific@test.com');
+      expect(next).toHaveBeenCalled();
+    });
+
+    test('should return exact error messages', () => {
+      authenticateUser(req, res, next);
+      expect(res.json).toHaveBeenCalledWith({ error: 'User email required in x-user-email header' });
+    });
+
+    test('should read from x-user-email header specifically', () => {
+      req.headers['x-user-email'] = 'test@example.com';
+      req.headers['authorization'] = 'Bearer token';
+      
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { email: 'test@example.com' });
+      });
+
+      authenticateUser(req, res, next);
+
+      expect(mockDb.get.mock.calls[0][1]).toEqual(['test@example.com']);
+    });
+  });
 });
