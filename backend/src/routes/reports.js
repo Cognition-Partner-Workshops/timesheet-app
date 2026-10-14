@@ -8,6 +8,15 @@ const fs = require('fs');
 
 const router = express.Router();
 
+// Format a date value (timestamp or string) to YYYY-MM-DD
+function formatDate(dateValue) {
+  const date = new Date(dateValue);
+  if (isNaN(date.getTime())) {
+    return String(dateValue);
+  }
+  return date.toISOString().split('T')[0];
+}
+
 // All routes require authentication
 router.use(authenticateUser);
 
@@ -121,7 +130,12 @@ router.get('/export/csv/:clientId', (req, res) => {
             ]
           });
           
-          csvWriter.writeRecords(workEntries)
+          const formattedEntries = workEntries.map(entry => ({
+            ...entry,
+            date: formatDate(entry.date)
+          }));
+          
+          csvWriter.writeRecords(formattedEntries)
             .then(() => {
               // Send file and clean up
               res.download(tempPath, filename, (err) => {
@@ -224,7 +238,7 @@ router.get('/export/pdf/:clientId', (req, res) => {
               doc.addPage();
             }
             
-            doc.text(entry.date, 50, doc.y, { width: 100 });
+            doc.text(formatDate(entry.date), 50, doc.y, { width: 100 });
             doc.text(entry.hours.toString(), 150, y, { width: 80 });
             doc.text(entry.description || 'No description', 230, y, { width: 300 });
             doc.moveDown();
