@@ -5,10 +5,10 @@ A full-stack web application for tracking and reporting employee hourly work acr
 ## ⚠️ Important Notes
 
 ### Data Persistence
-**This application uses SQLite in-memory database as specified in requirements.**
-- ⚠️ **All data is lost when the backend server restarts**
-- Suitable for development and testing
-- For production use, modify `backend/src/database/init.js` to use file-based SQLite instead of `:memory:`
+**This application uses a file-based SQLite database** at `backend/data/timesheet.db` by default.
+- Data persists across server restarts
+- Override the path via the `DATABASE_PATH` environment variable
+- Set `DATABASE_PATH=:memory:` for a non-persistent in-memory database (data lost on restart)
 
 ### Authentication
 - Email-only authentication with JWT tokens

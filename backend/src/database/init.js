@@ -1,5 +1,6 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fs = require('fs');
 
 let db = null;
 let isClosing = false;
@@ -10,13 +11,23 @@ function getDatabase() {
     // Reset state when creating a new database connection
     isClosing = false;
     isClosed = false;
-    // Use in-memory database as specified in requirements
-    db = new sqlite3.Database(':memory:', (err) => {
+    const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '..', '..', 'data', 'timesheet.db');
+
+    // Ensure the directory exists for file-based database
+    if (dbPath !== ':memory:') {
+      const dbDir = path.dirname(dbPath);
+      if (!fs.existsSync(dbDir)) {
+        fs.mkdirSync(dbDir, { recursive: true });
+      }
+    }
+
+    db = new sqlite3.Database(dbPath, (err) => {
       if (err) {
         console.error('Error opening database:', err);
         throw err;
       }
-      console.log('Connected to SQLite in-memory database');
+      const dbType = dbPath === ':memory:' ? 'in-memory' : `file: ${dbPath}`;
+      console.log(`Connected to SQLite database (${dbType})`);
     });
   }
   return db;

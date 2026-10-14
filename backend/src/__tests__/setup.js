@@ -1,3 +1,6 @@
+// Use in-memory database for tests to avoid file system side effects
+process.env.DATABASE_PATH = ':memory:';
+
 // Mock sqlite3 globally to avoid native module loading issues in tests
 jest.mock('sqlite3', () => {
   const mockDatabase = {
