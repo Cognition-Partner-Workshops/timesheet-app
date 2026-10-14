@@ -9,6 +9,7 @@ module.exports = {
   ],
   coverageReporters: ['text', 'lcov', 'html'],
   testMatch: ['**/__tests__/**/*.test.js'],
+  testPathIgnorePatterns: ['/node_modules/', '__tests__/e2e/'],
   coverageThreshold: {
     global: {
       branches: 60,
