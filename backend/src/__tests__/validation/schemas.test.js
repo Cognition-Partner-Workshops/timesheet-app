@@ -83,6 +83,55 @@ describe('Validation Schemas', () => {
       const { value } = clientSchema.validate(client);
       expect(value.name).toBe('Test Client');
     });
+
+    test('should allow valid phone number', () => {
+      const client = {
+        name: 'Test Client',
+        phone: '555-1234'
+      };
+
+      const { error } = clientSchema.validate(client);
+      expect(error).toBeUndefined();
+    });
+
+    test('should allow missing phone', () => {
+      const client = {
+        name: 'Test Client'
+      };
+
+      const { error } = clientSchema.validate(client);
+      expect(error).toBeUndefined();
+    });
+
+    test('should allow empty phone', () => {
+      const client = {
+        name: 'Test Client',
+        phone: ''
+      };
+
+      const { error } = clientSchema.validate(client);
+      expect(error).toBeUndefined();
+    });
+
+    test('should reject phone longer than 50 characters', () => {
+      const client = {
+        name: 'Test Client',
+        phone: 'a'.repeat(51)
+      };
+
+      const { error } = clientSchema.validate(client);
+      expect(error).toBeDefined();
+    });
+
+    test('should trim whitespace from phone', () => {
+      const client = {
+        name: 'Test Client',
+        phone: '  555-1234  '
+      };
+
+      const { value } = clientSchema.validate(client);
+      expect(value.phone).toBe('555-1234');
+    });
   });
 
   describe('workEntrySchema', () => {
@@ -287,6 +336,44 @@ describe('Validation Schemas', () => {
 
       const { error } = updateClientSchema.validate(update);
       expect(error).toBeUndefined();
+    });
+
+    test('should validate phone update', () => {
+      const update = {
+        phone: '555-9876'
+      };
+
+      const { error } = updateClientSchema.validate(update);
+      expect(error).toBeUndefined();
+    });
+
+    test('should validate phone with other fields update', () => {
+      const update = {
+        name: 'Updated Name',
+        phone: '555-0000',
+        email: 'test@example.com'
+      };
+
+      const { error } = updateClientSchema.validate(update);
+      expect(error).toBeUndefined();
+    });
+
+    test('should allow empty phone in update', () => {
+      const update = {
+        phone: ''
+      };
+
+      const { error } = updateClientSchema.validate(update);
+      expect(error).toBeUndefined();
+    });
+
+    test('should reject phone longer than 50 characters in update', () => {
+      const update = {
+        phone: 'a'.repeat(51)
+      };
+
+      const { error } = updateClientSchema.validate(update);
+      expect(error).toBeDefined();
     });
   });
 

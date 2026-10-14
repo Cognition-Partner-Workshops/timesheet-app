@@ -9,6 +9,7 @@ export interface Client {
   description: string | null;
   department: string | null;
   email: string | null;
+  phone: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -40,6 +41,7 @@ export interface CreateClientRequest {
   description?: string;
   department?: string;
   email?: string;
+  phone?: string;
 }
 
 export interface UpdateClientRequest {
@@ -47,6 +49,7 @@ export interface UpdateClientRequest {
   description?: string;
   department?: string;
   email?: string;
+  phone?: string;
 }
 
 export interface CreateWorkEntryRequest {
