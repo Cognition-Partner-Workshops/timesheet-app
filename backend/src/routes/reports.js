@@ -3,7 +3,7 @@ const { getDatabase } = require('../database/init');
 const { authenticateUser } = require('../middleware/auth');
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 const PDFDocument = require('pdfkit');
-const path = require('path');
+const path = require('node:path');
 const fs = require('fs');
 
 const router = express.Router();
@@ -13,9 +13,9 @@ router.use(authenticateUser);
 
 // Get hourly report for specific client
 router.get('/client/:clientId', (req, res) => {
-  const clientId = parseInt(req.params.clientId);
+  const clientId = Number.parseInt(req.params.clientId);
   
-  if (isNaN(clientId)) {
+  if (Number.isNaN(clientId)) {
     return res.status(400).json({ error: 'Invalid client ID' });
   }
   
@@ -49,7 +49,7 @@ router.get('/client/:clientId', (req, res) => {
           }
           
           // Calculate total hours
-          const totalHours = workEntries.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
+          const totalHours = workEntries.reduce((sum, entry) => sum + Number.parseFloat(entry.hours), 0);
           
           res.json({
             client: client,
@@ -65,9 +65,9 @@ router.get('/client/:clientId', (req, res) => {
 
 // Export client report as CSV
 router.get('/export/csv/:clientId', (req, res) => {
-  const clientId = parseInt(req.params.clientId);
+  const clientId = Number.parseInt(req.params.clientId);
   
-  if (isNaN(clientId)) {
+  if (Number.isNaN(clientId)) {
     return res.status(400).json({ error: 'Invalid client ID' });
   }
   
@@ -101,8 +101,8 @@ router.get('/export/csv/:clientId', (req, res) => {
           }
           
           // Create temporary CSV file
-          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-          const filename = `${client.name.replace(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.csv`;
+          const timestamp = new Date().toISOString().replaceAll(/[:.]/g, '-');
+          const filename = `${client.name.replaceAll(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.csv`;
           const tempPath = path.join(__dirname, '../../temp', filename);
           
           // Ensure temp directory exists
@@ -148,9 +148,9 @@ router.get('/export/csv/:clientId', (req, res) => {
 
 // Export client report as PDF
 router.get('/export/pdf/:clientId', (req, res) => {
-  const clientId = parseInt(req.params.clientId);
+  const clientId = Number.parseInt(req.params.clientId);
   
-  if (isNaN(clientId)) {
+  if (Number.isNaN(clientId)) {
     return res.status(400).json({ error: 'Invalid client ID' });
   }
   
@@ -185,8 +185,8 @@ router.get('/export/pdf/:clientId', (req, res) => {
           
           // Create PDF
           const doc = new PDFDocument();
-          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-          const filename = `${client.name.replace(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.pdf`;
+          const timestamp = new Date().toISOString().replaceAll(/[:.]/g, '-');
+          const filename = `${client.name.replaceAll(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.pdf`;
           
           // Set response headers
           res.setHeader('Content-Type', 'application/pdf');
@@ -199,7 +199,7 @@ router.get('/export/pdf/:clientId', (req, res) => {
           doc.fontSize(20).text(`Time Report for ${client.name}`, { align: 'center' });
           doc.moveDown();
           
-          const totalHours = workEntries.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
+          const totalHours = workEntries.reduce((sum, entry) => sum + Number.parseFloat(entry.hours), 0);
           doc.fontSize(14).text(`Total Hours: ${totalHours.toFixed(2)}`);
           doc.text(`Total Entries: ${workEntries.length}`);
           doc.text(`Generated: ${new Date().toLocaleString()}`);
