@@ -5,7 +5,7 @@ import axios, { type AxiosInstance, type AxiosResponse } from 'axios';
 const API_BASE_URL = '';
 
 class ApiClient {
-  private client: AxiosInstance;
+  private readonly client: AxiosInstance;
 
   constructor() {
     this.client = axios.create({
@@ -37,7 +37,7 @@ class ApiClient {
         if (error.response?.status === 401) {
           // Clear stored email on auth error
           localStorage.removeItem('userEmail');
-          window.location.href = '/login';
+          globalThis.location.href = '/login';
         }
         return Promise.reject(error);
       }
