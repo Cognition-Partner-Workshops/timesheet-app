@@ -184,4 +184,55 @@ describe('Database Initialization', () => {
       expect(workEntriesQuery[0]).toContain('FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE');
     });
   });
+
+  describe('closeDatabase - Edge Cases', () => {
+    test('should resolve immediately when no database connection exists', async () => {
+      jest.resetModules();
+      const { closeDatabase: closeFresh } = require('../../database/init');
+      await expect(closeFresh()).resolves.toBeUndefined();
+    });
+
+    test('should resolve when database is already closed', async () => {
+      const db = getDatabase();
+      db.close.mockImplementation((callback) => callback(null));
+      await closeDatabase();
+      await expect(closeDatabase()).resolves.toBeUndefined();
+    });
+
+    test('should wait for close to complete when already closing', async () => {
+      jest.resetModules();
+
+      let closeCallback = null;
+      jest.doMock('sqlite3', () => {
+        const mockDb = {
+          serialize: jest.fn(cb => cb()),
+          run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
+          get: jest.fn(),
+          all: jest.fn(),
+          close: jest.fn((cb) => {
+            closeCallback = cb;
+            setTimeout(() => {
+              if (closeCallback) closeCallback(null);
+            }, 50);
+          })
+        };
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, cb) => {
+              if (cb) cb(null);
+              return mockDb;
+            })
+          }))
+        };
+      });
+
+      const { getDatabase: getDb, closeDatabase: closeDb } = require('../../database/init');
+      getDb();
+
+      const p1 = closeDb();
+      const p2 = closeDb();
+
+      await Promise.all([p1, p2]);
+    }, 10000);
+  });
 });
