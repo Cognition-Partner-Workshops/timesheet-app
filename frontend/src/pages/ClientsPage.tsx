@@ -28,7 +28,7 @@ import {
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
-import { type Client } from '../types/api';
+import { type Client, type AxiosApiError } from '../types/api';
 
 const ClientsPage: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -50,9 +50,8 @@ const ClientsPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       handleClose();
     },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to create client');
+    onError: (err: AxiosApiError) => {
+      setError(err.response?.data?.error || 'Failed to create client');
     },
   });
 
@@ -63,9 +62,8 @@ const ClientsPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       handleClose();
     },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to update client');
+    onError: (err: AxiosApiError) => {
+      setError(err.response?.data?.error || 'Failed to update client');
     },
   });
 
@@ -74,9 +72,8 @@ const ClientsPage: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
     },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to delete client');
+    onError: (err: AxiosApiError) => {
+      setError(err.response?.data?.error || 'Failed to delete client');
     },
   });
 
@@ -85,9 +82,8 @@ const ClientsPage: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
     },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to delete all clients');
+    onError: (err: AxiosApiError) => {
+      setError(err.response?.data?.error || 'Failed to delete all clients');
     },
   });
 

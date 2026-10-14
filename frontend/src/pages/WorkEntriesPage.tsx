@@ -34,7 +34,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import apiClient from '../api/client';
-import { type WorkEntry } from '../types/api';
+import { type WorkEntry, type AxiosApiError } from '../types/api';
 
 const WorkEntriesPage: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -66,9 +66,8 @@ const WorkEntriesPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['workEntries'] });
       handleClose();
     },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to create work entry');
+    onError: (err: AxiosApiError) => {
+      setError(err.response?.data?.error || 'Failed to create work entry');
     },
   });
 
@@ -79,9 +78,8 @@ const WorkEntriesPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['workEntries'] });
       handleClose();
     },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to update work entry');
+    onError: (err: AxiosApiError) => {
+      setError(err.response?.data?.error || 'Failed to update work entry');
     },
   });
 
@@ -90,9 +88,8 @@ const WorkEntriesPage: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workEntries'] });
     },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to delete work entry');
+    onError: (err: AxiosApiError) => {
+      setError(err.response?.data?.error || 'Failed to delete work entry');
     },
   });
 
@@ -298,7 +295,7 @@ const WorkEntriesPage: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, clientId: Number(e.target.value) })}
                   disabled={createMutation.isPending || updateMutation.isPending}
                 >
-                  {clients.map((client: { id: number; name: string }) => (
+                  {clients.map((client) => (
                     <MenuItem key={client.id} value={client.id}>
                       {client.name}
                     </MenuItem>

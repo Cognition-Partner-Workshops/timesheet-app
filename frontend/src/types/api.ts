@@ -77,3 +77,46 @@ export interface ApiResponse<T> {
   error?: string;
   message?: string;
 }
+
+// Response types matching backend JSON shapes
+export interface ClientsResponse {
+  clients: Client[];
+}
+
+export interface ClientResponse {
+  message?: string;
+  client: Client;
+}
+
+export interface WorkEntriesResponse {
+  workEntries: WorkEntryWithClient[];
+}
+
+export interface WorkEntryResponse {
+  message?: string;
+  workEntry: WorkEntryWithClient;
+}
+
+export interface DeleteResponse {
+  message: string;
+  deletedCount?: number;
+}
+
+export interface UserResponse {
+  user: User;
+}
+
+/**
+ * Shape of Axios errors returned by the backend.
+ * Use this instead of inline type assertions when handling API errors.
+ */
+export interface AxiosApiError {
+  response?: {
+    data?: {
+      error?: string;
+      details?: string[];
+    };
+    status?: number;
+  };
+  message?: string;
+}
