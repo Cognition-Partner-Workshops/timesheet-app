@@ -16,12 +16,12 @@ class ApiClient {
       },
     });
 
-    // Request interceptor to add email header
+    // Request interceptor to add JWT token
     this.client.interceptors.request.use(
       (config) => {
-        const userEmail = localStorage.getItem('userEmail');
-        if (userEmail) {
-          config.headers['x-user-email'] = userEmail;
+        const token = localStorage.getItem('authToken');
+        if (token) {
+          config.headers['Authorization'] = `Bearer ${token}`;
         }
         return config;
       },
@@ -35,9 +35,14 @@ class ApiClient {
       (response: AxiosResponse) => response,
       (error) => {
         if (error.response?.status === 401) {
-          // Clear stored email on auth error
-          localStorage.removeItem('userEmail');
-          window.location.href = '/login';
+          // Skip redirect for auth endpoints so login/register errors display to the user
+          const requestUrl = error.config?.url || '';
+          const isAuthEndpoint = requestUrl.includes('/api/auth/login') || requestUrl.includes('/api/auth/register');
+          if (!isAuthEndpoint) {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('userEmail');
+            window.location.href = '/login';
+          }
         }
         return Promise.reject(error);
       }
@@ -45,8 +50,13 @@ class ApiClient {
   }
 
   // Auth endpoints
-  async login(email: string) {
-    const response = await this.client.post('/api/auth/login', { email });
+  async login(email: string, password: string) {
+    const response = await this.client.post('/api/auth/login', { email, password });
+    return response.data;
+  }
+
+  async register(email: string, password: string) {
+    const response = await this.client.post('/api/auth/register', { email, password });
     return response.data;
   }
 
