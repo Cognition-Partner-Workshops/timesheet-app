@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment files (contain secrets)
+.env
+config/.env
+
+# Models (too large for git)
+models/
+*.ckpt
+*.pth
+*.safetensors
+*.bin
+
+# Cache
+cache/
+.cache/
+
+# Logs
+logs/
+*.log
+
+# Assets (user-provided)
+assets/avatar_reference.png
+
+# Docker
+.docker/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+.pytest_cache/
+htmlcov/
+.coverage
