@@ -72,6 +72,33 @@ export interface LoginResponse {
   user: User;
 }
 
+export interface JournalEntry {
+  id: number;
+  title: string;
+  content: string;
+  source: string | null;
+  source_url: string | null;
+  published_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateJournalEntryRequest {
+  title: string;
+  content: string;
+  source?: string;
+  sourceUrl?: string;
+  publishedDate?: string;
+}
+
+export interface UpdateJournalEntryRequest {
+  title?: string;
+  content?: string;
+  source?: string;
+  sourceUrl?: string;
+  publishedDate?: string;
+}
+
 export interface ApiResponse<T> {
   data?: T;
   error?: string;

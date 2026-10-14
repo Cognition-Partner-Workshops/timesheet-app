@@ -133,6 +133,37 @@ class ApiClient {
     return response.data;
   }
 
+  // Journal endpoints
+  async getJournalEntries() {
+    const response = await this.client.get('/api/journal');
+    return response.data;
+  }
+
+  async getJournalEntry(id: number) {
+    const response = await this.client.get(`/api/journal/${id}`);
+    return response.data;
+  }
+
+  async createJournalEntry(entryData: { title: string; content: string; source?: string; sourceUrl?: string; publishedDate?: string }) {
+    const response = await this.client.post('/api/journal', entryData);
+    return response.data;
+  }
+
+  async updateJournalEntry(id: number, entryData: { title?: string; content?: string; source?: string; sourceUrl?: string; publishedDate?: string }) {
+    const response = await this.client.put(`/api/journal/${id}`, entryData);
+    return response.data;
+  }
+
+  async deleteJournalEntry(id: number) {
+    const response = await this.client.delete(`/api/journal/${id}`);
+    return response.data;
+  }
+
+  async seedJournalNews() {
+    const response = await this.client.post('/api/journal/seed-news');
+    return response.data;
+  }
+
   // Health check
   async healthCheck() {
     const response = await this.client.get('/health');

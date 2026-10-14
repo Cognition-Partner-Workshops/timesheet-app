@@ -32,10 +32,28 @@ const emailSchema = Joi.object({
   email: Joi.string().email().required()
 });
 
+const journalEntrySchema = Joi.object({
+  title: Joi.string().trim().min(1).max(500).required(),
+  content: Joi.string().trim().min(1).max(5000).required(),
+  source: Joi.string().trim().max(255).optional().allow(''),
+  sourceUrl: Joi.string().trim().max(2000).optional().allow(''),
+  publishedDate: Joi.date().iso().optional()
+});
+
+const updateJournalEntrySchema = Joi.object({
+  title: Joi.string().trim().min(1).max(500).optional(),
+  content: Joi.string().trim().min(1).max(5000).optional(),
+  source: Joi.string().trim().max(255).optional().allow(''),
+  sourceUrl: Joi.string().trim().max(2000).optional().allow(''),
+  publishedDate: Joi.date().iso().optional()
+}).min(1);
+
 module.exports = {
   clientSchema,
   workEntrySchema,
   updateWorkEntrySchema,
   updateClientSchema,
-  emailSchema
+  emailSchema,
+  journalEntrySchema,
+  updateJournalEntrySchema
 };
