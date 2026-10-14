@@ -13,6 +13,36 @@ export interface Client {
   updated_at: string;
 }
 
+export type ProjectStatus = 'active' | 'completed' | 'on-hold';
+
+export interface Project {
+  id: number;
+  name: string;
+  description: string | null;
+  client_id: number;
+  client_name: string;
+  start_date: string;
+  status: ProjectStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateProjectRequest {
+  name: string;
+  description?: string;
+  clientId: number;
+  startDate: string;
+  status?: ProjectStatus;
+}
+
+export interface UpdateProjectRequest {
+  name?: string;
+  description?: string;
+  clientId?: number;
+  startDate?: string;
+  status?: ProjectStatus;
+}
+
 export interface WorkEntry {
   id: number;
   client_id: number;
