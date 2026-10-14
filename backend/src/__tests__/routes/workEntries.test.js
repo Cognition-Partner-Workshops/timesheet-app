@@ -585,4 +585,54 @@ describe('Work Entry Routes', () => {
       expect(response.body.message).toBe('Work entry updated successfully');
     });
   });
+
+  describe('POST /api/work-entries - catch block', () => {
+    test('should handle unexpected synchronous error in POST', async () => {
+      const catchApp = express();
+      catchApp.use(express.json());
+      catchApp.use((req, res, next) => {
+        req.userEmail = 'test@example.com';
+        Object.defineProperty(req, 'body', {
+          get() { throw new Error('Unexpected sync error'); },
+          configurable: true
+        });
+        next();
+      });
+      catchApp.use('/api/work-entries', workEntryRoutes);
+      catchApp.use((err, req, res, next) => {
+        res.status(500).json({ error: 'Internal server error' });
+      });
+
+      const response = await request(catchApp)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: 8, date: '2024-01-01' });
+
+      expect(response.status).toBe(500);
+    });
+  });
+
+  describe('PUT /api/work-entries/:id - catch block', () => {
+    test('should handle unexpected synchronous error in PUT', async () => {
+      const catchApp = express();
+      catchApp.use(express.json());
+      catchApp.use((req, res, next) => {
+        req.userEmail = 'test@example.com';
+        Object.defineProperty(req, 'body', {
+          get() { throw new Error('Unexpected sync error'); },
+          configurable: true
+        });
+        next();
+      });
+      catchApp.use('/api/work-entries', workEntryRoutes);
+      catchApp.use((err, req, res, next) => {
+        res.status(500).json({ error: 'Internal server error' });
+      });
+
+      const response = await request(catchApp)
+        .put('/api/work-entries/1')
+        .send({ hours: 5 });
+
+      expect(response.status).toBe(500);
+    });
+  });
 });

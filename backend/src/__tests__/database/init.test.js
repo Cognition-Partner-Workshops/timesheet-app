@@ -183,5 +183,99 @@ describe('Database Initialization', () => {
       expect(workEntriesQuery[0]).toContain('FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE');
       expect(workEntriesQuery[0]).toContain('FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE');
     });
+
+    test('projects table should have correct structure', async () => {
+      const db = getDatabase();
+      await initializeDatabase();
+
+      const projectsQuery = db.run.mock.calls.find(call =>
+        call[0].includes('CREATE TABLE IF NOT EXISTS projects')
+      );
+
+      expect(projectsQuery).toBeDefined();
+      expect(projectsQuery[0]).toContain('name TEXT NOT NULL');
+      expect(projectsQuery[0]).toContain('status TEXT DEFAULT');
+      expect(projectsQuery[0]).toContain('FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE SET NULL');
+      expect(projectsQuery[0]).toContain('FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE');
+    });
+
+    test('projects indexes should be created', async () => {
+      const db = getDatabase();
+      await initializeDatabase();
+
+      const runCalls = db.run.mock.calls;
+      const queries = runCalls.map(call => call[0]);
+
+      expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_projects_user_email'))).toBe(true);
+      expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_projects_client_id'))).toBe(true);
+    });
+  });
+
+  describe('closeDatabase edge cases', () => {
+    test('should resolve immediately when no database connection exists', async () => {
+      // Use a fresh module where db is never initialized
+      jest.resetModules();
+
+      jest.doMock('sqlite3', () => {
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, callback) => {
+              callback(null);
+              return {
+                serialize: jest.fn(),
+                run: jest.fn(),
+                get: jest.fn(),
+                all: jest.fn(),
+                close: jest.fn((cb) => cb(null))
+              };
+            })
+          }))
+        };
+      });
+
+      const { closeDatabase: closeFresh } = require('../../database/init');
+      // db is null since getDatabase was never called
+      await expect(closeFresh()).resolves.toBeUndefined();
+    });
+
+    test('should handle concurrent close calls (isClosing state)', async () => {
+      jest.resetModules();
+
+      let closeCallback = null;
+      const mockDb = {
+        serialize: jest.fn((cb) => cb()),
+        run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
+        get: jest.fn(),
+        all: jest.fn(),
+        close: jest.fn((cb) => {
+          // Delay the callback to simulate slow close
+          closeCallback = cb;
+        })
+      };
+
+      jest.doMock('sqlite3', () => ({
+        verbose: jest.fn(() => ({
+          Database: jest.fn((path, callback) => {
+            callback(null);
+            return mockDb;
+          })
+        }))
+      }));
+
+      const { getDatabase: getDb, closeDatabase: closeDb } = require('../../database/init');
+      getDb(); // Initialize db
+
+      // Start first close (will be stuck waiting for callback)
+      const firstClose = closeDb();
+      
+      // Start second close while first is still closing
+      const secondClose = closeDb();
+
+      // Now resolve the first close
+      if (closeCallback) closeCallback(null);
+
+      await firstClose;
+      await secondClose;
+    });
   });
 });
