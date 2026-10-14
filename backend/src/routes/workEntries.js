@@ -8,6 +8,13 @@ const router = express.Router();
 // All routes require authentication
 router.use(authenticateUser);
 
+// Joi coerces validated dates into JS Date objects, which sqlite3 stores as
+// numeric epoch-ms values. Normalize to a YYYY-MM-DD string so the DATE column
+// holds human-readable dates that render correctly in reports and CSV/PDF exports.
+function toDateString(value) {
+  return value instanceof Date ? value.toISOString().split('T')[0] : value;
+}
+
 // Get all work entries for authenticated user (with optional client filter)
 router.get('/', (req, res) => {
   const { clientId } = req.query;
@@ -104,7 +111,7 @@ router.post('/', (req, res, next) => {
         // Create work entry
         db.run(
           'INSERT INTO work_entries (client_id, user_email, hours, description, date) VALUES (?, ?, ?, ?, ?)',
-          [clientId, req.userEmail, hours, description || null, date],
+          [clientId, req.userEmail, hours, description || null, toDateString(date)],
           function(err) {
             if (err) {
               console.error('Database error:', err);
@@ -214,7 +221,7 @@ router.put('/:id', (req, res, next) => {
 
           if (value.date !== undefined) {
             updates.push('date = ?');
-            values.push(value.date);
+            values.push(toDateString(value.date));
           }
 
           updates.push('updated_at = CURRENT_TIMESTAMP');

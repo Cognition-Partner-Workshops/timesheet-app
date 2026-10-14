@@ -152,6 +152,32 @@ describe('Work Entry Routes', () => {
       expect(response.body.message).toBe('Work entry created successfully');
     });
 
+    test('should store date as a YYYY-MM-DD string, not a Date/timestamp', async () => {
+      const newEntry = { clientId: 1, hours: 5, date: '2024-01-15' };
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        if (query.includes('clients')) {
+          callback(null, { id: 1 });
+        } else {
+          callback(null, { id: 1, ...newEntry, client_name: 'Client A' });
+        }
+      });
+
+      let insertedDate;
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        if (query.includes('INSERT INTO work_entries')) {
+          insertedDate = params[4];
+        }
+        this.lastID = 1;
+        callback.call(this, null);
+      });
+
+      await request(app).post('/api/work-entries').send(newEntry);
+
+      expect(insertedDate).toBe('2024-01-15');
+      expect(typeof insertedDate).toBe('string');
+    });
+
     test('should return 400 if client not found', async () => {
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(null, null); // Client doesn't exist
