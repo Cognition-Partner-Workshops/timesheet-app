@@ -52,11 +52,11 @@ __tests__/
 
 | Module | Coverage | Tests |
 |--------|----------|-------|
-| Database | 93.1% | 8 |
+| Database | 100% | 11 |
 | Middleware | 100% | 19 |
-| Routes | 75.9% | 76 |
+| Routes | 98.66% | 104 |
 | Validation | 100% | 38 |
-| **Total** | **79.2%** | **134** |
+| **Total** | **98.69%** | **182** |
 
 ## Test Categories
 
@@ -91,6 +91,70 @@ __tests__/
 - SQLite database errors
 - Generic error responses
 - Status code handling
+
+## Naming Conventions
+
+### Test Files
+- Mirror the source file path under `__tests__/`: `src/routes/clients.js` → `src/__tests__/routes/clients.test.js`
+- Always use the `.test.js` suffix
+
+### `describe` Blocks
+Use nested `describe` blocks to group by **route/module** → **behavior category**:
+
+```javascript
+// Top-level: module or route group
+describe('Client Routes', () => {
+
+  // Second-level: HTTP method + endpoint
+  describe('GET /api/clients', () => { ... });
+  describe('POST /api/clients', () => { ... });
+  describe('DELETE /api/clients/:id', () => { ... });
+
+  // Or group by behavior/concern
+  describe('Input Validation', () => { ... });
+  describe('Error Handling', () => { ... });
+});
+```
+
+### `test` Names
+Every test name **must** start with `should` and describe the **expected outcome**, not the implementation:
+
+```javascript
+// ✅ Good — describes outcome
+test('should return 404 if client not found')
+test('should create client and return 201')
+test('should reject name longer than 255 characters')
+test('should handle database error when fetching work entries')
+test('should delete all clients for authenticated user')
+
+// ❌ Bad — vague, describes implementation, or missing "should"
+test('test client route')
+test('calls db.get with correct params')
+test('client deletion')
+test('works')
+```
+
+**Patterns by test type:**
+
+| Category | Pattern | Example |
+|----------|---------|---------|
+| Success path | `should <action> and return <status>` | `should create client and return 201` |
+| Not found | `should return 404 if <entity> not found` | `should return 404 if client not found` |
+| Validation | `should reject <invalid condition>` | `should reject empty name` |
+| Auth | `should return 401 <when condition>` | `should return 401 when no email header` |
+| DB error | `should handle database error when <action>` | `should handle database error when fetching client` |
+| Edge case | `should handle <edge condition>` | `should handle entry with no description` |
+| Boundary | `should accept/reject <boundary value>` | `should reject hours greater than 24` |
+
+### Mock Naming
+- Prefix mock variables with `mock`: `mockDb`, `mockClient`, `mockWorkEntries`
+- Name mock implementations after what they simulate: `mockWriteRecords`, `mockDoc`
+
+### General Rules
+1. **Be specific** — a reader should understand what the test does from the name alone, without reading the body
+2. **One behavior per test** — if you need "and" in the name, consider splitting into two tests
+3. **Include the trigger** — when the outcome depends on a condition, include it: `should return 404 if client not found` (not just `should return 404`)
+4. **Use consistent vocabulary** — stick to `return`, `reject`, `handle`, `create`, `delete`, `update` across the suite
 
 ## Writing New Tests
 
