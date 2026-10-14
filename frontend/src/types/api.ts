@@ -77,3 +77,36 @@ export interface ApiResponse<T> {
   error?: string;
   message?: string;
 }
+
+export interface TeamMemberHours {
+  user_email: string;
+  total_hours: number;
+  entry_count: number;
+}
+
+export interface UpcomingDeadline {
+  id: number;
+  user_email: string;
+  hours: number;
+  description: string | null;
+  date: string;
+  client_name: string;
+}
+
+export interface ActiveClient {
+  id: number;
+  name: string;
+  entry_count: number;
+  total_hours: number;
+  user_email: string;
+}
+
+export interface TeamWorkloadData {
+  weekRange: {
+    start: string;
+    end: string;
+  };
+  teamHoursThisWeek: TeamMemberHours[];
+  upcomingDeadlines: UpcomingDeadline[];
+  activeClients: ActiveClient[];
+}
