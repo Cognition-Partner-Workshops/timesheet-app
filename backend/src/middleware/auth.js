@@ -23,7 +23,10 @@ function authenticateUser(req, res, next) {
       return res.status(500).json({ error: 'Internal server error' });
     }
     
-    if (!row) {
+    if (row) {
+      req.userEmail = userEmail;
+      next();
+    } else {
       // Create new user
       db.run('INSERT INTO users (email) VALUES (?)', [userEmail], (err) => {
         if (err) {
@@ -34,9 +37,6 @@ function authenticateUser(req, res, next) {
         req.userEmail = userEmail;
         next();
       });
-    } else {
-      req.userEmail = userEmail;
-      next();
     }
   });
 }
