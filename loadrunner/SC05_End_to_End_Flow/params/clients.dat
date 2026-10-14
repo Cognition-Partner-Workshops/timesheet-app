@@ -1,0 +1,11 @@
+P_ClientName,P_Department,P_ClientEmail,P_ClientDescription
+Acme Corporation,Engineering,contact@acme.com,Enterprise software development client
+Globex International,Marketing,info@globex.com,Global marketing and advertising firm
+Initech Solutions,Finance,accounts@initech.com,Financial consulting and advisory services
+Wayne Enterprises,Research,rnd@wayne.com,Advanced research and development projects
+Stark Industries,Operations,ops@stark.com,Industrial manufacturing and logistics
+Umbrella Corp,IT Services,support@umbrella.com,IT infrastructure and managed services
+Cyberdyne Systems,Engineering,dev@cyberdyne.com,AI and machine learning solutions
+Oscorp Industries,Quality Assurance,qa@oscorp.com,Quality assurance and compliance
+Weyland-Yutani,Human Resources,hr@weyland.com,Workforce management and HR consulting
+Tyrell Corporation,Data Analytics,analytics@tyrell.com,Business intelligence and data services
