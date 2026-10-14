@@ -1,16 +1,16 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
-import { AuthProvider } from './contexts/AuthContext';
-import { useAuth } from './hooks/useAuth';
-import Layout from './components/Layout';
-import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
-import ClientsPage from './pages/ClientsPage';
-import WorkEntriesPage from './pages/WorkEntriesPage';
-import ReportsPage from './pages/ReportsPage';
+import React from 'react'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ThemeProvider, createTheme } from '@mui/material/styles'
+import CssBaseline from '@mui/material/CssBaseline'
+import { AuthProvider } from './contexts/AuthContext'
+import { useAuth } from './hooks/useAuth'
+import Layout from './components/Layout'
+import LoginPage from './pages/LoginPage'
+import DashboardPage from './pages/DashboardPage'
+import ClientsPage from './pages/ClientsPage'
+import WorkEntriesPage from './pages/WorkEntriesPage'
+import ReportsPage from './pages/ReportsPage'
 
 const theme = createTheme({
   palette: {
@@ -21,7 +21,7 @@ const theme = createTheme({
       main: '#dc004e',
     },
   },
-});
+})
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,15 +30,15 @@ const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
     },
   },
-});
+})
 
 const AppContent: React.FC = () => {
-  const { isAuthenticated, isLoading } = useAuth();
-  
+  const { isAuthenticated, isLoading } = useAuth()
+
   if (isLoading) {
-    return <div>Loading...</div>;
+    return <div>Loading...</div>
   }
-  
+
   return (
     <Router>
       <Routes>
@@ -64,8 +64,8 @@ const AppContent: React.FC = () => {
         />
       </Routes>
     </Router>
-  );
-};
+  )
+}
 
 const App: React.FC = () => {
   return (
@@ -77,7 +77,7 @@ const App: React.FC = () => {
         </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
-  );
-};
+  )
+}
 
-export default App;
+export default App

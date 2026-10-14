@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from 'react'
 import {
   Box,
   Typography,
@@ -22,81 +22,80 @@ import {
   Chip,
   IconButton,
   Tooltip,
-} from '@mui/material';
-import {
-  PictureAsPdf as PdfIcon,
-  Description as CsvIcon,
-} from '@mui/icons-material';
-import { useQuery } from '@tanstack/react-query';
-import apiClient from '../api/client';
-import { type ClientReport } from '../types/api';
+} from '@mui/material'
+import { PictureAsPdf as PdfIcon, Description as CsvIcon } from '@mui/icons-material'
+import { useQuery } from '@tanstack/react-query'
+import apiClient from '../api/client'
+import { type ClientReport } from '../types/api'
 
 const ReportsPage: React.FC = () => {
-  const [selectedClientId, setSelectedClientId] = useState<number>(0);
-  const [error, setError] = useState('');
+  const [selectedClientId, setSelectedClientId] = useState<number>(0)
+  const [error, setError] = useState('')
 
   const { data: clientsData, isLoading: clientsLoading } = useQuery({
     queryKey: ['clients'],
     queryFn: () => apiClient.getClients(),
-  });
+  })
 
   const { data: reportData, isLoading: reportLoading } = useQuery({
     queryKey: ['clientReport', selectedClientId],
     queryFn: () => apiClient.getClientReport(selectedClientId),
     enabled: selectedClientId > 0,
-  });
+  })
 
-  const clients = clientsData?.clients || [];
-  const report = reportData as ClientReport | undefined;
+  const clients = clientsData?.clients || []
+  const report = reportData as ClientReport | undefined
 
   const handleExportCsv = async () => {
-    if (!selectedClientId) return;
-    
+    if (!selectedClientId) return
+
     try {
-      const blob = await apiClient.exportClientReportCsv(selectedClientId);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const client = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
-      a.download = `${client?.name?.replace(/[^a-zA-Z0-9]/g, '_')}_report_${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      const blob = await apiClient.exportClientReportCsv(selectedClientId)
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const client = clients.find((c: { id: number; name: string }) => c.id === selectedClientId)
+      a.download = `${client?.name?.replace(/[^a-zA-Z0-9]/g, '_')}_report_${new Date().toISOString().split('T')[0]}.csv`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
     } catch (err: unknown) {
-      setError('Failed to export CSV report');
-      console.error('Export error:', err);
+      setError('Failed to export CSV report')
+      console.error('Export error:', err)
     }
-  };
+  }
 
   const handleExportPdf = async () => {
-    if (!selectedClientId) return;
+    if (!selectedClientId) return
 
     try {
-      const blob = await apiClient.exportClientReportPdf(selectedClientId);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const client = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
-      a.download = `${client?.name?.replace(/[^a-zA-Z0-9]/g, '_')}_report_${new Date().toISOString().split('T')[0]}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      const blob = await apiClient.exportClientReportPdf(selectedClientId)
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const client = clients.find((c: { id: number; name: string }) => c.id === selectedClientId)
+      a.download = `${client?.name?.replace(/[^a-zA-Z0-9]/g, '_')}_report_${new Date().toISOString().split('T')[0]}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
     } catch (err: unknown) {
-      setError('Failed to export PDF report');
-      console.error('Export error:', err);
+      setError('Failed to export PDF report')
+      console.error('Export error:', err)
     }
-  };
+  }
 
-  const selectedClient = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
+  const selectedClient = clients.find(
+    (c: { id: number; name: string }) => c.id === selectedClientId,
+  )
 
   if (clientsLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
         <CircularProgress />
       </Box>
-    );
+    )
   }
 
   return (
@@ -176,9 +175,9 @@ const ReportsPage: React.FC = () => {
 
           {selectedClient && report && (
             <>
-                <Grid container spacing={3} sx={{ mb: 3 }}>
-                  <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                    <Card>
+              <Grid container spacing={3} sx={{ mb: 3 }}>
+                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                  <Card>
                     <CardContent>
                       <Typography color="textSecondary" gutterBottom>
                         Total Hours
@@ -208,7 +207,9 @@ const ReportsPage: React.FC = () => {
                         Average Hours per Entry
                       </Typography>
                       <Typography variant="h4" component="div">
-                        {report.entryCount > 0 ? (report.totalHours / report.entryCount).toFixed(2) : '0.00'}
+                        {report.entryCount > 0
+                          ? (report.totalHours / report.entryCount).toFixed(2)
+                          : '0.00'}
                       </Typography>
                     </CardContent>
                   </Card>
@@ -236,10 +237,10 @@ const ReportsPage: React.FC = () => {
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Chip 
-                                label={`${entry.hours} hours`} 
-                                color="primary" 
-                                variant="outlined" 
+                              <Chip
+                                label={`${entry.hours} hours`}
+                                color="primary"
+                                variant="outlined"
                               />
                             </TableCell>
                             <TableCell>
@@ -284,7 +285,7 @@ const ReportsPage: React.FC = () => {
         </>
       )}
     </Box>
-  );
-};
+  )
+}
 
-export default ReportsPage;
+export default ReportsPage

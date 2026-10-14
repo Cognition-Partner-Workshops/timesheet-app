@@ -1,4 +1,4 @@
-import React, { type ReactNode } from 'react';
+import React, { type ReactNode } from 'react'
 import {
   AppBar,
   Box,
@@ -14,7 +14,7 @@ import {
   Typography,
   Button,
   Avatar,
-} from '@mui/material';
+} from '@mui/material'
 import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
@@ -22,32 +22,32 @@ import {
   Assignment as AssignmentIcon,
   Assessment as AssessmentIcon,
   Logout as LogoutIcon,
-} from '@mui/icons-material';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+} from '@mui/icons-material'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth'
 
-const drawerWidth = 240;
+const drawerWidth = 240
 
 interface LayoutProps {
-  children: ReactNode;
+  children: ReactNode
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { user, logout } = useAuth();
-  const [mobileOpen, setMobileOpen] = React.useState(false);
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { user, logout } = useAuth()
+  const [mobileOpen, setMobileOpen] = React.useState(false)
 
   const handleDrawerToggle = () => {
-    setMobileOpen(!mobileOpen);
-  };
+    setMobileOpen(!mobileOpen)
+  }
 
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
     { text: 'Clients', icon: <BusinessIcon />, path: '/clients' },
     { text: 'Work Entries', icon: <AssignmentIcon />, path: '/work-entries' },
     { text: 'Reports', icon: <AssessmentIcon />, path: '/reports' },
-  ];
+  ]
 
   const drawer = (
     <div>
@@ -70,7 +70,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         ))}
       </List>
     </div>
-  );
+  )
 
   return (
     <Box sx={{ display: 'flex' }}>
@@ -93,19 +93,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            {menuItems.find(item => item.path === location.pathname)?.text || 'Time Tracker'}
+            {menuItems.find((item) => item.path === location.pathname)?.text || 'Time Tracker'}
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Typography variant="body2">{user?.email}</Typography>
-            <Avatar sx={{ width: 32, height: 32 }}>
-              {user?.email?.charAt(0).toUpperCase()}
-            </Avatar>
-            <Button
-              color="inherit"
-              startIcon={<LogoutIcon />}
-              onClick={logout}
-              size="small"
-            >
+            <Avatar sx={{ width: 32, height: 32 }}>{user?.email?.charAt(0).toUpperCase()}</Avatar>
+            <Button color="inherit" startIcon={<LogoutIcon />} onClick={logout} size="small">
               Logout
             </Button>
           </Box>
@@ -153,7 +146,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         {children}
       </Box>
     </Box>
-  );
-};
+  )
+}
 
-export default Layout;
+export default Layout
