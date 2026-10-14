@@ -31,6 +31,18 @@ import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
 import { type ClientReport } from '../types/api';
 
+/** Triggers a browser download for the given blob. */
+function downloadBlob(blob: Blob, filename: string) {
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+}
+
 const ReportsPage: React.FC = () => {
   const [selectedClientId, setSelectedClientId] = useState<number>(0);
   const [error, setError] = useState('');
@@ -49,47 +61,35 @@ const ReportsPage: React.FC = () => {
   const clients = clientsData?.clients || [];
   const report = reportData as ClientReport | undefined;
 
-  const handleExportCsv = async () => {
-    if (!selectedClientId) return;
-    
-    try {
-      const blob = await apiClient.exportClientReportCsv(selectedClientId);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const client = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
-      a.download = `${client?.name?.replace(/[^a-zA-Z0-9]/g, '_')}_report_${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (err: unknown) {
-      setError('Failed to export CSV report');
-      console.error('Export error:', err);
-    }
-  };
-
-  const handleExportPdf = async () => {
-    if (!selectedClientId) return;
-
-    try {
-      const blob = await apiClient.exportClientReportPdf(selectedClientId);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const client = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
-      a.download = `${client?.name?.replace(/[^a-zA-Z0-9]/g, '_')}_report_${new Date().toISOString().split('T')[0]}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (err: unknown) {
-      setError('Failed to export PDF report');
-      console.error('Export error:', err);
-    }
-  };
-
   const selectedClient = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
+
+  const buildFilename = (extension: string) => {
+    const safeName = selectedClient?.name?.replace(/[^a-zA-Z0-9]/g, '_') ?? 'report';
+    const dateSuffix = new Date().toISOString().split('T')[0];
+    return `${safeName}_report_${dateSuffix}.${extension}`;
+  };
+
+  const handleExport = async (
+    exportFn: (id: number) => Promise<Blob>,
+    extension: string,
+    errorMsg: string,
+  ) => {
+    if (!selectedClientId) return;
+
+    try {
+      const blob = await exportFn(selectedClientId);
+      downloadBlob(blob, buildFilename(extension));
+    } catch (err: unknown) {
+      setError(errorMsg);
+      console.error('Export error:', err);
+    }
+  };
+
+  const handleExportCsv = () =>
+    handleExport(apiClient.exportClientReportCsv.bind(apiClient), 'csv', 'Failed to export CSV report');
+
+  const handleExportPdf = () =>
+    handleExport(apiClient.exportClientReportPdf.bind(apiClient), 'pdf', 'Failed to export PDF report');
 
   if (clientsLoading) {
     return (
