@@ -1,6 +1,12 @@
 const { getDatabase } = require('../database/init');
 
-// Simple email-based authentication middleware
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Passwordless authentication middleware. Identifies the user via the
+ * x-user-email header, auto-creating a user record on first request, and
+ * exposes the email on req.userEmail for downstream handlers.
+ */
 function authenticateUser(req, res, next) {
   const userEmail = req.headers['x-user-email'];
   
@@ -8,9 +14,7 @@ function authenticateUser(req, res, next) {
     return res.status(401).json({ error: 'User email required in x-user-email header' });
   }
 
-  // Validate email format
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(userEmail)) {
+  if (!EMAIL_REGEX.test(userEmail)) {
     return res.status(400).json({ error: 'Invalid email format' });
   }
 
