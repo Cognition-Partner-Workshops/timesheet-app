@@ -1,0 +1,927 @@
+name: Test Suite Maintenance (Devin CLI)
+
+on:
+  workflow_dispatch: # Disabled auto-trigger; run manually if needed
+  # pull_request:
+  #   types: [opened, synchronize, reopened]
+  #   branches:
+  #     - feature/pr-test-update-workflow
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  base-health-check:
+    name: Health Check (Base Branch)
+    if: "!contains(github.event.pull_request.user.login, 'devin')"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout base branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          (cd frontend && npm ci)
+          (cd backend && npm ci)
+
+      - name: Run backend tests and capture results
+        id: backend-tests
+        continue-on-error: true
+        run: |
+          set +e
+          OUTPUT=$(cd backend && npm test 2>&1)
+          EXIT_CODE=$?
+          echo "$OUTPUT"
+
+          # Strip ANSI color codes for reliable parsing
+          CLEAN=$(echo "$OUTPUT" | sed 's/\x1b\[[0-9;]*m//g')
+
+          # Jest output: "Tests:       2 failed, 159 passed, 161 total"
+          TESTS_LINE=$(echo "$CLEAN" | grep 'Tests:' | tail -1)
+          TOTAL=$(echo "$TESTS_LINE" | grep -oP '(\d+)\s+total' | grep -oP '\d+' || echo "0")
+          PASSED=$(echo "$TESTS_LINE" | grep -oP '(\d+)\s+passed' | grep -oP '\d+' || echo "0")
+          FAILED=$(echo "$TESTS_LINE" | grep -oP '(\d+)\s+failed' | grep -oP '\d+' || echo "0")
+
+          if [ "$TOTAL" -gt 0 ] 2>/dev/null; then
+            PCT=$(( PASSED * 100 / TOTAL ))
+          else
+            if [ $EXIT_CODE -eq 0 ]; then
+              PCT=100
+              TOTAL="all"
+              PASSED="all"
+              FAILED=0
+            else
+              PCT=0
+            fi
+          fi
+
+          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
+          echo "passed=$PASSED" >> "$GITHUB_OUTPUT"
+          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
+          echo "pct=$PCT" >> "$GITHUB_OUTPUT"
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+
+      - name: Run frontend tests and capture results
+        id: frontend-tests
+        continue-on-error: true
+        run: |
+          set +e
+          OUTPUT=$(cd frontend && npm run test 2>&1)
+          EXIT_CODE=$?
+          echo "$OUTPUT"
+
+          # Strip ANSI color codes for reliable parsing
+          CLEAN=$(echo "$OUTPUT" | sed 's/\x1b\[[0-9;]*m//g')
+
+          # Vitest output: "      Tests  136 passed (136)" or "      Tests  5 failed | 131 passed (136)"
+          TESTS_LINE=$(echo "$CLEAN" | grep '^\s*Tests\s' | grep -v 'Test Files' | tail -1)
+          # Total is in parentheses at end: (136)
+          TOTAL=$(echo "$TESTS_LINE" | grep -oP '\(\d+\)' | grep -oP '\d+' || echo "0")
+          PASSED=$(echo "$TESTS_LINE" | grep -oP '(\d+)\s+passed' | grep -oP '\d+' || echo "0")
+          FAILED=$(echo "$TESTS_LINE" | grep -oP '(\d+)\s+failed' | grep -oP '\d+' || echo "0")
+
+          if [ "$TOTAL" -gt 0 ] 2>/dev/null; then
+            PCT=$(( PASSED * 100 / TOTAL ))
+          else
+            if [ $EXIT_CODE -eq 0 ]; then
+              PCT=100
+              TOTAL="all"
+              PASSED="all"
+              FAILED=0
+            else
+              PCT=0
+            fi
+          fi
+
+          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
+          echo "passed=$PASSED" >> "$GITHUB_OUTPUT"
+          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
+          echo "pct=$PCT" >> "$GITHUB_OUTPUT"
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+
+      - name: Comment base branch results on PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BE_EXIT="${{ steps.backend-tests.outputs.exit_code }}"
+          FE_EXIT="${{ steps.frontend-tests.outputs.exit_code }}"
+          BE_PCT="${{ steps.backend-tests.outputs.pct }}"
+          FE_PCT="${{ steps.frontend-tests.outputs.pct }}"
+          BE_PASSED="${{ steps.backend-tests.outputs.passed }}"
+          BE_TOTAL="${{ steps.backend-tests.outputs.total }}"
+          FE_PASSED="${{ steps.frontend-tests.outputs.passed }}"
+          FE_TOTAL="${{ steps.frontend-tests.outputs.total }}"
+
+          if [ "$BE_EXIT" = "0" ] && [ "$FE_EXIT" = "0" ]; then
+            STATUS="✅"
+          else
+            STATUS="❌"
+          fi
+
+          COMMENT="${STATUS} **Health Check — Base Branch (\`${{ github.event.pull_request.base.ref }}\`)**"
+          COMMENT="${COMMENT}\n\n"
+          COMMENT="${COMMENT}**Backend tests:** ${BE_PCT}% passed (${BE_PASSED}/${BE_TOTAL})\n"
+          COMMENT="${COMMENT}**Frontend tests:** ${FE_PCT}% passed (${FE_PASSED}/${FE_TOTAL})\n"
+
+          echo -e "$COMMENT" | gh pr comment ${{ github.event.pull_request.number }} --body-file -
+
+  pr-health-check:
+    name: Health Check (PR Branch)
+    needs: [base-health-check]
+    if: "!contains(github.event.pull_request.user.login, 'devin')"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          (cd frontend && npm ci)
+          (cd backend && npm ci)
+
+      - name: Run backend tests and capture results
+        id: backend-tests
+        continue-on-error: true
+        run: |
+          set +e
+          OUTPUT=$(cd backend && npm test 2>&1)
+          EXIT_CODE=$?
+          echo "$OUTPUT"
+
+          # Strip ANSI color codes for reliable parsing
+          CLEAN=$(echo "$OUTPUT" | sed 's/\x1b\[[0-9;]*m//g')
+
+          # Jest output: "Tests:       2 failed, 159 passed, 161 total"
+          TESTS_LINE=$(echo "$CLEAN" | grep 'Tests:' | tail -1)
+          TOTAL=$(echo "$TESTS_LINE" | grep -oP '(\d+)\s+total' | grep -oP '\d+' || echo "0")
+          PASSED=$(echo "$TESTS_LINE" | grep -oP '(\d+)\s+passed' | grep -oP '\d+' || echo "0")
+          FAILED=$(echo "$TESTS_LINE" | grep -oP '(\d+)\s+failed' | grep -oP '\d+' || echo "0")
+
+          if [ "$TOTAL" -gt 0 ] 2>/dev/null; then
+            PCT=$(( PASSED * 100 / TOTAL ))
+          else
+            if [ $EXIT_CODE -eq 0 ]; then
+              PCT=100
+              TOTAL="all"
+              PASSED="all"
+              FAILED=0
+            else
+              PCT=0
+            fi
+          fi
+
+          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
+          echo "passed=$PASSED" >> "$GITHUB_OUTPUT"
+          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
+          echo "pct=$PCT" >> "$GITHUB_OUTPUT"
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+
+      - name: Run frontend tests and capture results
+        id: frontend-tests
+        continue-on-error: true
+        run: |
+          set +e
+          OUTPUT=$(cd frontend && npm run test 2>&1)
+          EXIT_CODE=$?
+          echo "$OUTPUT"
+
+          # Strip ANSI color codes for reliable parsing
+          CLEAN=$(echo "$OUTPUT" | sed 's/\x1b\[[0-9;]*m//g')
+
+          # Vitest output: "      Tests  136 passed (136)" or "      Tests  5 failed | 131 passed (136)"
+          TESTS_LINE=$(echo "$CLEAN" | grep '^\s*Tests\s' | grep -v 'Test Files' | tail -1)
+          # Total is in parentheses at end: (136)
+          TOTAL=$(echo "$TESTS_LINE" | grep -oP '\(\d+\)' | grep -oP '\d+' || echo "0")
+          PASSED=$(echo "$TESTS_LINE" | grep -oP '(\d+)\s+passed' | grep -oP '\d+' || echo "0")
+          FAILED=$(echo "$TESTS_LINE" | grep -oP '(\d+)\s+failed' | grep -oP '\d+' || echo "0")
+
+          if [ "$TOTAL" -gt 0 ] 2>/dev/null; then
+            PCT=$(( PASSED * 100 / TOTAL ))
+          else
+            if [ $EXIT_CODE -eq 0 ]; then
+              PCT=100
+              TOTAL="all"
+              PASSED="all"
+              FAILED=0
+            else
+              PCT=0
+            fi
+          fi
+
+          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
+          echo "passed=$PASSED" >> "$GITHUB_OUTPUT"
+          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
+          echo "pct=$PCT" >> "$GITHUB_OUTPUT"
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+
+      - name: Comment PR branch results on PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BE_EXIT="${{ steps.backend-tests.outputs.exit_code }}"
+          FE_EXIT="${{ steps.frontend-tests.outputs.exit_code }}"
+          BE_PCT="${{ steps.backend-tests.outputs.pct }}"
+          FE_PCT="${{ steps.frontend-tests.outputs.pct }}"
+          BE_PASSED="${{ steps.backend-tests.outputs.passed }}"
+          BE_TOTAL="${{ steps.backend-tests.outputs.total }}"
+          FE_PASSED="${{ steps.frontend-tests.outputs.passed }}"
+          FE_TOTAL="${{ steps.frontend-tests.outputs.total }}"
+
+          if [ "$BE_EXIT" = "0" ] && [ "$FE_EXIT" = "0" ]; then
+            STATUS="✅"
+          else
+            STATUS="❌"
+          fi
+
+          COMMENT="${STATUS} **Health Check — PR Branch (\`${{ github.event.pull_request.head.ref }}\`)**"
+          COMMENT="${COMMENT}\n\n"
+          COMMENT="${COMMENT}**Backend tests:** ${BE_PCT}% passed (${BE_PASSED}/${BE_TOTAL})\n"
+          COMMENT="${COMMENT}**Frontend tests:** ${FE_PCT}% passed (${FE_PASSED}/${FE_TOTAL})\n"
+
+          echo -e "$COMMENT" | gh pr comment ${{ github.event.pull_request.number }} --body-file -
+
+  analyze-changes:
+    name: Analyze Changes
+    needs: [pr-health-check]
+    if: "!contains(github.event.pull_request.user.login, 'devin')"
+    runs-on: ubuntu-latest
+    outputs:
+      needs_test_update: ${{ steps.categorize.outputs.needs_test_update }}
+      summary: ${{ steps.categorize.outputs.summary }}
+      tests_report: ${{ steps.categorize.outputs.tests_report }}
+      ui_changes: ${{ steps.categorize.outputs.ui_changes }}
+      backend_changes: ${{ steps.categorize.outputs.backend_changes }}
+      ui_missing: ${{ steps.categorize.outputs.ui_missing }}
+      ui_existing: ${{ steps.categorize.outputs.ui_existing }}
+      backend_missing: ${{ steps.categorize.outputs.backend_missing }}
+      backend_existing: ${{ steps.categorize.outputs.backend_existing }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CHANGED_FILES=$(gh pr diff ${{ github.event.pull_request.number }} --name-only)
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          {
+            echo "files<<FILES_EOF"
+            echo "$CHANGED_FILES"
+            echo "FILES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Categorize changes and check test coverage
+        id: categorize
+        run: |
+          CHANGED_FILES="${{ steps.changed.outputs.files }}"
+
+          UI_CHANGES=""
+          BACKEND_CHANGES=""
+          ENV_CHANGES=""
+          CONFIG_CHANGES=""
+
+          UI_MISSING_TESTS=""
+          UI_EXISTING_TESTS=""
+          BACKEND_MISSING_TESTS=""
+          BACKEND_EXISTING_TESTS=""
+
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+
+            # UI: frontend source files (excluding test files and config)
+            if echo "$file" | grep -qE '^frontend/src/.*\.(tsx?|css)$' && ! echo "$file" | grep -qE '__tests__|\.test\.|\.spec\.'; then
+              UI_CHANGES="${UI_CHANGES}${file}\n"
+
+              DIR=$(dirname "$file")
+              BASENAME=$(basename "$file")
+              NAME_NO_EXT="${BASENAME%.*}"
+              EXT="${BASENAME##*.}"
+
+              if [ "$EXT" = "css" ]; then
+                continue
+              fi
+
+              TEST_FILE="${DIR}/__tests__/${NAME_NO_EXT}.test.${EXT}"
+              SPEC_FILE="${DIR}/__tests__/${NAME_NO_EXT}.spec.${EXT}"
+
+              if [ -f "$TEST_FILE" ] || [ -f "$SPEC_FILE" ]; then
+                UI_EXISTING_TESTS="${UI_EXISTING_TESTS}- ${file} → test exists (${TEST_FILE})\n"
+              else
+                UI_MISSING_TESTS="${UI_MISSING_TESTS}- ${file} → no test found (expected ${TEST_FILE})\n"
+              fi
+
+            # Backend: backend source files (excluding test files and config)
+            elif echo "$file" | grep -qE '^backend/src/.*\.js$' && ! echo "$file" | grep -qE '__tests__|\.test\.|\.spec\.'; then
+              BACKEND_CHANGES="${BACKEND_CHANGES}${file}\n"
+
+              REL_PATH="${file#backend/src/}"
+              DIR=$(dirname "$REL_PATH")
+              BASENAME=$(basename "$REL_PATH")
+              NAME_NO_EXT="${BASENAME%.js}"
+
+              TEST_FILE="backend/src/__tests__/${DIR}/${NAME_NO_EXT}.test.js"
+
+              if [ -f "$TEST_FILE" ]; then
+                BACKEND_EXISTING_TESTS="${BACKEND_EXISTING_TESTS}- ${file} → test exists (${TEST_FILE})\n"
+              else
+                BACKEND_MISSING_TESTS="${BACKEND_MISSING_TESTS}- ${file} → no test found (expected ${TEST_FILE})\n"
+              fi
+
+            # Environment: .env files, docker, deployment configs
+            elif echo "$file" | grep -qE '\.env|docker/|Dockerfile|DEPLOYMENT|\.env\.example'; then
+              ENV_CHANGES="${ENV_CHANGES}${file}\n"
+
+            # Config: package.json, tsconfig, eslint, vite, jest, sonar, CI workflows, etc.
+            elif echo "$file" | grep -qE 'package\.json|package-lock\.json|tsconfig|eslint|vite\.config|jest\.config|sonar-project|\.github/|\.windsurf/'; then
+              CONFIG_CHANGES="${CONFIG_CHANGES}${file}\n"
+            fi
+
+          done <<< "$CHANGED_FILES"
+
+          # --- Build summary ---
+          SUMMARY=""
+          NEEDS_TEST_UPDATE="false"
+
+          if [ -n "$UI_CHANGES" ]; then
+            SUMMARY="${SUMMARY}### UI Changes\n\`\`\`\n$(echo -e "$UI_CHANGES")\`\`\`\n\n"
+          fi
+          if [ -n "$BACKEND_CHANGES" ]; then
+            SUMMARY="${SUMMARY}### Backend Changes\n\`\`\`\n$(echo -e "$BACKEND_CHANGES")\`\`\`\n\n"
+          fi
+          if [ -n "$ENV_CHANGES" ]; then
+            SUMMARY="${SUMMARY}### Environment Changes\n\`\`\`\n$(echo -e "$ENV_CHANGES")\`\`\`\n\n"
+          fi
+          if [ -n "$CONFIG_CHANGES" ]; then
+            SUMMARY="${SUMMARY}### Config Changes\n\`\`\`\n$(echo -e "$CONFIG_CHANGES")\`\`\`\n\n"
+          fi
+
+          TESTS_REPORT=""
+          if [ -n "$UI_EXISTING_TESTS" ]; then
+            TESTS_REPORT="${TESTS_REPORT}#### UI – Tests to Update\n$(echo -e "$UI_EXISTING_TESTS")\n"
+            NEEDS_TEST_UPDATE="true"
+          fi
+          if [ -n "$UI_MISSING_TESTS" ]; then
+            TESTS_REPORT="${TESTS_REPORT}#### UI – Tests to Create\n$(echo -e "$UI_MISSING_TESTS")\n"
+            NEEDS_TEST_UPDATE="true"
+          fi
+          if [ -n "$BACKEND_EXISTING_TESTS" ]; then
+            TESTS_REPORT="${TESTS_REPORT}#### Backend – Tests to Update\n$(echo -e "$BACKEND_EXISTING_TESTS")\n"
+            NEEDS_TEST_UPDATE="true"
+          fi
+          if [ -n "$BACKEND_MISSING_TESTS" ]; then
+            TESTS_REPORT="${TESTS_REPORT}#### Backend – Tests to Create\n$(echo -e "$BACKEND_MISSING_TESTS")\n"
+            NEEDS_TEST_UPDATE="true"
+          fi
+
+          echo "needs_test_update=${NEEDS_TEST_UPDATE}" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "summary<<SUMMARY_EOF"
+            echo -e "$SUMMARY"
+            echo "SUMMARY_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "tests_report<<TESTS_EOF"
+            echo -e "$TESTS_REPORT"
+            echo "TESTS_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "ui_changes<<UI_EOF"
+            echo -e "$UI_CHANGES"
+            echo "UI_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "backend_changes<<BE_EOF"
+            echo -e "$BACKEND_CHANGES"
+            echo "BE_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "ui_missing<<UIM_EOF"
+            echo -e "$UI_MISSING_TESTS"
+            echo "UIM_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "ui_existing<<UIE_EOF"
+            echo -e "$UI_EXISTING_TESTS"
+            echo "UIE_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "backend_missing<<BEM_EOF"
+            echo -e "$BACKEND_MISSING_TESTS"
+            echo "BEM_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "backend_existing<<BEE_EOF"
+            echo -e "$BACKEND_EXISTING_TESTS"
+            echo "BEE_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ "$NEEDS_TEST_UPDATE" = "true" ]; then
+            echo "Test maintenance needed."
+          else
+            echo "No test maintenance needed — changes are config/env only or all tests already exist."
+          fi
+
+      - name: Comment analysis on PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEEDS: ${{ steps.categorize.outputs.needs_test_update }}
+          SUMMARY: ${{ steps.categorize.outputs.summary }}
+          TESTS_REPORT: ${{ steps.categorize.outputs.tests_report }}
+        run: |
+          {
+            echo "## Test Suite Maintenance – Change Analysis"
+            echo ""
+            echo "$SUMMARY"
+            echo ""
+
+            if [ "$NEEDS" = "true" ]; then
+              echo "### Test Coverage Gap Detected"
+              echo ""
+              echo "$TESTS_REPORT"
+              echo ""
+              echo "> Devin CLI will run headlessly to create/update tests and push to this PR."
+            else
+              echo "All changed source files have corresponding tests, or changes are limited to config/env files. No test maintenance required."
+            fi
+          } > /tmp/pr_comment.md
+
+          gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/pr_comment.md
+
+  maintain-tests:
+    name: Devin CLI - Maintain Tests
+    needs: [analyze-changes]
+    if: needs.analyze-changes.outputs.needs_test_update == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          (cd frontend && npm ci)
+          (cd backend && npm ci)
+
+      - name: Build test maintenance prompt
+        id: prompt
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          UI_CHANGES: ${{ needs.analyze-changes.outputs.ui_changes }}
+          BACKEND_CHANGES: ${{ needs.analyze-changes.outputs.backend_changes }}
+          UI_MISSING: ${{ needs.analyze-changes.outputs.ui_missing }}
+          UI_EXISTING: ${{ needs.analyze-changes.outputs.ui_existing }}
+          BACKEND_MISSING: ${{ needs.analyze-changes.outputs.backend_missing }}
+          BACKEND_EXISTING: ${{ needs.analyze-changes.outputs.backend_existing }}
+        run: |
+          cat > test-maintenance-prompt.txt <<'PROMPT_HEADER'
+          You are a test maintenance engineer. Source code has changed and the test suite needs updating.
+          Review the code changes (use git diff) and maintain the test suite accordingly.
+
+          PROMPT_HEADER
+
+          # --- UI test tasks ---
+          if [ -n "$UI_EXISTING" ] || [ -n "$UI_MISSING" ]; then
+            cat >> test-maintenance-prompt.txt <<TASK_UI
+          == UI Test Maintenance ==
+          Changed frontend source files:
+          ${UI_CHANGES}
+          TASK_UI
+
+            if [ -n "$UI_EXISTING" ]; then
+              cat >> test-maintenance-prompt.txt <<EXISTING_UI
+          Tests that EXIST and need updating to match the new code:
+          ${UI_EXISTING}
+
+          For each file above, review the code diff and update the corresponding test file so it validates the new behavior. Do not remove existing valid test cases — add or modify as needed.
+          EXISTING_UI
+            fi
+
+            if [ -n "$UI_MISSING" ]; then
+              cat >> test-maintenance-prompt.txt <<MISSING_UI
+          Tests that need to be CREATED:
+          ${UI_MISSING}
+
+          For each file above, create a new test file at the expected path. Write meaningful unit tests that cover the component's rendering, user interactions, and key behaviors. Aim for at least 80% coverage of the changed file.
+          MISSING_UI
+            fi
+
+            cat >> test-maintenance-prompt.txt <<'UI_CONSTRAINTS'
+
+          UI Test Constraints:
+          - Use vitest with @testing-library/react for all frontend tests.
+          - The test setup file is at frontend/src/test/setup.ts (imports jest-dom matchers).
+          - Place tests in the __tests__/ subdirectory adjacent to the source file.
+          - Run: cd frontend && npm run test — to verify tests pass.
+          - Run: cd frontend && npm run build — to verify the build still succeeds.
+          - Do NOT modify source components — only add or update test files.
+
+          UI_CONSTRAINTS
+          fi
+
+          # --- Backend test tasks ---
+          if [ -n "$BACKEND_EXISTING" ] || [ -n "$BACKEND_MISSING" ]; then
+            cat >> test-maintenance-prompt.txt <<TASK_BE
+          == Backend Test Maintenance ==
+          Changed backend source files:
+          ${BACKEND_CHANGES}
+          TASK_BE
+
+            if [ -n "$BACKEND_EXISTING" ]; then
+              cat >> test-maintenance-prompt.txt <<EXISTING_BE
+          Tests that EXIST and need updating to match the new code:
+          ${BACKEND_EXISTING}
+
+          For each file above, review the code diff and update the corresponding test file so it validates the new behavior. Do not remove existing valid test cases — add or modify as needed.
+          EXISTING_BE
+            fi
+
+            if [ -n "$BACKEND_MISSING" ]; then
+              cat >> test-maintenance-prompt.txt <<MISSING_BE
+          Tests that need to be CREATED:
+          ${BACKEND_MISSING}
+
+          For each file above, create a new test file at the expected path under backend/src/__tests__/. Write meaningful unit tests using Jest that cover the module's exported functions, error handling, and edge cases.
+          MISSING_BE
+            fi
+
+            cat >> test-maintenance-prompt.txt <<'BE_CONSTRAINTS'
+
+          Backend Test Constraints:
+          - Use Jest for all backend tests. Test setup is in backend/src/__tests__/setup.js.
+          - Place tests in backend/src/__tests__/ mirroring the source directory structure.
+          - Run: cd backend && npm test — to verify tests pass.
+          - Do NOT modify source code — only add or update test files.
+
+          BE_CONSTRAINTS
+          fi
+
+          cat >> test-maintenance-prompt.txt <<'PROMPT_FOOTER'
+          General rules:
+          - ONLY modify or create test files. Do NOT change source code.
+          - Tests must be meaningful — validate real behavior, not just assert true.
+          - Maintain consistent style with the existing test files in the repo.
+          - If a changed file is a CSS file, a config file, or an env file, skip it.
+          - After writing all tests, run the full test suites and the build to confirm everything passes.
+          PROMPT_FOOTER
+
+          echo "Prompt written to test-maintenance-prompt.txt"
+          cat test-maintenance-prompt.txt
+
+      - name: Install and authenticate Devin CLI
+        env:
+          WINDSURF_API_KEY: ${{ secrets.WINDSURF_API_KEY }}
+        run: |
+          for dir in "$HOME/.local/share/cognition" "$HOME/.local/share/devin"; do
+            mkdir -p "$dir"
+            echo "windsurf_api_key = \"$WINDSURF_API_KEY\"" > "$dir/credentials.toml"
+          done
+
+          curl -fsSL https://cli.devin.ai/install.sh | sed '/setup$/d' | bash
+
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+
+          devin --version
+          devin auth status 2>&1 || true
+
+      - name: Run Devin CLI to maintain tests
+        env:
+          WINDSURF_API_KEY: ${{ secrets.WINDSURF_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            BACKEND_FLAG="--backend anthropic"
+          else
+            BACKEND_FLAG=""
+          fi
+
+          PROMPT=$(cat test-maintenance-prompt.txt)
+
+          devin -p $BACKEND_FLAG --permission-mode dangerous \
+            -- "$PROMPT" \
+            | tee devin-output.txt
+
+          echo "## Devin CLI Test Maintenance Output" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat devin-output.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit and push test updates
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A '*.test.*' '*.spec.*' '*/__tests__/*'
+
+          if git diff --cached --quiet; then
+            echo "No test file changes to commit."
+          else
+            git commit -m "test: auto-maintain test suite for PR changes
+
+          Generated by Devin CLI in GitHub Actions"
+            git push origin HEAD:${PR_BRANCH}
+          fi
+
+      - name: Comment results on PR
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -f devin-output.txt ]; then
+            RESULT_COMMENT="## Test Suite Maintenance — Complete"
+            RESULT_COMMENT="${RESULT_COMMENT}\n\nDevin CLI ran headlessly and processed the test maintenance tasks."
+            RESULT_COMMENT="${RESULT_COMMENT}\n\n<details><summary>Devin CLI Output</summary>\n\n\`\`\`\n$(cat devin-output.txt)\n\`\`\`\n\n</details>"
+
+            echo -e "$RESULT_COMMENT" | gh pr comment ${{ github.event.pull_request.number }} --body-file -
+          fi
+
+  verify-tests:
+    name: Verify Updated Test Suite
+    needs: [maintain-tests]
+    if: always() && needs.maintain-tests.result == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      frontend_passed: ${{ steps.frontend-tests.outputs.passed }}
+      backend_passed: ${{ steps.backend-tests.outputs.passed }}
+      frontend_coverage: ${{ steps.frontend-coverage.outputs.summary }}
+      backend_test_output: ${{ steps.backend-tests.outputs.test_output }}
+      frontend_test_output: ${{ steps.frontend-tests.outputs.test_output }}
+      all_passed: ${{ steps.verdict.outputs.all_passed }}
+      failure_summary: ${{ steps.verdict.outputs.failure_summary }}
+
+    steps:
+      - name: Checkout PR branch (with Devin CLI updates)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          (cd frontend && npm ci)
+          (cd backend && npm ci)
+
+      - name: Run backend tests
+        id: backend-tests
+        continue-on-error: true
+        run: |
+          set +e
+          BACKEND_OUTPUT=$(cd backend && npm test 2>&1)
+          BACKEND_EXIT=$?
+          echo "$BACKEND_OUTPUT"
+
+          {
+            echo "test_output<<BACKEND_EOF"
+            echo "$BACKEND_OUTPUT"
+            echo "BACKEND_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ $BACKEND_EXIT -eq 0 ]; then
+            echo "passed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "passed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run frontend tests
+        id: frontend-tests
+        continue-on-error: true
+        run: |
+          set +e
+          FRONTEND_OUTPUT=$(cd frontend && npm run test 2>&1)
+          FRONTEND_EXIT=$?
+          echo "$FRONTEND_OUTPUT"
+
+          {
+            echo "test_output<<FRONTEND_EOF"
+            echo "$FRONTEND_OUTPUT"
+            echo "FRONTEND_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ $FRONTEND_EXIT -eq 0 ]; then
+            echo "passed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "passed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run frontend test coverage
+        id: frontend-coverage
+        continue-on-error: true
+        run: |
+          set +e
+          COVERAGE_OUTPUT=$(cd frontend && npm run test:coverage 2>&1)
+          echo "$COVERAGE_OUTPUT"
+
+          SUMMARY=$(echo "$COVERAGE_OUTPUT" | sed -n '/^-\{5,\}/,/^-\{5,\}$/p' || echo "Coverage table not available")
+
+          {
+            echo "summary<<COV_EOF"
+            echo "$SUMMARY"
+            echo "COV_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Determine verdict
+        id: verdict
+        run: |
+          FRONTEND="${{ steps.frontend-tests.outputs.passed }}"
+          BACKEND="${{ steps.backend-tests.outputs.passed }}"
+
+          FAILURE_SUMMARY=""
+
+          if [ "$FRONTEND" != "true" ]; then
+            FAILURE_SUMMARY="${FAILURE_SUMMARY}- Frontend tests failed\n"
+          fi
+          if [ "$BACKEND" != "true" ]; then
+            FAILURE_SUMMARY="${FAILURE_SUMMARY}- Backend tests failed\n"
+          fi
+
+          if [ "$FRONTEND" = "true" ] && [ "$BACKEND" = "true" ]; then
+            echo "all_passed=true" >> "$GITHUB_OUTPUT"
+            echo "All tests passed after test suite maintenance."
+          else
+            echo "all_passed=false" >> "$GITHUB_OUTPUT"
+            echo "Some tests still failing — code changes may have a flaw."
+          fi
+
+          {
+            echo "failure_summary<<FAIL_EOF"
+            echo -e "$FAILURE_SUMMARY"
+            echo "FAIL_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Comment verification results on PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          FRONTEND="${{ steps.frontend-tests.outputs.passed }}"
+          BACKEND="${{ steps.backend-tests.outputs.passed }}"
+          ALL="${{ steps.verdict.outputs.all_passed }}"
+
+          if [ "$ALL" = "true" ]; then
+            STATUS_ICON="✅"
+            HEADLINE="All Tests Passing"
+          else
+            STATUS_ICON="❌"
+            HEADLINE="Tests Still Failing After Maintenance"
+          fi
+
+          COMMENT="## ${STATUS_ICON} Health Check — ${HEADLINE}\n\n"
+          COMMENT="${COMMENT}| Suite | Status |\n|---|---|\n"
+          COMMENT="${COMMENT}| Frontend | $([ "$FRONTEND" = "true" ] && echo '✅ Passed' || echo '❌ Failed') |\n"
+          COMMENT="${COMMENT}| Backend | $([ "$BACKEND" = "true" ] && echo '✅ Passed' || echo '❌ Failed') |\n\n"
+
+          if [ -n "${{ steps.frontend-coverage.outputs.summary }}" ]; then
+            COMMENT="${COMMENT}<details><summary>Frontend Coverage Report</summary>\n\n\`\`\`\n${{ steps.frontend-coverage.outputs.summary }}\n\`\`\`\n\n</details>\n\n"
+          fi
+
+          if [ "$ALL" != "true" ]; then
+            COMMENT="${COMMENT}> **⚠️ Persistent test failures indicate a potential flaw in the code changes**, not the test suite. A Jira ticket will be created to track this issue."
+          fi
+
+          echo -e "$COMMENT" | gh pr comment ${{ github.event.pull_request.number }} --body-file -
+
+  create-jira-ticket:
+    name: Create Jira Ticket for Code Flaw
+    needs: [verify-tests, analyze-changes]
+    if: always() && needs.verify-tests.outputs.all_passed == 'false'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create Jira ticket
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_PROJECT_KEY: ${{ secrets.JIRA_PROJECT_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          FAILURE_SUMMARY: ${{ needs.verify-tests.outputs.failure_summary }}
+        run: |
+          DESCRIPTION=$(cat <<EOF
+          h2. Persistent Test Failures on PR #${PR_NUMBER}
+
+          *PR:* [${PR_TITLE}|${PR_URL}]
+          *Branch:* \`${PR_BRANCH}\`
+
+          After the automated test suite maintenance (Devin CLI) updated tests to match the code changes, the following tests still fail:
+
+          ${FAILURE_SUMMARY}
+
+          This indicates a *code-level defect* in the PR — the test suite was correctly updated but the underlying code changes produce incorrect behavior.
+
+          h3. Recommended Actions
+          # Review the failing tests and the code changes on branch \`${PR_BRANCH}\`
+          # Fix the code logic causing the failures
+          # Re-run the CI pipeline to verify
+          EOF
+          )
+
+          ESCAPED_DESCRIPTION=$(echo "$DESCRIPTION" | jq -Rs .)
+
+          REQUEST_BODY=$(jq -n \
+            --arg project "$JIRA_PROJECT_KEY" \
+            --arg summary "Code flaw detected: tests failing after auto-maintenance on PR #${PR_NUMBER}" \
+            --argjson description "$ESCAPED_DESCRIPTION" \
+            '{
+              fields: {
+                project: { key: $project },
+                summary: $summary,
+                description: $description,
+                issuetype: { name: "Bug" },
+                priority: { name: "High" },
+                labels: ["auto-detected", "ci-failure", "test-maintenance"]
+              }
+            }')
+
+          HTTP_RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST \
+            -H "Authorization: Basic $(echo -n "${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}" | base64)" \
+            -H "Content-Type: application/json" \
+            -d "$REQUEST_BODY" \
+            "${JIRA_BASE_URL}/rest/api/2/issue")
+
+          HTTP_BODY=$(echo "$HTTP_RESPONSE" | sed '/^HTTP_STATUS:/d')
+          HTTP_CODE=$(echo "$HTTP_RESPONSE" | grep '^HTTP_STATUS:' | cut -d: -f2)
+
+          if [ "$HTTP_CODE" -eq 201 ]; then
+            ISSUE_KEY=$(echo "$HTTP_BODY" | jq -r '.key')
+            echo "Jira ticket created: ${ISSUE_KEY}"
+            echo "## 🎫 Jira Ticket Created" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**${ISSUE_KEY}**: Code flaw detected — tests still failing after auto-maintenance" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "[View in Jira](${JIRA_BASE_URL}/browse/${ISSUE_KEY})" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::Failed to create Jira ticket (HTTP ${HTTP_CODE})"
+            echo "$HTTP_BODY"
+          fi
+
+      - name: Comment Jira ticket on PR
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+        run: |
+          COMMENT="## 🎫 Jira Ticket Created\n\n"
+          COMMENT="${COMMENT}Tests are still failing after automated test suite maintenance. "
+          COMMENT="${COMMENT}This indicates a **code-level defect** in the PR changes.\n\n"
+          COMMENT="${COMMENT}A Jira ticket has been created to track this issue. "
+          COMMENT="${COMMENT}Please review the failing tests and fix the underlying code.\n\n"
+          COMMENT="${COMMENT}${{ needs.verify-tests.outputs.failure_summary }}"
+
+          echo -e "$COMMENT" | gh pr comment ${{ github.event.pull_request.number }} --body-file -
