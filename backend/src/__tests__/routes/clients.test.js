@@ -55,7 +55,7 @@ describe('Client Routes', () => {
       expect(response.body).toEqual({ clients: mockClients });
       expect(mockDb.all).toHaveBeenCalledWith(
         expect.stringContaining('SELECT id, name, description'),
-        ['test@example.com'],
+        [],
         expect.any(Function)
       );
     });
@@ -452,6 +452,53 @@ describe('Client Routes', () => {
         .send({ description: '' });
 
       expect(response.status).toBe(200);
+    });
+  });
+
+  describe('Cross-User Client Visibility', () => {
+    test('should return clients created by another user', async () => {
+      const sharedClients = [
+        { id: 1, name: 'Client by User A', description: 'Created by test@example.com', user_email: 'userA@example.com', created_at: '2024-01-01', updated_at: '2024-01-01' },
+        { id: 2, name: 'Client by User B', description: 'Created by other@example.com', user_email: 'userB@example.com', created_at: '2024-01-02', updated_at: '2024-01-02' }
+      ];
+
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, sharedClients);
+      });
+
+      const response = await request(app).get('/api/clients');
+
+      expect(response.status).toBe(200);
+      expect(response.body.clients).toEqual(sharedClients);
+      expect(response.body.clients).toHaveLength(2);
+
+      // Verify the query does not filter by user_email — clients are shared
+      const query = mockDb.all.mock.calls[0][0];
+      const params = mockDb.all.mock.calls[0][1];
+      expect(query).not.toContain('user_email');
+      expect(params).toEqual([]);
+    });
+
+    test('should retrieve a specific client regardless of who created it', async () => {
+      const clientByOtherUser = {
+        id: 5, name: 'Other User Client', description: 'Created by someone else',
+        user_email: 'other@example.com', created_at: '2024-01-01', updated_at: '2024-01-01'
+      };
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, clientByOtherUser);
+      });
+
+      const response = await request(app).get('/api/clients/5');
+
+      expect(response.status).toBe(200);
+      expect(response.body.client).toEqual(clientByOtherUser);
+
+      // Verify the query only filters by id, not user_email
+      const query = mockDb.get.mock.calls[0][0];
+      const params = mockDb.get.mock.calls[0][1];
+      expect(query).not.toContain('user_email');
+      expect(params).toEqual([5]);
     });
   });
 });
