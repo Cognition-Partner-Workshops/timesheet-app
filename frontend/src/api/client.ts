@@ -4,6 +4,11 @@ import axios, { type AxiosInstance, type AxiosResponse } from 'axios';
 // Vite proxy will forward /api requests to the backend
 const API_BASE_URL = '';
 
+export interface DateRangeParams {
+  from?: string;
+  to?: string;
+}
+
 class ApiClient {
   private client: AxiosInstance;
 
@@ -113,23 +118,113 @@ class ApiClient {
     return response.data;
   }
 
-  // Report endpoints
-  async getClientReport(clientId: number) {
-    const response = await this.client.get(`/api/reports/client/${clientId}`);
+  // Weekly summary endpoint
+  async getWeeklySummary(weekStart: string) {
+    const response = await this.client.get('/api/work-entries/weekly-summary', {
+      params: { weekStart },
+    });
     return response.data;
   }
 
-  async exportClientReportCsv(clientId: number) {
+  // Report endpoints
+  async getClientReport(clientId: number, dateRange?: DateRangeParams) {
+    const params: Record<string, string> = {};
+    if (dateRange?.from) params.from = dateRange.from;
+    if (dateRange?.to) params.to = dateRange.to;
+    const response = await this.client.get(`/api/reports/client/${clientId}`, { params });
+    return response.data;
+  }
+
+  async exportClientReportCsv(clientId: number, dateRange?: DateRangeParams) {
+    const params: Record<string, string> = {};
+    if (dateRange?.from) params.from = dateRange.from;
+    if (dateRange?.to) params.to = dateRange.to;
     const response = await this.client.get(`/api/reports/export/csv/${clientId}`, {
       responseType: 'blob',
+      params,
     });
     return response.data;
   }
 
-  async exportClientReportPdf(clientId: number) {
+  async exportClientReportPdf(clientId: number, dateRange?: DateRangeParams) {
+    const params: Record<string, string> = {};
+    if (dateRange?.from) params.from = dateRange.from;
+    if (dateRange?.to) params.to = dateRange.to;
     const response = await this.client.get(`/api/reports/export/pdf/${clientId}`, {
       responseType: 'blob',
+      params,
     });
+    return response.data;
+  }
+
+  // Timesheet endpoints
+  async getWeeklyTimesheet(weekStart: string) {
+    const response = await this.client.get('/api/timesheets/weekly', {
+      params: { weekStart },
+    });
+    return response.data;
+  }
+
+  async submitTimesheet(data: { weekStart: string; weekEnd: string; totalHours: number }) {
+    const response = await this.client.post('/api/timesheets/submit', data);
+    return response.data;
+  }
+
+  // Recurring template endpoints
+  async getRecurringTemplates() {
+    const response = await this.client.get('/api/recurring');
+    return response.data;
+  }
+
+  async createRecurringTemplate(data: {
+    clientId: number; hours: number; description?: string;
+    frequency: string; daysOfWeek: number; startDate: string; endDate?: string | null;
+  }) {
+    const response = await this.client.post('/api/recurring', data);
+    return response.data;
+  }
+
+  async updateRecurringTemplate(id: number, data: {
+    clientId?: number; hours?: number; description?: string;
+    frequency?: string; daysOfWeek?: number; startDate?: string; endDate?: string | null; active?: boolean;
+  }) {
+    const response = await this.client.put(`/api/recurring/${id}`, data);
+    return response.data;
+  }
+
+  async deleteRecurringTemplate(id: number) {
+    const response = await this.client.delete(`/api/recurring/${id}`);
+    return response.data;
+  }
+
+  async generateRecurringEntries(id: number, from: string, to: string) {
+    const response = await this.client.post(`/api/recurring/${id}/generate`, { from, to });
+    return response.data;
+  }
+
+  async applyRecurringEntries(id: number, from: string, to: string) {
+    const response = await this.client.post(`/api/recurring/${id}/apply`, { from, to });
+    return response.data;
+  }
+
+  // Timer endpoints
+  async getActiveTimer() {
+    const response = await this.client.get('/api/timers/active');
+    return response.data;
+  }
+
+  async startTimer(data: { clientId: number; description?: string }) {
+    const response = await this.client.post('/api/timers/start', data);
+    return response.data;
+  }
+
+  async stopTimer() {
+    const response = await this.client.post('/api/timers/stop');
+    return response.data;
+  }
+
+  async discardTimer() {
+    const response = await this.client.delete('/api/timers/discard');
     return response.data;
   }
 

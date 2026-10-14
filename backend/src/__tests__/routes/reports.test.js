@@ -346,7 +346,7 @@ describe('Report Routes', () => {
       await request(app).get('/api/reports/export/csv/1');
 
       expect(mockDb.get).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT id, name FROM clients'),
+        expect.stringContaining('SELECT id, name, hourly_rate FROM clients'),
         expect.arrayContaining([1, 'test@example.com']),
         expect.any(Function)
       );
@@ -432,7 +432,7 @@ describe('Report Routes', () => {
       await request(app).get('/api/reports/export/pdf/1');
 
       expect(mockDb.get).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT id, name FROM clients'),
+        expect.stringContaining('SELECT id, name, hourly_rate FROM clients'),
         expect.arrayContaining([1, 'test@example.com']),
         expect.any(Function)
       );

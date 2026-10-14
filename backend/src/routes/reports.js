@@ -11,6 +11,33 @@ const router = express.Router();
 // All routes require authentication
 router.use(authenticateUser);
 
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseDateRange(query) {
+  const { from, to } = query;
+  if (from && !DATE_REGEX.test(from)) {
+    return { error: 'Invalid "from" date format. Use YYYY-MM-DD.' };
+  }
+  if (to && !DATE_REGEX.test(to)) {
+    return { error: 'Invalid "to" date format. Use YYYY-MM-DD.' };
+  }
+  return { from: from || null, to: to || null };
+}
+
+function buildDateFilter(from, to) {
+  let clause = '';
+  const params = [];
+  if (from) {
+    clause += ' AND date >= ?';
+    params.push(from);
+  }
+  if (to) {
+    clause += ' AND date <= ?';
+    params.push(to);
+  }
+  return { clause, params };
+}
+
 // Get hourly report for specific client
 router.get('/client/:clientId', (req, res) => {
   const clientId = parseInt(req.params.clientId);
@@ -18,12 +45,17 @@ router.get('/client/:clientId', (req, res) => {
   if (isNaN(clientId)) {
     return res.status(400).json({ error: 'Invalid client ID' });
   }
+
+  const dateRange = parseDateRange(req.query);
+  if (dateRange.error) {
+    return res.status(400).json({ error: dateRange.error });
+  }
   
   const db = getDatabase();
   
   // Verify client belongs to user
   db.get(
-    'SELECT id, name FROM clients WHERE id = ? AND user_email = ?',
+    'SELECT id, name, hourly_rate FROM clients WHERE id = ? AND user_email = ?',
     [clientId, req.userEmail],
     (err, client) => {
       if (err) {
@@ -34,14 +66,16 @@ router.get('/client/:clientId', (req, res) => {
       if (!client) {
         return res.status(404).json({ error: 'Client not found' });
       }
+
+      const { clause, params } = buildDateFilter(dateRange.from, dateRange.to);
       
       // Get work entries for this client
       db.all(
         `SELECT id, hours, description, date, created_at, updated_at
          FROM work_entries 
-         WHERE client_id = ? AND user_email = ? 
+         WHERE client_id = ? AND user_email = ?${clause}
          ORDER BY date DESC`,
-        [clientId, req.userEmail],
+        [clientId, req.userEmail, ...params],
         (err, workEntries) => {
           if (err) {
             console.error('Database error:', err);
@@ -50,12 +84,16 @@ router.get('/client/:clientId', (req, res) => {
           
           // Calculate total hours
           const totalHours = workEntries.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
+          const hourlyRate = client.hourly_rate != null ? parseFloat(client.hourly_rate) : null;
+          const estimatedRevenue = hourlyRate != null ? totalHours * hourlyRate : null;
           
           res.json({
             client: client,
             workEntries: workEntries,
             totalHours: totalHours,
-            entryCount: workEntries.length
+            entryCount: workEntries.length,
+            hourlyRate: hourlyRate,
+            estimatedRevenue: estimatedRevenue
           });
         }
       );
@@ -70,12 +108,17 @@ router.get('/export/csv/:clientId', (req, res) => {
   if (isNaN(clientId)) {
     return res.status(400).json({ error: 'Invalid client ID' });
   }
+
+  const dateRange = parseDateRange(req.query);
+  if (dateRange.error) {
+    return res.status(400).json({ error: dateRange.error });
+  }
   
   const db = getDatabase();
   
   // Verify client belongs to user and get data
   db.get(
-    'SELECT id, name FROM clients WHERE id = ? AND user_email = ?',
+    'SELECT id, name, hourly_rate FROM clients WHERE id = ? AND user_email = ?',
     [clientId, req.userEmail],
     (err, client) => {
       if (err) {
@@ -86,19 +129,28 @@ router.get('/export/csv/:clientId', (req, res) => {
       if (!client) {
         return res.status(404).json({ error: 'Client not found' });
       }
+
+      const { clause, params } = buildDateFilter(dateRange.from, dateRange.to);
       
       // Get work entries
       db.all(
         `SELECT hours, description, date, created_at
          FROM work_entries 
-         WHERE client_id = ? AND user_email = ? 
+         WHERE client_id = ? AND user_email = ?${clause}
          ORDER BY date DESC`,
-        [clientId, req.userEmail],
+        [clientId, req.userEmail, ...params],
         (err, workEntries) => {
           if (err) {
             console.error('Database error:', err);
             return res.status(500).json({ error: 'Internal server error' });
           }
+
+          const hourlyRate = client.hourly_rate != null ? parseFloat(client.hourly_rate) : null;
+          const csvEntries = workEntries.map(entry => ({
+            ...entry,
+            hourly_rate: hourlyRate != null ? hourlyRate.toFixed(2) : '',
+            entry_revenue: hourlyRate != null ? (parseFloat(entry.hours) * hourlyRate).toFixed(2) : ''
+          }));
           
           // Create temporary CSV file
           const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -117,11 +169,13 @@ router.get('/export/csv/:clientId', (req, res) => {
               { id: 'date', title: 'Date' },
               { id: 'hours', title: 'Hours' },
               { id: 'description', title: 'Description' },
+              { id: 'hourly_rate', title: 'Hourly Rate' },
+              { id: 'entry_revenue', title: 'Entry Revenue' },
               { id: 'created_at', title: 'Created At' }
             ]
           });
           
-          csvWriter.writeRecords(workEntries)
+          csvWriter.writeRecords(csvEntries)
             .then(() => {
               // Send file and clean up
               res.download(tempPath, filename, (err) => {
@@ -153,12 +207,17 @@ router.get('/export/pdf/:clientId', (req, res) => {
   if (isNaN(clientId)) {
     return res.status(400).json({ error: 'Invalid client ID' });
   }
+
+  const dateRange = parseDateRange(req.query);
+  if (dateRange.error) {
+    return res.status(400).json({ error: dateRange.error });
+  }
   
   const db = getDatabase();
   
   // Verify client belongs to user and get data
   db.get(
-    'SELECT id, name FROM clients WHERE id = ? AND user_email = ?',
+    'SELECT id, name, hourly_rate FROM clients WHERE id = ? AND user_email = ?',
     [clientId, req.userEmail],
     (err, client) => {
       if (err) {
@@ -169,14 +228,16 @@ router.get('/export/pdf/:clientId', (req, res) => {
       if (!client) {
         return res.status(404).json({ error: 'Client not found' });
       }
+
+      const { clause, params } = buildDateFilter(dateRange.from, dateRange.to);
       
       // Get work entries
       db.all(
         `SELECT hours, description, date, created_at
          FROM work_entries 
-         WHERE client_id = ? AND user_email = ? 
+         WHERE client_id = ? AND user_email = ?${clause}
          ORDER BY date DESC`,
-        [clientId, req.userEmail],
+        [clientId, req.userEmail, ...params],
         (err, workEntries) => {
           if (err) {
             console.error('Database error:', err);
@@ -200,9 +261,18 @@ router.get('/export/pdf/:clientId', (req, res) => {
           doc.moveDown();
           
           const totalHours = workEntries.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
+          const hourlyRate = client.hourly_rate != null ? parseFloat(client.hourly_rate) : null;
+          const totalRevenue = hourlyRate != null ? totalHours * hourlyRate : null;
           doc.fontSize(14).text(`Total Hours: ${totalHours.toFixed(2)}`);
           doc.text(`Total Entries: ${workEntries.length}`);
+          if (hourlyRate != null) {
+            doc.text(`Hourly Rate: $${hourlyRate.toFixed(2)}`);
+            doc.text(`Total Revenue: $${totalRevenue.toFixed(2)}`);
+          }
           doc.text(`Generated: ${new Date().toLocaleString()}`);
+          if (dateRange.from || dateRange.to) {
+            doc.text(`Date Range: ${dateRange.from || 'Start'} to ${dateRange.to || 'Present'}`);
+          }
           doc.moveDown();
           
           // Add table header

@@ -9,6 +9,7 @@ export interface Client {
   description: string | null;
   department: string | null;
   email: string | null;
+  hourly_rate: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -33,6 +34,8 @@ export interface ClientReport {
   workEntries: WorkEntry[];
   totalHours: number;
   entryCount: number;
+  hourlyRate: number | null;
+  estimatedRevenue: number | null;
 }
 
 export interface CreateClientRequest {
@@ -40,6 +43,7 @@ export interface CreateClientRequest {
   description?: string;
   department?: string;
   email?: string;
+  hourlyRate?: number | null;
 }
 
 export interface UpdateClientRequest {
@@ -47,6 +51,7 @@ export interface UpdateClientRequest {
   description?: string;
   department?: string;
   email?: string;
+  hourlyRate?: number | null;
 }
 
 export interface CreateWorkEntryRequest {
@@ -63,6 +68,15 @@ export interface UpdateWorkEntryRequest {
   date?: string;
 }
 
+export interface ActiveTimer {
+  id: number;
+  client_id: number;
+  description: string | null;
+  started_at: string;
+  created_at: string;
+  client_name: string;
+}
+
 export interface LoginRequest {
   email: string;
 }
@@ -76,4 +90,42 @@ export interface ApiResponse<T> {
   data?: T;
   error?: string;
   message?: string;
+}
+
+export interface TimesheetClient {
+  clientId: number;
+  clientName: string;
+  days: Record<string, number>;
+}
+
+export interface TimesheetSubmission {
+  id: number;
+  status: string;
+  submitted_at: string;
+  total_hours: number;
+}
+
+export interface WeeklyTimesheetResponse {
+  weekStart: string;
+  weekEnd: string;
+  clients: TimesheetClient[];
+  submission: TimesheetSubmission | null;
+}
+
+export interface SubmitTimesheetRequest {
+  weekStart: string;
+  weekEnd: string;
+  totalHours: number;
+}
+
+export interface SubmitTimesheetResponse {
+  message: string;
+  submission: {
+    id: number;
+    weekStart: string;
+    weekEnd: string;
+    totalHours: number;
+    status: string;
+    submittedAt: string;
+  };
 }
