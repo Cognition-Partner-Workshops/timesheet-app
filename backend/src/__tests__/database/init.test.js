@@ -142,6 +142,74 @@ describe('Database Initialization', () => {
 
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
+
+    test('should resolve immediately when no database connection exists', async () => {
+      // Use a fresh module where db is null and never initialized
+      jest.resetModules();
+
+      jest.doMock('sqlite3', () => {
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, callback) => {
+              callback(null);
+              return {
+                serialize: jest.fn((cb) => cb()),
+                run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
+                close: jest.fn((cb) => cb(null))
+              };
+            })
+          }))
+        };
+      });
+
+      const { closeDatabase: closeFresh } = require('../../database/init');
+      // closeDatabase on a module where getDatabase was never called (db is null)
+      await expect(closeFresh()).resolves.toBeUndefined();
+    });
+
+    test('should wait when database is currently closing', async () => {
+      // Get a fresh module
+      jest.resetModules();
+
+      let closeCallback;
+      jest.doMock('sqlite3', () => {
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, callback) => {
+              callback(null);
+              return {
+                serialize: jest.fn((cb) => cb()),
+                run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
+                close: jest.fn((cb) => {
+                  // Capture callback to delay resolution
+                  closeCallback = cb;
+                }),
+                get: jest.fn(),
+                all: jest.fn()
+              };
+            })
+          }))
+        };
+      });
+
+      const { getDatabase: getDb, closeDatabase: closeDb } = require('../../database/init');
+      
+      // Initialize the database
+      getDb();
+
+      // Start first close (will be pending because we captured the callback)
+      const firstClose = closeDb();
+      
+      // Start second close while first is still in progress (isClosing = true)
+      const secondClose = closeDb();
+
+      // Now resolve the first close
+      if (closeCallback) closeCallback(null);
+
+      // Both should resolve
+      await expect(firstClose).resolves.toBeUndefined();
+      await expect(secondClose).resolves.toBeUndefined();
+    });
   });
 
   describe('Database Schema', () => {
