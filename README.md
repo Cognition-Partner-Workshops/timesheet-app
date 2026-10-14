@@ -20,6 +20,7 @@ A full-stack web application for tracking and reporting employee hourly work acr
 
 - ✅ User authentication (email-based with JWT tokens)
 - ✅ Add, edit, and delete clients
+- ✅ Add, edit, and delete projects (with client assignment, start date, and status tracking)
 - ✅ Add, edit, and delete hourly work entries for each client
 - ✅ View hourly reports for each client
 - ✅ Export hourly reports to CSV or PDF
@@ -56,6 +57,7 @@ A full-stack web application for tracking and reporting employee hourly work acr
 │   │   ├── routes/
 │   │   │   ├── auth.js           # Authentication endpoints
 │   │   │   ├── clients.js        # Client CRUD
+│   │   │   ├── projects.js       # Project CRUD
 │   │   │   ├── workEntries.js    # Work entry CRUD
 │   │   │   └── reports.js        # Reporting & export
 │   │   ├── validation/
@@ -76,6 +78,7 @@ A full-stack web application for tracking and reporting employee hourly work acr
     │   │   ├── LoginPage.tsx     # Login page
     │   │   ├── DashboardPage.tsx # Dashboard
     │   │   ├── ClientsPage.tsx   # Client management
+    │   │   ├── ProjectsPage.tsx  # Project management
     │   │   ├── WorkEntriesPage.tsx # Work entry management
     │   │   └── ReportsPage.tsx   # Reports & exports
     │   ├── types/
@@ -155,7 +158,7 @@ Frontend will be running at `http://localhost:5173`
 
 1. Open `http://localhost:5173` in your browser
 2. Enter any email address to log in (no password required)
-3. Start adding clients and tracking work hours
+3. Start adding clients, creating projects, and tracking work hours
 4. View reports and export data as CSV or PDF
 
 ## API Endpoints
@@ -170,6 +173,15 @@ Frontend will be running at `http://localhost:5173`
 - `GET /api/clients/:id` - Get specific client
 - `PUT /api/clients/:id` - Update client
 - `DELETE /api/clients/:id` - Delete client
+
+### Projects
+- `GET /api/projects` - Get all projects
+- `POST /api/projects` - Create new project (name, description, clientId, startDate, status)
+- `GET /api/projects/:id` - Get specific project
+- `PUT /api/projects/:id` - Update project
+- `DELETE /api/projects/:id` - Delete project
+
+Project statuses: `active`, `completed`, `on-hold`. Client assignment is validated against the authenticated user's clients.
 
 ### Work Entries
 - `GET /api/work-entries` - Get all work entries (optional ?clientId filter)
@@ -220,7 +232,7 @@ npm run test:watch          # Run tests in watch mode
 
 ### Test Coverage
 
-The backend has comprehensive test coverage with **161 tests** across 8 test suites:
+The backend has comprehensive test coverage with **189 tests** across 9 test suites:
 
 | File | Statements | Branches | Functions | Lines |
 |------|------------|----------|-----------|-------|
@@ -230,6 +242,7 @@ The backend has comprehensive test coverage with **161 tests** across 8 test sui
 | middleware/errorHandler.js | 100% | 100% | 100% | 100% |
 | routes/auth.js | 100% | 100% | 100% | 100% |
 | routes/clients.js | 97.89% | 100% | 100% | 97.89% |
+| routes/projects.js | 98%+ | 100% | 100% | 98%+ |
 | routes/workEntries.js | 98.41% | 100% | 100% | 98.41% |
 | routes/reports.js | 64.15% | 69.44% | 68.75% | 64.42% |
 | validation/schemas.js | 100% | 100% | 100% | 100% |
