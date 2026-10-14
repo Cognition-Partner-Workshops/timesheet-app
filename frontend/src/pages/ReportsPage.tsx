@@ -29,7 +29,8 @@ import {
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
-import { type ClientReport } from '../types/api';
+import { type Client, type ClientReport } from '../types/api';
+import { buildReportFilename, downloadBlob } from '../utils/download';
 
 const ReportsPage: React.FC = () => {
   const [selectedClientId, setSelectedClientId] = useState<number>(0);
@@ -46,50 +47,24 @@ const ReportsPage: React.FC = () => {
     enabled: selectedClientId > 0,
   });
 
-  const clients = clientsData?.clients || [];
+  const clients: Client[] = clientsData?.clients || [];
   const report = reportData as ClientReport | undefined;
+  const selectedClient = clients.find((c) => c.id === selectedClientId);
 
-  const handleExportCsv = async () => {
-    if (!selectedClientId) return;
-    
+  const handleExport = async (format: 'csv' | 'pdf') => {
+    if (!selectedClient) return;
+
     try {
-      const blob = await apiClient.exportClientReportCsv(selectedClientId);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const client = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
-      a.download = `${client?.name?.replace(/[^a-zA-Z0-9]/g, '_')}_report_${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      const blob =
+        format === 'csv'
+          ? await apiClient.exportClientReportCsv(selectedClient.id)
+          : await apiClient.exportClientReportPdf(selectedClient.id);
+      downloadBlob(blob, buildReportFilename(selectedClient.name, format));
     } catch (err: unknown) {
-      setError('Failed to export CSV report');
+      setError(`Failed to export ${format.toUpperCase()} report`);
       console.error('Export error:', err);
     }
   };
-
-  const handleExportPdf = async () => {
-    if (!selectedClientId) return;
-
-    try {
-      const blob = await apiClient.exportClientReportPdf(selectedClientId);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const client = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
-      a.download = `${client?.name?.replace(/[^a-zA-Z0-9]/g, '_')}_report_${new Date().toISOString().split('T')[0]}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (err: unknown) {
-      setError('Failed to export PDF report');
-      console.error('Export error:', err);
-    }
-  };
-
-  const selectedClient = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
 
   if (clientsLoading) {
     return (
@@ -133,7 +108,7 @@ const ReportsPage: React.FC = () => {
                     label="Select Client"
                   >
                     <MenuItem value={0}>Choose a client...</MenuItem>
-                    {clients.map((c: { id: number; name: string }) => (
+                    {clients.map((c) => (
                       <MenuItem key={c.id} value={c.id}>
                         {c.name}
                       </MenuItem>
@@ -145,7 +120,7 @@ const ReportsPage: React.FC = () => {
                 <Box display="flex" gap={2}>
                   <Tooltip title="Export as CSV">
                     <IconButton
-                      onClick={handleExportCsv}
+                      onClick={() => handleExport('csv')}
                       disabled={!selectedClientId || reportLoading}
                       color="primary"
                       size="large"
@@ -155,7 +130,7 @@ const ReportsPage: React.FC = () => {
                   </Tooltip>
                   <Tooltip title="Export as PDF">
                     <IconButton
-                      onClick={handleExportPdf}
+                      onClick={() => handleExport('pdf')}
                       disabled={!selectedClientId || reportLoading}
                       color="error"
                       size="large"

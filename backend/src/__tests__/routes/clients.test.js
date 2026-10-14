@@ -274,6 +274,102 @@ describe('Client Routes', () => {
 
       expect(response.status).toBe(400);
     });
+
+    // Helpers to mock the exists-check -> update -> re-fetch sequence in PUT /:id
+    const mockClientExists = () =>
+      mockDb.get.mockImplementationOnce((query, params, callback) => callback(null, { id: 1 }));
+    const mockRefetchResult = (err, row) =>
+      mockDb.get.mockImplementationOnce((query, params, callback) => callback(err, row));
+
+    test('should update client department and email in a single request', async () => {
+      mockClientExists();
+      mockDb.run.mockImplementation((query, params, callback) => {
+        expect(query).toContain('department = ?');
+        expect(query).toContain('email = ?');
+        expect(params).toEqual(['Engineering', 'client@example.com', 1, 'test@example.com']);
+        callback(null);
+      });
+      mockRefetchResult(null, { id: 1, name: 'Client', department: 'Engineering', email: 'client@example.com' });
+
+      const response = await request(app)
+        .put('/api/clients/1')
+        .send({ department: 'Engineering', email: 'client@example.com' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.client.department).toBe('Engineering');
+      expect(response.body.client.email).toBe('client@example.com');
+    });
+
+    test('should clear department and email when empty strings provided', async () => {
+      mockClientExists();
+      mockDb.run.mockImplementation((query, params, callback) => {
+        expect(params).toEqual([null, null, 1, 'test@example.com']);
+        callback(null);
+      });
+      mockRefetchResult(null, { id: 1, name: 'Client', department: null, email: null });
+
+      const response = await request(app)
+        .put('/api/clients/1')
+        .send({ department: '', email: '' });
+
+      expect(response.status).toBe(200);
+    });
+
+    test('should handle database error when retrieving updated client', async () => {
+      mockClientExists();
+      mockDb.run.mockImplementation((query, params, callback) => callback(null));
+      mockRefetchResult(new Error('Retrieve failed'), null);
+
+      const response = await request(app)
+        .put('/api/clients/1')
+        .send({ name: 'Updated' });
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Client updated but failed to retrieve' });
+    });
+  });
+
+  describe('DELETE /api/clients (all clients)', () => {
+    const mockDeleteAll = (err, changes) =>
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.changes = changes;
+        callback.call(this, err);
+      });
+
+    test('should delete all clients for authenticated user', async () => {
+      mockDeleteAll(null, 3);
+
+      const response = await request(app).delete('/api/clients');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        message: 'All clients deleted successfully',
+        deletedCount: 3
+      });
+      expect(mockDb.run).toHaveBeenCalledWith(
+        'DELETE FROM clients WHERE user_email = ?',
+        ['test@example.com'],
+        expect.any(Function)
+      );
+    });
+
+    test('should report zero deletions when user has no clients', async () => {
+      mockDeleteAll(null, 0);
+
+      const response = await request(app).delete('/api/clients');
+
+      expect(response.status).toBe(200);
+      expect(response.body.deletedCount).toBe(0);
+    });
+
+    test('should handle database error when deleting all clients', async () => {
+      mockDeleteAll(new Error('Delete failed'), 0);
+
+      const response = await request(app).delete('/api/clients');
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Failed to delete clients' });
+    });
   });
 
   describe('DELETE /api/clients/:id', () => {
