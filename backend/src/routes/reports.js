@@ -21,10 +21,10 @@ router.get('/client/:clientId', (req, res) => {
   
   const db = getDatabase();
   
-  // Verify client belongs to user
+  // Verify client exists
   db.get(
-    'SELECT id, name FROM clients WHERE id = ? AND user_email = ?',
-    [clientId, req.userEmail],
+    'SELECT id, name FROM clients WHERE id = ?',
+    [clientId],
     (err, client) => {
       if (err) {
         console.error('Database error:', err);
@@ -39,9 +39,9 @@ router.get('/client/:clientId', (req, res) => {
       db.all(
         `SELECT id, hours, description, date, created_at, updated_at
          FROM work_entries 
-         WHERE client_id = ? AND user_email = ? 
+         WHERE client_id = ? 
          ORDER BY date DESC`,
-        [clientId, req.userEmail],
+        [clientId],
         (err, workEntries) => {
           if (err) {
             console.error('Database error:', err);
@@ -73,10 +73,10 @@ router.get('/export/csv/:clientId', (req, res) => {
   
   const db = getDatabase();
   
-  // Verify client belongs to user and get data
+  // Verify client exists and get data
   db.get(
-    'SELECT id, name FROM clients WHERE id = ? AND user_email = ?',
-    [clientId, req.userEmail],
+    'SELECT id, name FROM clients WHERE id = ?',
+    [clientId],
     (err, client) => {
       if (err) {
         console.error('Database error:', err);
@@ -91,9 +91,9 @@ router.get('/export/csv/:clientId', (req, res) => {
       db.all(
         `SELECT hours, description, date, created_at
          FROM work_entries 
-         WHERE client_id = ? AND user_email = ? 
+         WHERE client_id = ? 
          ORDER BY date DESC`,
-        [clientId, req.userEmail],
+        [clientId],
         (err, workEntries) => {
           if (err) {
             console.error('Database error:', err);
@@ -156,10 +156,10 @@ router.get('/export/pdf/:clientId', (req, res) => {
   
   const db = getDatabase();
   
-  // Verify client belongs to user and get data
+  // Verify client exists and get data
   db.get(
-    'SELECT id, name FROM clients WHERE id = ? AND user_email = ?',
-    [clientId, req.userEmail],
+    'SELECT id, name FROM clients WHERE id = ?',
+    [clientId],
     (err, client) => {
       if (err) {
         console.error('Database error:', err);
@@ -174,9 +174,9 @@ router.get('/export/pdf/:clientId', (req, res) => {
       db.all(
         `SELECT hours, description, date, created_at
          FROM work_entries 
-         WHERE client_id = ? AND user_email = ? 
+         WHERE client_id = ? 
          ORDER BY date DESC`,
-        [clientId, req.userEmail],
+        [clientId],
         (err, workEntries) => {
           if (err) {
             console.error('Database error:', err);
