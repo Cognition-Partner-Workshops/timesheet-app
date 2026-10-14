@@ -46,6 +46,9 @@ A full-stack web application for tracking and reporting employee hourly work acr
 
 ```
 .
+├── e2e/
+│   └── work-entries.spec.ts   # E2E tests for work entries workflow
+├── playwright.config.ts       # Playwright test configuration
 ├── backend/
 │   ├── src/
 │   │   ├── database/
@@ -217,6 +220,25 @@ npm test                    # Run all tests
 npm run test:coverage       # Run tests with coverage report
 npm run test:watch          # Run tests in watch mode
 ```
+
+**E2E (Playwright):**
+
+End-to-end tests cover the full work entries CRUD workflow (login, create client, create/edit/delete work entries) using Playwright with Chromium.
+
+```bash
+# Prerequisites: backend and frontend must be running
+cd backend && npm run dev &   # Port 3001
+cd frontend && npm run dev &  # Port 5173
+
+# From the project root:
+npm install                   # Install Playwright dependencies
+npx playwright install chromium
+npx playwright test           # Run E2E tests (headless)
+npx playwright test --headed  # Run with visible browser
+npx playwright show-report    # View HTML test report
+```
+
+Test files live in `e2e/` and are configured via `playwright.config.ts`. Videos and traces are captured automatically (traces on failure, video on all runs).
 
 ### Test Coverage
 
