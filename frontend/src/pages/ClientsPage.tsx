@@ -73,6 +73,7 @@ const ClientsPage: React.FC = () => {
     mutationFn: (id: number) => apiClient.deleteClient(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['workEntries'] });
     },
     onError: (err: unknown) => {
       const error = err as { response?: { data?: { error?: string } } };
@@ -84,6 +85,7 @@ const ClientsPage: React.FC = () => {
     mutationFn: () => apiClient.deleteAllClients(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['workEntries'] });
     },
     onError: (err: unknown) => {
       const error = err as { response?: { data?: { error?: string } } };
