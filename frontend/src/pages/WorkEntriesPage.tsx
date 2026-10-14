@@ -106,7 +106,7 @@ const WorkEntriesPage: React.FC = () => {
         clientId: entry.client_id,
         hours: entry.hours.toString(),
         description: entry.description || '',
-        date: new Date(entry.date),
+        date: new Date(entry.date + 'T00:00:00'),
       });
     } else {
       setEditingEntry(null);
@@ -157,7 +157,7 @@ const WorkEntriesPage: React.FC = () => {
       clientId: formData.clientId,
       hours,
       description: formData.description || undefined,
-      date: formData.date.toISOString().split('T')[0],
+      date: `${formData.date.getFullYear()}-${String(formData.date.getMonth() + 1).padStart(2, '0')}-${String(formData.date.getDate()).padStart(2, '0')}`,
     };
 
     if (editingEntry) {
@@ -233,7 +233,7 @@ const WorkEntriesPage: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2">
-                            {new Date(entry.date).toLocaleDateString()}
+                            {new Date(entry.date + 'T00:00:00').toLocaleDateString()}
                           </Typography>
                         </TableCell>
                         <TableCell>
