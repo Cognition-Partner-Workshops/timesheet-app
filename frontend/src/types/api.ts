@@ -72,6 +72,20 @@ export interface LoginResponse {
   user: User;
 }
 
+export interface WeeklyReportEntry {
+  hours: number;
+  description: string | null;
+  date: string;
+  user_email: string;
+  client_name: string;
+}
+
+export interface WeeklyReportWeek {
+  weekStartDate: string;
+  totalHours: number;
+  entries: WeeklyReportEntry[];
+}
+
 export interface ApiResponse<T> {
   data?: T;
   error?: string;

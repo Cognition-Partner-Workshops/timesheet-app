@@ -244,4 +244,212 @@ router.get('/export/pdf/:clientId', (req, res) => {
   );
 });
 
+// Get weekly work entries report
+router.get('/weekly', (req, res) => {
+  const db = getDatabase();
+
+  db.all(
+    `SELECT we.hours, we.description, we.date, we.user_email,
+            c.name as client_name
+     FROM work_entries we
+     JOIN clients c ON we.client_id = c.id
+     WHERE we.user_email = ?
+     ORDER BY we.date DESC`,
+    [req.userEmail],
+    (err, workEntries) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      const weeks = groupEntriesByWeek(workEntries);
+      res.json({ weeks });
+    }
+  );
+});
+
+// Export weekly report as CSV
+router.get('/export/weekly-csv', (req, res) => {
+  const db = getDatabase();
+
+  db.all(
+    `SELECT we.hours, we.description, we.date, we.user_email,
+            c.name as client_name
+     FROM work_entries we
+     JOIN clients c ON we.client_id = c.id
+     WHERE we.user_email = ?
+     ORDER BY we.date DESC`,
+    [req.userEmail],
+    (err, workEntries) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      const weeks = groupEntriesByWeek(workEntries);
+      const rows = [];
+      weeks.forEach((week) => {
+        week.entries.forEach((entry) => {
+          rows.push({
+            week_start_date: week.weekStartDate,
+            total_hours_in_week: week.totalHours.toFixed(2),
+            logged_by: entry.user_email,
+            logged_date: entry.date,
+            client_name: entry.client_name,
+            hours: entry.hours,
+            description: entry.description || ''
+          });
+        });
+      });
+
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `weekly_report_${timestamp}.csv`;
+      const tempPath = path.join(__dirname, '../../temp', filename);
+
+      const tempDir = path.dirname(tempPath);
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+
+      const csvWriter = createCsvWriter({
+        path: tempPath,
+        header: [
+          { id: 'week_start_date', title: 'Week Start Date' },
+          { id: 'total_hours_in_week', title: 'Total Hours (Week)' },
+          { id: 'logged_by', title: 'Logged By' },
+          { id: 'logged_date', title: 'Logged Date' },
+          { id: 'client_name', title: 'Client Name' },
+          { id: 'hours', title: 'Hours' },
+          { id: 'description', title: 'Description' }
+        ]
+      });
+
+      csvWriter.writeRecords(rows)
+        .then(() => {
+          res.download(tempPath, filename, (err) => {
+            if (err) {
+              console.error('Error sending file:', err);
+            }
+            fs.unlink(tempPath, (unlinkErr) => {
+              if (unlinkErr) {
+                console.error('Error deleting temp file:', unlinkErr);
+              }
+            });
+          });
+        })
+        .catch((error) => {
+          console.error('Error creating CSV:', error);
+          res.status(500).json({ error: 'Failed to generate weekly CSV report' });
+        });
+    }
+  );
+});
+
+// Export weekly report as PDF
+router.get('/export/weekly-pdf', (req, res) => {
+  const db = getDatabase();
+
+  db.all(
+    `SELECT we.hours, we.description, we.date, we.user_email,
+            c.name as client_name
+     FROM work_entries we
+     JOIN clients c ON we.client_id = c.id
+     WHERE we.user_email = ?
+     ORDER BY we.date DESC`,
+    [req.userEmail],
+    (err, workEntries) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      const weeks = groupEntriesByWeek(workEntries);
+      const totalHoursAll = workEntries.reduce((sum, e) => sum + parseFloat(e.hours), 0);
+
+      const doc = new PDFDocument({ margin: 50 });
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `weekly_report_${timestamp}.pdf`;
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      doc.pipe(res);
+
+      doc.fontSize(20).text('Weekly Work Entries Report', { align: 'center' });
+      doc.moveDown();
+      doc.fontSize(12).text(`Total Hours: ${totalHoursAll.toFixed(2)}`);
+      doc.text(`Total Weeks: ${weeks.length}`);
+      doc.text(`Generated: ${new Date().toLocaleString()}`);
+      doc.moveDown();
+
+      weeks.forEach((week) => {
+        if (doc.y > 650) {
+          doc.addPage();
+        }
+
+        doc.fontSize(14).fillColor('#1976d2')
+          .text(`Week of ${week.weekStartDate}  |  Total: ${week.totalHours.toFixed(2)} hours`);
+        doc.fillColor('black');
+        doc.moveDown(0.3);
+
+        doc.fontSize(10);
+        const headerY = doc.y;
+        doc.text('Logged Date', 50, headerY, { width: 90 });
+        doc.text('Client', 140, headerY, { width: 120 });
+        doc.text('Hours', 260, headerY, { width: 50 });
+        doc.text('Logged By', 310, headerY, { width: 130 });
+        doc.text('Description', 440, headerY, { width: 110 });
+        doc.moveDown(0.5);
+        doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+        doc.moveDown(0.3);
+
+        week.entries.forEach((entry) => {
+          if (doc.y > 700) {
+            doc.addPage();
+          }
+          const y = doc.y;
+          doc.text(entry.date, 50, y, { width: 90 });
+          doc.text(entry.client_name, 140, y, { width: 120 });
+          doc.text(entry.hours.toString(), 260, y, { width: 50 });
+          doc.text(entry.user_email, 310, y, { width: 130 });
+          doc.text(entry.description || '-', 440, y, { width: 110 });
+          doc.moveDown();
+        });
+
+        doc.moveDown(0.5);
+      });
+
+      doc.end();
+    }
+  );
+});
+
+function getWeekStartDate(dateVal) {
+  const date = typeof dateVal === 'number' ? new Date(dateVal) : new Date(dateVal + 'T00:00:00Z');
+  const day = date.getUTCDay();
+  const diff = day === 0 ? 6 : day - 1;
+  const monday = new Date(date);
+  monday.setUTCDate(date.getUTCDate() - diff);
+  return monday.toISOString().split('T')[0];
+}
+
+function formatDate(dateVal) {
+  const date = typeof dateVal === 'number' ? new Date(dateVal) : new Date(dateVal + 'T00:00:00Z');
+  return date.toISOString().split('T')[0];
+}
+
+function groupEntriesByWeek(workEntries) {
+  const weekMap = {};
+  workEntries.forEach((entry) => {
+    const formattedDate = formatDate(entry.date);
+    const weekStart = getWeekStartDate(entry.date);
+    if (!weekMap[weekStart]) {
+      weekMap[weekStart] = { weekStartDate: weekStart, totalHours: 0, entries: [] };
+    }
+    weekMap[weekStart].totalHours += parseFloat(entry.hours);
+    weekMap[weekStart].entries.push({ ...entry, date: formattedDate });
+  });
+
+  return Object.values(weekMap).sort((a, b) => b.weekStartDate.localeCompare(a.weekStartDate));
+}
+
 module.exports = router;

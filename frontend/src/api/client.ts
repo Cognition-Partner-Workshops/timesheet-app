@@ -133,6 +133,26 @@ class ApiClient {
     return response.data;
   }
 
+  // Weekly report endpoints
+  async getWeeklyReport() {
+    const response = await this.client.get('/api/reports/weekly');
+    return response.data;
+  }
+
+  async exportWeeklyReportCsv() {
+    const response = await this.client.get('/api/reports/export/weekly-csv', {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
+  async exportWeeklyReportPdf() {
+    const response = await this.client.get('/api/reports/export/weekly-pdf', {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
   // Health check
   async healthCheck() {
     const response = await this.client.get('/health');
