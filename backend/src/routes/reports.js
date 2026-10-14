@@ -11,7 +11,34 @@ const router = express.Router();
 // All routes require authentication
 router.use(authenticateUser);
 
-// Get hourly report for specific client
+/**
+ * @swagger
+ * /api/reports/client/{clientId}:
+ *   get:
+ *     summary: Get client hourly report
+ *     description: Returns a summary report of work entries and total hours for a specific client.
+ *     tags: [Reports]
+ *     parameters:
+ *       - in: path
+ *         name: clientId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Client ID
+ *     responses:
+ *       200:
+ *         description: Client report data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ClientReport'
+ *       400:
+ *         description: Invalid client ID
+ *       401:
+ *         description: Authentication required
+ *       404:
+ *         description: Client not found
+ */
 router.get('/client/:clientId', (req, res) => {
   const clientId = parseInt(req.params.clientId);
   
@@ -63,7 +90,35 @@ router.get('/client/:clientId', (req, res) => {
   );
 });
 
-// Export client report as CSV
+/**
+ * @swagger
+ * /api/reports/export/csv/{clientId}:
+ *   get:
+ *     summary: Export client report as CSV
+ *     description: Downloads a CSV file containing work entry data for a specific client.
+ *     tags: [Reports]
+ *     parameters:
+ *       - in: path
+ *         name: clientId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Client ID
+ *     responses:
+ *       200:
+ *         description: CSV file download
+ *         content:
+ *           text/csv:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       400:
+ *         description: Invalid client ID
+ *       401:
+ *         description: Authentication required
+ *       404:
+ *         description: Client not found
+ */
 router.get('/export/csv/:clientId', (req, res) => {
   const clientId = parseInt(req.params.clientId);
   
@@ -146,7 +201,35 @@ router.get('/export/csv/:clientId', (req, res) => {
   );
 });
 
-// Export client report as PDF
+/**
+ * @swagger
+ * /api/reports/export/pdf/{clientId}:
+ *   get:
+ *     summary: Export client report as PDF
+ *     description: Downloads a PDF file containing a formatted time report for a specific client.
+ *     tags: [Reports]
+ *     parameters:
+ *       - in: path
+ *         name: clientId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Client ID
+ *     responses:
+ *       200:
+ *         description: PDF file download
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       400:
+ *         description: Invalid client ID
+ *       401:
+ *         description: Authentication required
+ *       404:
+ *         description: Client not found
+ */
 router.get('/export/pdf/:clientId', (req, res) => {
   const clientId = parseInt(req.params.clientId);
   

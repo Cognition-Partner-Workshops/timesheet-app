@@ -8,7 +8,28 @@ const router = express.Router();
 // All routes require authentication
 router.use(authenticateUser);
 
-// Get all clients for authenticated user
+/**
+ * @swagger
+ * /api/clients:
+ *   get:
+ *     summary: Get all clients
+ *     description: Returns all clients belonging to the authenticated user.
+ *     tags: [Clients]
+ *     responses:
+ *       200:
+ *         description: List of clients
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 clients:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Client'
+ *       401:
+ *         description: Authentication required
+ */
 router.get('/', (req, res) => {
   const db = getDatabase();
   
@@ -26,7 +47,37 @@ router.get('/', (req, res) => {
   );
 });
 
-// Get specific client
+/**
+ * @swagger
+ * /api/clients/{id}:
+ *   get:
+ *     summary: Get a specific client
+ *     description: Returns a single client by ID.
+ *     tags: [Clients]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Client ID
+ *     responses:
+ *       200:
+ *         description: Client details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 client:
+ *                   $ref: '#/components/schemas/Client'
+ *       400:
+ *         description: Invalid client ID
+ *       401:
+ *         description: Authentication required
+ *       404:
+ *         description: Client not found
+ */
 router.get('/:id', (req, res) => {
   const clientId = parseInt(req.params.id);
   
@@ -54,7 +105,37 @@ router.get('/:id', (req, res) => {
   );
 });
 
-// Create new client
+/**
+ * @swagger
+ * /api/clients:
+ *   post:
+ *     summary: Create a new client
+ *     description: Creates a new client for the authenticated user.
+ *     tags: [Clients]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CreateClientRequest'
+ *     responses:
+ *       201:
+ *         description: Client created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Client created successfully
+ *                 client:
+ *                   $ref: '#/components/schemas/Client'
+ *       401:
+ *         description: Authentication required
+ *       422:
+ *         description: Validation error
+ */
 router.post('/', (req, res, next) => {
   try {
     const { error, value } = clientSchema.validate(req.body);
@@ -97,7 +178,48 @@ router.post('/', (req, res, next) => {
   }
 });
 
-// Update client
+/**
+ * @swagger
+ * /api/clients/{id}:
+ *   put:
+ *     summary: Update a client
+ *     description: Updates an existing client. At least one field must be provided.
+ *     tags: [Clients]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Client ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UpdateClientRequest'
+ *     responses:
+ *       200:
+ *         description: Client updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Client updated successfully
+ *                 client:
+ *                   $ref: '#/components/schemas/Client'
+ *       400:
+ *         description: Invalid client ID
+ *       401:
+ *         description: Authentication required
+ *       404:
+ *         description: Client not found
+ *       422:
+ *         description: Validation error
+ */
 router.put('/:id', (req, res, next) => {
   try {
     const clientId = parseInt(req.params.id);
@@ -186,7 +308,30 @@ router.put('/:id', (req, res, next) => {
   }
 });
 
-// Delete all clients for authenticated user
+/**
+ * @swagger
+ * /api/clients:
+ *   delete:
+ *     summary: Delete all clients
+ *     description: Deletes all clients belonging to the authenticated user. Work entries are also deleted via cascade.
+ *     tags: [Clients]
+ *     responses:
+ *       200:
+ *         description: All clients deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: All clients deleted successfully
+ *                 deletedCount:
+ *                   type: integer
+ *                   example: 3
+ *       401:
+ *         description: Authentication required
+ */
 router.delete('/', (req, res) => {
   const db = getDatabase();
   
@@ -207,7 +352,38 @@ router.delete('/', (req, res) => {
   );
 });
 
-// Delete client
+/**
+ * @swagger
+ * /api/clients/{id}:
+ *   delete:
+ *     summary: Delete a client
+ *     description: Deletes a specific client. Associated work entries are deleted via cascade.
+ *     tags: [Clients]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Client ID
+ *     responses:
+ *       200:
+ *         description: Client deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Client deleted successfully
+ *       400:
+ *         description: Invalid client ID
+ *       401:
+ *         description: Authentication required
+ *       404:
+ *         description: Client not found
+ */
 router.delete('/:id', (req, res) => {
   const clientId = parseInt(req.params.id);
   
