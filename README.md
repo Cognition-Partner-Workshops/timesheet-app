@@ -288,6 +288,26 @@ See `backend/DEPLOYMENT.md` for detailed production deployment instructions.
 - Mobile app
 - Integration with calendar systems
 
+## Docker Setup
+
+A Dockerfile is included in the `docker/` directory for containerized deployment.
+
+```bash
+# Build the Docker image
+docker build -t timesheet-app -f docker/Dockerfile .
+
+# Run the container
+docker run -p 3001:3001 -e JWT_SECRET=your-secret -e FRONTEND_URL=http://localhost:5173 timesheet-app
+```
+
+## Contributing
+
+1. Create a feature branch from `main`
+2. Make your changes and ensure all tests pass (`cd backend && npm test`)
+3. Run the frontend linter (`cd frontend && npm run lint`)
+4. Build the frontend to verify no build errors (`cd frontend && npm run build`)
+5. Submit a pull request with a clear description of your changes
+
 ## License
 
 MIT
