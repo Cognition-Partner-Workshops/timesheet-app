@@ -65,8 +65,7 @@ describe('Error Handler Middleware', () => {
 
       expect(res.status).toHaveBeenCalledWith(500);
       expect(res.json).toHaveBeenCalledWith({
-        error: 'Database error',
-        message: 'An error occurred while processing your request'
+        error: 'An error occurred while processing your request'
       });
     });
 
@@ -80,8 +79,7 @@ describe('Error Handler Middleware', () => {
 
       expect(res.status).toHaveBeenCalledWith(500);
       expect(res.json).toHaveBeenCalledWith({
-        error: 'Database error',
-        message: 'An error occurred while processing your request'
+        error: 'An error occurred while processing your request'
       });
     });
   });
@@ -101,7 +99,7 @@ describe('Error Handler Middleware', () => {
       });
     });
 
-    test('should default to 500 status if not specified', () => {
+    test('should default to 500 status and hide internal message', () => {
       const genericError = {
         message: 'Something went wrong'
       };
@@ -110,7 +108,7 @@ describe('Error Handler Middleware', () => {
 
       expect(res.status).toHaveBeenCalledWith(500);
       expect(res.json).toHaveBeenCalledWith({
-        error: 'Something went wrong'
+        error: 'Internal server error'
       });
     });
 
@@ -127,12 +125,12 @@ describe('Error Handler Middleware', () => {
   });
 
   describe('Console Logging', () => {
-    test('should log error to console', () => {
+    test('should log error message to console', () => {
       const error = new Error('Test error');
       
       errorHandler(error, req, res, next);
 
-      expect(console.error).toHaveBeenCalledWith('Error:', error);
+      expect(console.error).toHaveBeenCalledWith('Error:', 'Test error');
     });
   });
 });

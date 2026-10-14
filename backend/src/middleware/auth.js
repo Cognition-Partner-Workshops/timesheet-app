@@ -1,11 +1,18 @@
 const { getDatabase } = require('../database/init');
 
-// Simple email-based authentication middleware
+// Email-based authentication middleware with input sanitization
 function authenticateUser(req, res, next) {
-  const userEmail = req.headers['x-user-email'];
+  const rawEmail = req.headers['x-user-email'];
   
-  if (!userEmail) {
+  if (!rawEmail) {
     return res.status(401).json({ error: 'User email required in x-user-email header' });
+  }
+
+  // Sanitize: trim whitespace, lowercase, enforce max length
+  const userEmail = typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : '';
+
+  if (userEmail.length === 0 || userEmail.length > 254) {
+    return res.status(400).json({ error: 'Invalid email format' });
   }
 
   // Validate email format
