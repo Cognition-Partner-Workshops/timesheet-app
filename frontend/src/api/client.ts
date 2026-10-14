@@ -113,6 +113,14 @@ class ApiClient {
     return response.data;
   }
 
+  // Weekly summary endpoint
+  async getWeeklySummary(weekStart: string) {
+    const response = await this.client.get('/api/work-entries/weekly-summary', {
+      params: { weekStart },
+    });
+    return response.data;
+  }
+
   // Report endpoints
   async getClientReport(clientId: number) {
     const response = await this.client.get(`/api/reports/client/${clientId}`);
