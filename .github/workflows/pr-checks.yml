@@ -122,12 +122,12 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        working-directory: frontend
+        working-directory: backend
         run: npm ci
 
       - name: Run tests with coverage
         id: coverage
-        working-directory: frontend
+        working-directory: backend
         continue-on-error: true
         run: |
           set +e
@@ -154,21 +154,21 @@ jobs:
               echo "TABLE_EOF"
             } >> "$GITHUB_OUTPUT"
 
-            echo "::warning::Test coverage is below the 80% threshold."
+            exit 1
           else
             echo "coverage_failed=false" >> "$GITHUB_OUTPUT"
             echo "All coverage thresholds met."
           fi
 
       - name: Comment findings on PR
-        if: steps.coverage.outputs.coverage_failed == 'true'
+        if: steps.coverage.outcome == 'failure' && steps.coverage.outputs.coverage_failed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           COMMENT=$(cat <<'EOF'
-          ## Quality Gate Warning – Test Coverage
+          ## Quality Gate Failed – Test Coverage
 
-          Unit test coverage is below the recommended **80% threshold** for `frontend/src/components/`.
+          Unit test coverage is below the required **80% threshold** for `backend/src/`.
 
           ### Coverage Failures
 
@@ -184,12 +184,17 @@ jobs:
 
           ### Recommended Fix
 
-          Add unit tests in `frontend/src/components/__tests__/` to bring coverage above 80% for branches, functions, lines, and statements. Use vitest with `@testing-library/react`. Do not modify source components or lower the thresholds in `vite.config.ts`.
+          Add unit tests in `backend/src/__tests__/` to bring coverage above the threshold. Use jest with supertest. Do not lower the thresholds in `jest.config.js`.
           EOF
           )
 
           gh pr comment ${{ github.event.pull_request.number }} --body "$COMMENT"
 
+      - name: Fail if coverage below threshold
+        if: steps.coverage.outputs.coverage_failed == 'true'
+        run: |
+          echo "Failing job: test coverage is below the required threshold."
+          exit 1
 
   trigger-devin-cve-fix:
     name: Trigger Devin CVE Auto-Fix
