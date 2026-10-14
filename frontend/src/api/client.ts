@@ -86,6 +86,20 @@ class ApiClient {
     return response.data;
   }
 
+  // Generic resource helpers
+  private async list(resource: string) { return (await this.client.get(`/api/${resource}`)).data; }
+  private async show(resource: string, id: number) { return (await this.client.get(`/api/${resource}/${id}`)).data; }
+  private async create(resource: string, data: Record<string, unknown>) { return (await this.client.post(`/api/${resource}`, data)).data; }
+  private async update(resource: string, id: number, data: Record<string, unknown>) { return (await this.client.put(`/api/${resource}/${id}`, data)).data; }
+  private async remove(resource: string, id: number) { return (await this.client.delete(`/api/${resource}/${id}`)).data; }
+
+  // Project endpoints
+  async getProjects() { return this.list('projects'); }
+  async getProject(id: number) { return this.show('projects', id); }
+  async createProject(data: { name: string; description?: string; clientId?: number | null; startDate?: string | null; status?: string }) { return this.create('projects', data as Record<string, unknown>); }
+  async updateProject(id: number, data: { name?: string; description?: string; clientId?: number | null; startDate?: string | null; status?: string }) { return this.update('projects', id, data as Record<string, unknown>); }
+  async deleteProject(id: number) { return this.remove('projects', id); }
+
   // Work entry endpoints
   async getWorkEntries(clientId?: number) {
     const params = clientId ? { clientId } : {};
