@@ -1,0 +1,231 @@
+.movie-details {
+  min-height: 100vh;
+  position: relative;
+}
+
+.movie-details__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  color: #888;
+  font-size: 1.2rem;
+}
+
+.movie-details__backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60vh;
+  background-size: cover;
+  background-position: center;
+  z-index: -1;
+}
+
+.movie-details__backdrop-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(20,20,20,.4) 0%, #141414 100%);
+}
+
+.movie-details__content {
+  position: relative;
+  padding: 100px 4% 40px;
+}
+
+.movie-details__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.2);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-bottom: 24px;
+  font-size: .9rem;
+  transition: background .2s;
+}
+
+.movie-details__back:hover {
+  background: rgba(255,255,255,.2);
+}
+
+.movie-details__main {
+  display: flex;
+  gap: 40px;
+  margin-bottom: 40px;
+}
+
+.movie-details__poster-wrap {
+  flex-shrink: 0;
+}
+
+.movie-details__poster {
+  width: 300px;
+  border-radius: 8px;
+  box-shadow: 0 8px 40px rgba(0,0,0,.5);
+}
+
+.movie-details__info {
+  flex: 1;
+}
+
+.movie-details__title {
+  font-size: 2.5rem;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.movie-details__tagline {
+  color: #aaa;
+  font-style: italic;
+  margin-bottom: 16px;
+  font-size: 1.1rem;
+}
+
+.movie-details__meta {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  color: #ccc;
+  font-size: .95rem;
+}
+
+.movie-details__meta span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.movie-details__rating {
+  color: #ffc107;
+  font-weight: 600;
+}
+
+.movie-details__genres {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.movie-details__genre-tag {
+  padding: 6px 14px;
+  background: rgba(229, 9, 20, .2);
+  border: 1px solid #e50914;
+  border-radius: 20px;
+  color: #e50914;
+  font-size: .8rem;
+  font-weight: 600;
+}
+
+.movie-details__overview {
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: #ddd;
+  margin-bottom: 16px;
+}
+
+.movie-details__director {
+  color: #aaa;
+  margin-bottom: 20px;
+}
+
+.movie-details__trailer-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 28px;
+  background: #e50914;
+  color: #fff;
+  border-radius: 4px;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 1rem;
+  transition: background .2s;
+}
+
+.movie-details__trailer-btn:hover {
+  background: #f40612;
+}
+
+.movie-details__video {
+  margin: 40px 0;
+}
+
+.movie-details__video h2 {
+  margin-bottom: 16px;
+  font-size: 1.4rem;
+}
+
+.movie-details__video-wrapper {
+  position: relative;
+  padding-bottom: 56.25%;
+  height: 0;
+  max-width: 900px;
+}
+
+.movie-details__video-wrapper iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 8px;
+}
+
+.movie-details__cast {
+  margin: 40px 0;
+}
+
+.movie-details__cast h2 {
+  margin-bottom: 16px;
+  font-size: 1.4rem;
+}
+
+.movie-details__cast-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 16px;
+}
+
+.movie-details__cast-card {
+  text-align: center;
+}
+
+.movie-details__cast-card img {
+  width: 100%;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.movie-details__cast-placeholder {
+  width: 100%;
+  aspect-ratio: 2/3;
+  background: #333;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.movie-details__cast-name {
+  font-size: .85rem;
+  font-weight: 600;
+}
+
+.movie-details__cast-character {
+  font-size: .75rem;
+  color: #888;
+}
+
+@media (max-width: 768px) {
+  .movie-details__main { flex-direction: column; align-items: center; text-align: center; }
+  .movie-details__poster { width: 220px; }
+  .movie-details__title { font-size: 1.6rem; }
+  .movie-details__meta { justify-content: center; }
+  .movie-details__genres { justify-content: center; }
+}
