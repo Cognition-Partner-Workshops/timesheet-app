@@ -68,9 +68,9 @@ const DashboardPage: React.FC = () => {
       </Typography>
 
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        {statsCards.map((stat, index) => (
+        {statsCards.map((stat) => (
           // @ts-expect-error - MUI Grid item prop type issue
-          <Grid item xs={12} sm={6} md={4} key={index}>
+          <Grid item xs={12} sm={6} md={4} key={stat.title}>
             <Card
               sx={{
                 cursor: 'pointer',

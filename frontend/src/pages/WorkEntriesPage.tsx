@@ -142,7 +142,7 @@ const WorkEntriesPage: React.FC = () => {
       return;
     }
 
-    const hours = parseFloat(formData.hours);
+    const hours = Number.parseFloat(formData.hours);
     if (!hours || hours <= 0 || hours > 24) {
       setError('Hours must be between 0 and 24');
       return;
@@ -171,10 +171,12 @@ const WorkEntriesPage: React.FC = () => {
   };
 
   const handleDelete = (entry: WorkEntry) => {
-    if (window.confirm(`Are you sure you want to delete this ${entry.hours} hour entry for ${entry.client_name}?`)) {
+    if (globalThis.confirm(`Are you sure you want to delete this ${entry.hours} hour entry for ${entry.client_name}?`)) {
       deleteMutation.mutate(entry.id);
     }
   };
+
+  const submitButtonLabel = editingEntry ? 'Update' : 'Create';
 
   if (entriesLoading || clientsLoading) {
     return (
@@ -352,11 +354,10 @@ const WorkEntriesPage: React.FC = () => {
                 variant="contained"
                 disabled={createMutation.isPending || updateMutation.isPending}
               >
-                {createMutation.isPending || updateMutation.isPending ? (
-                  <CircularProgress size={24} />
-                ) : (
-                  editingEntry ? 'Update' : 'Create'
-                )}
+                {createMutation.isPending || updateMutation.isPending
+                  ? <CircularProgress size={24} />
+                  : submitButtonLabel
+                }
               </Button>
             </DialogActions>
           </form>
