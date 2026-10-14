@@ -1,0 +1,14 @@
+ANALYZE users;
+ANALYZE projects;
+ANALYZE project_stakeholders;
+ANALYZE employees;
+ANALYZE employee_skills;
+ANALYZE employee_evidence;
+ANALYZE employee_capacity;
+ANALYZE project_roles;
+ANALYZE allocations;
+ANALYZE staffing_proposals;
+ANALYZE proposal_candidates;
+ANALYZE proposal_reviews;
+ANALYZE audit_events;
+ANALYZE source_records;
