@@ -8,12 +8,14 @@ import {
   Box,
   Alert,
   CircularProgress,
+  Link as MuiLink,
 } from '@mui/material';
 import { useAuth } from '../hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
@@ -25,7 +27,7 @@ const LoginPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await login(email);
+      await login(email, password);
       navigate('/dashboard');
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } } };
@@ -51,11 +53,8 @@ const LoginPage: React.FC = () => {
           Time Tracker
         </Typography>
         <Typography variant="body2" align="center" color="text.secondary" sx={{ mb: 2 }}>
-          Enter your email to log in
+          Enter your credentials to log in
         </Typography>
-        <Alert severity="info" sx={{ mb: 2 }}>
-          This app intentionally does not have a password field.
-        </Alert>
         
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -77,15 +76,33 @@ const LoginPage: React.FC = () => {
             onChange={(e) => setEmail(e.target.value)}
             disabled={isLoading}
           />
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            id="password"
+            label="Password"
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={isLoading}
+          />
           <Button
             type="submit"
             fullWidth
             variant="contained"
             sx={{ mt: 2, mb: 1 }}
-            disabled={isLoading || !email}
+            disabled={isLoading || !email || !password}
           >
             {isLoading ? <CircularProgress size={24} /> : 'Log In'}
           </Button>
+          <Box sx={{ textAlign: 'center', mt: 1 }}>
+            <MuiLink component={Link} to="/register" variant="body2">
+              Don&apos;t have an account? Register
+            </MuiLink>
+          </Box>
         </Box>
       </Paper>
     </Box>
