@@ -35,6 +35,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import apiClient from '../api/client';
 import { type WorkEntry } from '../types/api';
+import { isValidHoursPrecision, isWithinLength } from '../utils/validation';
 
 const WorkEntriesPage: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -148,8 +149,18 @@ const WorkEntriesPage: React.FC = () => {
       return;
     }
 
-    if (!formData.date) {
-      setError('Please select a date');
+    if (formData.hours && !isValidHoursPrecision(formData.hours)) {
+      setError('Hours can have at most 2 decimal places');
+      return;
+    }
+
+    if (!isWithinLength(formData.description, 1000)) {
+      setError('Description must be 1000 characters or less');
+      return;
+    }
+
+    if (!formData.date || isNaN(formData.date.getTime())) {
+      setError('Please select a valid date');
       return;
     }
 
@@ -338,6 +349,7 @@ const WorkEntriesPage: React.FC = () => {
                 fullWidth
                 multiline
                 rows={3}
+                inputProps={{ maxLength: 1000 }}
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 disabled={createMutation.isPending || updateMutation.isPending}

@@ -10,6 +10,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { useAuth } from '../hooks/useAuth';
+import { isValidEmail } from '../utils/validation';
 import { useNavigate } from 'react-router-dom';
 
 const LoginPage: React.FC = () => {
@@ -22,6 +23,12 @@ const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!isValidEmail(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -71,6 +78,7 @@ const LoginPage: React.FC = () => {
             id="email"
             label="Email Address"
             name="email"
+            type="email"
             autoComplete="email"
             autoFocus
             value={email}
