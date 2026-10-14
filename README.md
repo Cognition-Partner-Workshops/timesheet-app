@@ -11,14 +11,14 @@ A full-stack web application for tracking and reporting employee hourly work acr
 - For production use, modify `backend/src/database/init.js` to use file-based SQLite instead of `:memory:`
 
 ### Authentication
-- Email-only authentication with JWT tokens
-- No password required - assumes trusted internal network
+- Email-only authentication (no password required)
+- Assumes trusted internal network
 - Anyone with a valid email can create an account and log in
-- Consider integrating with company SSO for production use
+- Consider integrating with company SSO or adding JWT-based auth for production use
 
 ## Features
 
-- ✅ User authentication (email-based with JWT tokens)
+- ✅ User authentication (email-based)
 - ✅ Add, edit, and delete clients
 - ✅ Add, edit, and delete hourly work entries for each client
 - ✅ View hourly reports for each client
@@ -37,7 +37,7 @@ A full-stack web application for tracking and reporting employee hourly work acr
 ### Backend
 - **Node.js** with Express
 - **SQLite** in-memory database
-- **JWT** for authentication
+- **Pino** for structured logging
 - **Joi** for validation
 - **PDFKit** for PDF generation
 - **csv-writer** for CSV export
@@ -51,7 +51,7 @@ A full-stack web application for tracking and reporting employee hourly work acr
 │   │   ├── database/
 │   │   │   └── init.js           # Database initialization
 │   │   ├── middleware/
-│   │   │   ├── auth.js           # JWT authentication
+│   │   │   ├── auth.js           # Email-based authentication
 │   │   │   └── errorHandler.js  # Error handling
 │   │   ├── routes/
 │   │   │   ├── auth.js           # Authentication endpoints
@@ -67,7 +67,7 @@ A full-stack web application for tracking and reporting employee hourly work acr
 └── frontend/
     ├── src/
     │   ├── api/
-    │   │   └── client.ts         # API client with JWT
+    │   │   └── client.ts         # API client
     │   ├── components/
     │   │   └── Layout.tsx        # Main layout
     │   ├── contexts/
@@ -161,7 +161,7 @@ Frontend will be running at `http://localhost:5173`
 ## API Endpoints
 
 ### Authentication
-- `POST /api/auth/login` - Login with email, returns JWT token
+- `POST /api/auth/login` - Login with email
 - `GET /api/auth/me` - Get current user info (requires auth)
 
 ### Clients
@@ -183,16 +183,21 @@ Frontend will be running at `http://localhost:5173`
 - `GET /api/reports/export/csv/:clientId` - Export report as CSV
 - `GET /api/reports/export/pdf/:clientId` - Export report as PDF
 
-All authenticated endpoints require `Authorization: Bearer <token>` header.
+All authenticated endpoints require the `x-user-email` header.
 
 ## Security Features
 
-- JWT-based authentication with 24-hour token expiration
+- Email-based authentication with user isolation
 - Rate limiting on authentication endpoints (5 attempts per 15 minutes)
+- Global rate limiting (100 requests per 15 minutes)
+- Content Security Policy (CSP) via helmet
+- HSTS headers (1-year max-age, includeSubDomains)
 - CORS protection
 - Helmet security headers
 - Input validation with Joi schemas
 - SQL injection protection with parameterized queries
+- Structured security event logging with pino
+- Error message sanitization in production
 
 ## Development
 
@@ -260,7 +265,7 @@ npm run preview  # Preview production build
 See `backend/DEPLOYMENT.md` for detailed production deployment instructions.
 
 ### Quick Production Checklist
-- [ ] Set strong `JWT_SECRET` in environment variables
+- [ ] Implement JWT-based authentication with strong `JWT_SECRET`
 - [ ] Configure proper `FRONTEND_URL` for CORS
 - [ ] Consider switching to file-based SQLite for data persistence
 - [ ] Set up HTTPS/SSL certificates
@@ -272,8 +277,8 @@ See `backend/DEPLOYMENT.md` for detailed production deployment instructions.
 ## Known Limitations
 
 1. **In-memory database** - All data is lost on server restart
-2. **Email-only auth** - No password protection, assumes trusted network
-3. **No user roles** - All users have equal access to all data
+2. **Email-only auth** - No password protection, assumes trusted network (see PR1 for JWT upgrade)
+3. **No user roles** - All users have equal access to their own data
 4. **Single-server architecture** - Not designed for horizontal scaling
 5. **No real-time updates** - Changes require page refresh
 

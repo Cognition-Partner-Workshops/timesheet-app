@@ -2,6 +2,7 @@ const express = require('express');
 const { getDatabase } = require('../database/init');
 const { emailSchema } = require('../validation/schemas');
 const { authenticateUser } = require('../middleware/auth');
+const logger = require('../logger');
 
 const router = express.Router();
 
@@ -24,7 +25,7 @@ router.post('/login', async (req, res, next) => {
       }
 
       if (row) {
-        // User exists
+        logger.info({ email: row.email, ip: req.ip, event: 'login_success' }, 'User logged in successfully');
         return res.json({
           message: 'Login successful',
           user: {
@@ -40,6 +41,7 @@ router.post('/login', async (req, res, next) => {
             return res.status(500).json({ error: 'Failed to create user' });
           }
 
+          logger.info({ email, ip: req.ip, event: 'user_registered' }, 'New user registered');
           res.status(201).json({
             message: 'User created and logged in successfully',
             user: {
