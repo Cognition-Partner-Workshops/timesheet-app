@@ -44,6 +44,29 @@ router.get('/', (req, res) => {
   });
 });
 
+// Get the 10 most recent work entries
+router.get('/recent', (req, res) => {
+  const db = getDatabase();
+
+  const query = `
+    SELECT we.id, we.client_id, we.hours, we.description, we.date,
+           we.created_at, we.updated_at, c.name as client_name
+    FROM work_entries we
+    JOIN clients c ON we.client_id = c.id
+    ORDER BY we.date DESC, we.created_at DESC
+    LIMIT 10
+  `;
+
+  db.all(query, [], (err, rows) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
+    res.json({ workEntries: rows });
+  });
+});
+
 // Get specific work entry
 router.get('/:id', (req, res) => {
   const workEntryId = parseInt(req.params.id);
