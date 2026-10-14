@@ -18,6 +18,8 @@ function getDatabase() {
       }
       console.log('Connected to SQLite in-memory database');
     });
+    // Enable foreign key enforcement (SQLite disables this by default)
+    db.run('PRAGMA foreign_keys = ON');
   }
   return db;
 }
