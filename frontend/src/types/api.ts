@@ -13,6 +13,19 @@ export interface Client {
   updated_at: string;
 }
 
+export interface Project {
+  id: number;
+  name: string;
+  description: string | null;
+  client_id: number | null;
+  client_name?: string | null;
+  start_date: string | null;
+  status: 'active' | 'completed' | 'on-hold';
+  user_email: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface WorkEntry {
   id: number;
   client_id: number;
