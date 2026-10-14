@@ -157,7 +157,7 @@ const WorkEntriesPage: React.FC = () => {
       clientId: formData.clientId,
       hours,
       description: formData.description || undefined,
-      date: formData.date.toISOString().split('T')[0],
+      date: `${formData.date.getFullYear()}-${String(formData.date.getMonth() + 1).padStart(2, '0')}-${String(formData.date.getDate()).padStart(2, '0')}`,
     };
 
     if (editingEntry) {
@@ -294,6 +294,7 @@ const WorkEntriesPage: React.FC = () => {
               <FormControl fullWidth margin="dense" required>
                 <InputLabel>Client</InputLabel>
                 <Select
+                  label="Client"
                   value={formData.clientId}
                   onChange={(e) => setFormData({ ...formData, clientId: Number(e.target.value) })}
                   disabled={createMutation.isPending || updateMutation.isPending}
