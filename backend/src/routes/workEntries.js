@@ -5,6 +5,16 @@ const { workEntrySchema, updateWorkEntrySchema } = require('../validation/schema
 
 const router = express.Router();
 
+// Normalize a validated date to a YYYY-MM-DD string.
+// Joi coerces the incoming ISO date into a JS Date, which the sqlite3 driver
+// would otherwise persist as a numeric epoch-ms timestamp.
+function formatDate(date) {
+  if (date instanceof Date) {
+    return date.toISOString().split('T')[0];
+  }
+  return date;
+}
+
 // All routes require authentication
 router.use(authenticateUser);
 
@@ -104,7 +114,7 @@ router.post('/', (req, res, next) => {
         // Create work entry
         db.run(
           'INSERT INTO work_entries (client_id, user_email, hours, description, date) VALUES (?, ?, ?, ?, ?)',
-          [clientId, req.userEmail, hours, description || null, date],
+          [clientId, req.userEmail, hours, description || null, formatDate(date)],
           function(err) {
             if (err) {
               console.error('Database error:', err);
@@ -214,7 +224,7 @@ router.put('/:id', (req, res, next) => {
 
           if (value.date !== undefined) {
             updates.push('date = ?');
-            values.push(value.date);
+            values.push(formatDate(value.date));
           }
 
           updates.push('updated_at = CURRENT_TIMESTAMP');
