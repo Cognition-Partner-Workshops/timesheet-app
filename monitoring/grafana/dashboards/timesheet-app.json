@@ -1,0 +1,313 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Request Rate (req/s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total[5m]))",
+          "legendFormat": "Total",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(http_requests_total[5m])) by (method)",
+          "legendFormat": "{{method}}",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Error Rate (errors/s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "red" },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "spanNulls": false
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_errors_total[5m]))",
+          "legendFormat": "Total Errors",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(http_errors_total{status_code=~\"5..\"}[5m]))",
+          "legendFormat": "5xx",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(http_errors_total{status_code=~\"4..\"}[5m]))",
+          "legendFormat": "4xx",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "title": "Request Latency (p50 / p90 / p99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "spanNulls": false
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.90, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p90",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "title": "Latency by Route (p95)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 5,
+            "spanNulls": false
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, route))",
+          "legendFormat": "{{route}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Requests by Route",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "spanNulls": false,
+            "stacking": { "mode": "normal" }
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total[5m])) by (route)",
+          "legendFormat": "{{route}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Error Rate %",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "100 * sum(rate(http_errors_total[5m])) / sum(rate(http_requests_total[5m]))",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Avg Latency",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_request_duration_seconds_sum[5m])) / sum(rate(http_request_duration_seconds_count[5m]))",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Request Rate",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total[5m]))",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "HTTP Status Code Distribution",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "targets": [
+        {
+          "expr": "sum(increase(http_requests_total[1h])) by (status_code)",
+          "legendFormat": "{{status_code}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Process Memory (RSS)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "purple" },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "spanNulls": false
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "process_resident_memory_bytes{job=\"timesheet-app\"}",
+          "legendFormat": "RSS",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Node.js Event Loop Lag",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "orange" },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "nodejs_eventloop_lag_seconds{job=\"timesheet-app\"}",
+          "legendFormat": "Event Loop Lag",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["timesheet", "nodejs", "observability"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Timesheet App - Production Observability",
+  "uid": "timesheet-app-observability",
+  "version": 1
+}
