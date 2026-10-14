@@ -144,6 +144,80 @@ describe('Database Initialization', () => {
     });
   });
 
+  describe('closeDatabase - Edge Cases', () => {
+    test('should resolve immediately when already closed', async () => {
+      jest.resetModules();
+
+      jest.doMock('sqlite3', () => {
+        const mockDb = {
+          serialize: jest.fn((cb) => cb()),
+          run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
+          close: jest.fn((cb) => cb(null))
+        };
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, cb) => { cb(null); return mockDb; })
+          }))
+        };
+      });
+
+      const { getDatabase: gdb, closeDatabase: cdb } = require('../../database/init');
+      gdb(); // create connection
+      await cdb(); // first close
+      // Second close should resolve immediately (isClosed = true)
+      await expect(cdb()).resolves.toBeUndefined();
+    });
+
+    test('should resolve when no database connection exists', async () => {
+      jest.resetModules();
+
+      jest.doMock('sqlite3', () => {
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, cb) => { cb(null); return {}; })
+          }))
+        };
+      });
+
+      const { closeDatabase: cdb } = require('../../database/init');
+      // closeDatabase without ever calling getDatabase (db is null)
+      await expect(cdb()).resolves.toBeUndefined();
+    });
+
+    test('should wait when close is already in progress', async () => {
+      jest.resetModules();
+
+      let closeCallback;
+      jest.doMock('sqlite3', () => {
+        const mockDb = {
+          serialize: jest.fn((cb) => cb()),
+          run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
+          close: jest.fn((cb) => { closeCallback = cb; }) // Don't call callback immediately
+        };
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, cb) => { cb(null); return mockDb; })
+          }))
+        };
+      });
+
+      const { getDatabase: gdb, closeDatabase: cdb } = require('../../database/init');
+      gdb(); // create connection
+
+      // Start first close (will not complete because callback is held)
+      const firstClose = cdb();
+
+      // Start second close while first is in progress (isClosing = true)
+      const secondClose = cdb();
+
+      // Now complete the first close
+      closeCallback(null);
+
+      await expect(firstClose).resolves.toBeUndefined();
+      await expect(secondClose).resolves.toBeUndefined();
+    });
+  });
+
   describe('Database Schema', () => {
     test('users table should have correct structure', async () => {
       const db = getDatabase();
