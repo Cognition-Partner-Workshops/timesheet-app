@@ -18,6 +18,8 @@ function getDatabase() {
       }
       console.log('Connected to SQLite in-memory database');
     });
+    // Enable foreign key enforcement on every new connection
+    db.run('PRAGMA foreign_keys = ON');
   }
   return db;
 }
@@ -27,6 +29,9 @@ async function initializeDatabase() {
   
   return new Promise((resolve, reject) => {
     database.serialize(() => {
+      // Enable foreign key enforcement (required for CASCADE to work in SQLite)
+      database.run('PRAGMA foreign_keys = ON');
+
       // Create users table
       database.run(`
         CREATE TABLE IF NOT EXISTS users (
