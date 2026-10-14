@@ -20,6 +20,7 @@ import {
   Dashboard as DashboardIcon,
   Business as BusinessIcon,
   Assignment as AssignmentIcon,
+  AccountTree as AccountTreeIcon,
   Assessment as AssessmentIcon,
   Logout as LogoutIcon,
 } from '@mui/icons-material';
@@ -46,6 +47,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
     { text: 'Clients', icon: <BusinessIcon />, path: '/clients' },
     { text: 'Work Entries', icon: <AssignmentIcon />, path: '/work-entries' },
+    { text: 'Projects', icon: <AccountTreeIcon />, path: '/projects' },
     { text: 'Reports', icon: <AssessmentIcon />, path: '/reports' },
   ];
 
