@@ -131,9 +131,9 @@ const ClientsPage: React.FC = () => {
         id: editingClient.id,
         data: {
           name: formData.name,
-          description: formData.description || undefined,
-          department: formData.department || undefined,
-          email: formData.email || undefined,
+          description: formData.description,
+          department: formData.department,
+          email: formData.email,
         },
       });
     } else {

@@ -156,7 +156,7 @@ const WorkEntriesPage: React.FC = () => {
     const entryData = {
       clientId: formData.clientId,
       hours,
-      description: formData.description || undefined,
+      description: formData.description,
       date: formData.date.toISOString().split('T')[0],
     };
 
