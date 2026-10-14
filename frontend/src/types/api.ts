@@ -77,3 +77,18 @@ export interface ApiResponse<T> {
   error?: string;
   message?: string;
 }
+
+/** Shape of Axios error responses from the backend. */
+export interface ApiError {
+  response?: {
+    data?: {
+      error?: string;
+    };
+  };
+}
+
+/** Extracts a user-facing message from an Axios error, falling back to the provided default. */
+export function getApiErrorMessage(err: unknown, fallback: string): string {
+  const apiErr = err as ApiError;
+  return apiErr.response?.data?.error || fallback;
+}
