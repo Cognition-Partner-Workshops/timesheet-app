@@ -4,6 +4,17 @@ import axios, { type AxiosInstance, type AxiosResponse } from 'axios';
 // Vite proxy will forward /api requests to the backend
 const API_BASE_URL = '';
 
+// In-memory token storage (avoids localStorage exposure to XSS)
+let authToken: string | null = null;
+
+export function setAuthToken(token: string | null) {
+  authToken = token;
+}
+
+export function getAuthToken(): string | null {
+  return authToken;
+}
+
 class ApiClient {
   private client: AxiosInstance;
 
@@ -16,12 +27,12 @@ class ApiClient {
       },
     });
 
-    // Request interceptor to add email header
+    // Request interceptor to add Authorization header
     this.client.interceptors.request.use(
       (config) => {
-        const userEmail = localStorage.getItem('userEmail');
-        if (userEmail) {
-          config.headers['x-user-email'] = userEmail;
+        const token = getAuthToken();
+        if (token) {
+          config.headers['Authorization'] = `Bearer ${token}`;
         }
         return config;
       },
@@ -35,8 +46,8 @@ class ApiClient {
       (response: AxiosResponse) => response,
       (error) => {
         if (error.response?.status === 401) {
-          // Clear stored email on auth error
-          localStorage.removeItem('userEmail');
+          setAuthToken(null);
+          sessionStorage.removeItem('authToken');
           window.location.href = '/login';
         }
         return Promise.reject(error);
@@ -45,8 +56,13 @@ class ApiClient {
   }
 
   // Auth endpoints
-  async login(email: string) {
-    const response = await this.client.post('/api/auth/login', { email });
+  async login(email: string, password: string) {
+    const response = await this.client.post('/api/auth/login', { email, password });
+    return response.data;
+  }
+
+  async register(email: string, password: string) {
+    const response = await this.client.post('/api/auth/register', { email, password });
     return response.data;
   }
 

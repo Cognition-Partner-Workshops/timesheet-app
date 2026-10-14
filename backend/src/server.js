@@ -29,6 +29,13 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
+// Stricter rate limiter for auth login endpoint
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: 'Too many login attempts, please try again later' }
+});
+
 // Logging
 app.use(morgan('combined'));
 
@@ -41,8 +48,11 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+// JWT is sent via Authorization header, so CSRF is inherently mitigated
+// (custom headers cannot be set by cross-origin forms).
+
 // Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/work-entries', workEntryRoutes);
 app.use('/api/reports', reportRoutes);
