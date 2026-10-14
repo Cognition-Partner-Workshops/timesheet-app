@@ -18,7 +18,7 @@ export interface WorkEntry {
   client_id: number;
   hours: number;
   description: string | null;
-  date: string;
+  date: string | number;
   created_at: string;
   updated_at: string;
   client_name?: string;
