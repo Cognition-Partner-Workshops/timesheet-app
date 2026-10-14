@@ -84,7 +84,8 @@ router.post('/', (req, res, next) => {
       return next(error);
     }
 
-    const { clientId, hours, description, date } = value;
+    const { clientId, hours, description } = value;
+    const date = value.date instanceof Date ? value.date.toISOString().split('T')[0] : value.date;
     const db = getDatabase();
 
     // Verify client exists and belongs to user
@@ -214,7 +215,8 @@ router.put('/:id', (req, res, next) => {
 
           if (value.date !== undefined) {
             updates.push('date = ?');
-            values.push(value.date);
+            const dateStr = value.date instanceof Date ? value.date.toISOString().split('T')[0] : value.date;
+            values.push(dateStr);
           }
 
           updates.push('updated_at = CURRENT_TIMESTAMP');
