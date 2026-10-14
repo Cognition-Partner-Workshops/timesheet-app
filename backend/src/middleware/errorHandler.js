@@ -1,7 +1,9 @@
 function errorHandler(err, req, res, next) {
   console.error('Error:', err);
 
-  // Joi validation errors
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  // Joi validation errors - safe to expose validation details
   if (err.isJoi) {
     return res.status(400).json({
       error: 'Validation error',
@@ -9,7 +11,7 @@ function errorHandler(err, req, res, next) {
     });
   }
 
-  // SQLite errors
+  // SQLite errors - never expose database details
   if (err.code && err.code.startsWith('SQLITE_')) {
     return res.status(500).json({
       error: 'Database error',
@@ -17,10 +19,15 @@ function errorHandler(err, req, res, next) {
     });
   }
 
-  // Default error
-  res.status(err.status || 500).json({
-    error: err.message || 'Internal server error'
-  });
+  // Default error - hide internal details in production
+  const statusCode = err.status || 500;
+  const responseBody = {
+    error: isProduction && statusCode >= 500
+      ? 'Internal server error'
+      : err.message || 'Internal server error'
+  };
+
+  res.status(statusCode).json(responseBody);
 }
 
 module.exports = {

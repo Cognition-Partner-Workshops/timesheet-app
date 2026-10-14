@@ -1,7 +1,14 @@
-const { authenticateUser } = require('../../middleware/auth');
+const jwt = require('jsonwebtoken');
+const { authenticateUser, generateToken } = require('../../middleware/auth');
 const { getDatabase } = require('../../database/init');
 
 jest.mock('../../database/init');
+
+const TEST_SECRET = process.env.JWT_SECRET || 'development-only-secret';
+
+function createValidToken(email) {
+  return jwt.sign({ email }, TEST_SECRET, { expiresIn: '24h' });
+}
 
 describe('Authentication Middleware', () => {
   let req, res, next, mockDb;
@@ -28,31 +35,57 @@ describe('Authentication Middleware', () => {
     jest.clearAllMocks();
   });
 
-  describe('Email Header Validation', () => {
-    test('should return 401 if x-user-email header is missing', () => {
+  describe('Token Validation', () => {
+    test('should return 401 if Authorization header is missing', () => {
       authenticateUser(req, res, next);
 
       expect(res.status).toHaveBeenCalledWith(401);
       expect(res.json).toHaveBeenCalledWith({
-        error: 'User email required in x-user-email header'
+        error: 'Authorization token required'
       });
       expect(next).not.toHaveBeenCalled();
     });
 
-    test('should return 400 if email format is invalid', () => {
-      req.headers['x-user-email'] = 'invalid-email';
+    test('should return 401 if Authorization header does not start with Bearer', () => {
+      req.headers['authorization'] = 'Basic some-token';
 
       authenticateUser(req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.status).toHaveBeenCalledWith(401);
       expect(res.json).toHaveBeenCalledWith({
-        error: 'Invalid email format'
+        error: 'Authorization token required'
       });
       expect(next).not.toHaveBeenCalled();
     });
 
-    test('should accept valid email format', () => {
-      req.headers['x-user-email'] = 'test@example.com';
+    test('should return 401 for invalid JWT token', () => {
+      req.headers['authorization'] = 'Bearer invalid-token';
+
+      authenticateUser(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Invalid token'
+      });
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    test('should return 401 for expired token', () => {
+      const expiredToken = jwt.sign({ email: 'test@example.com' }, TEST_SECRET, { expiresIn: '-1s' });
+      req.headers['authorization'] = `Bearer ${expiredToken}`;
+
+      authenticateUser(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Token expired'
+      });
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    test('should accept valid JWT token and verify user in database', () => {
+      const token = createValidToken('test@example.com');
+      req.headers['authorization'] = `Bearer ${token}`;
       
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(null, { email: 'test@example.com' });
@@ -66,7 +99,8 @@ describe('Authentication Middleware', () => {
 
   describe('Existing User Authentication', () => {
     test('should authenticate existing user and call next()', (done) => {
-      req.headers['x-user-email'] = 'existing@example.com';
+      const token = createValidToken('existing@example.com');
+      req.headers['authorization'] = `Bearer ${token}`;
       
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(null, { email: 'existing@example.com' });
@@ -82,8 +116,29 @@ describe('Authentication Middleware', () => {
       });
     });
 
+    test('should return 401 if user not found in database', (done) => {
+      const token = createValidToken('nonexistent@example.com');
+      req.headers['authorization'] = `Bearer ${token}`;
+      
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, null);
+      });
+
+      authenticateUser(req, res, next);
+
+      setImmediate(() => {
+        expect(res.status).toHaveBeenCalledWith(401);
+        expect(res.json).toHaveBeenCalledWith({
+          error: 'User not found'
+        });
+        expect(next).not.toHaveBeenCalled();
+        done();
+      });
+    });
+
     test('should handle database error when checking user', (done) => {
-      req.headers['x-user-email'] = 'test@example.com';
+      const token = createValidToken('test@example.com');
+      req.headers['authorization'] = `Bearer ${token}`;
       
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(new Error('Database error'), null);
@@ -102,77 +157,19 @@ describe('Authentication Middleware', () => {
     });
   });
 
-  describe('New User Creation', () => {
-    test('should create new user if not exists and call next()', (done) => {
-      req.headers['x-user-email'] = 'newuser@example.com';
-      
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, null); // User doesn't exist
-      });
-      
-      mockDb.run.mockImplementation((query, params, callback) => {
-        callback(null);
-      });
-
-      authenticateUser(req, res, next);
-
-      setImmediate(() => {
-        expect(mockDb.run).toHaveBeenCalledWith(
-          'INSERT INTO users (email) VALUES (?)',
-          ['newuser@example.com'],
-          expect.any(Function)
-        );
-        expect(req.userEmail).toBe('newuser@example.com');
-        expect(next).toHaveBeenCalled();
-        done();
-      });
-    });
-
-    test('should handle error when creating new user', (done) => {
-      req.headers['x-user-email'] = 'newuser@example.com';
-      
-      mockDb.get.mockImplementation((query, params, callback) => {
-        callback(null, null);
-      });
-      
-      mockDb.run.mockImplementation((query, params, callback) => {
-        callback(new Error('Insert failed'));
-      });
-
-      authenticateUser(req, res, next);
-
-      setImmediate(() => {
-        expect(res.status).toHaveBeenCalledWith(500);
-        expect(res.json).toHaveBeenCalledWith({
-          error: 'Failed to create user'
-        });
-        expect(next).not.toHaveBeenCalled();
-        done();
-      });
+  describe('Token Generation', () => {
+    test('should generate a valid JWT token', () => {
+      const token = generateToken('test@example.com');
+      const decoded = jwt.verify(token, TEST_SECRET);
+      expect(decoded.email).toBe('test@example.com');
+      expect(decoded.exp).toBeDefined();
     });
   });
 
-  describe('Email Format Edge Cases', () => {
-    test('should reject email without @', () => {
-      req.headers['x-user-email'] = 'notanemail';
-      authenticateUser(req, res, next);
-      expect(res.status).toHaveBeenCalledWith(400);
-    });
-
-    test('should reject email without domain', () => {
-      req.headers['x-user-email'] = 'test@';
-      authenticateUser(req, res, next);
-      expect(res.status).toHaveBeenCalledWith(400);
-    });
-
-    test('should reject email without TLD', () => {
-      req.headers['x-user-email'] = 'test@domain';
-      authenticateUser(req, res, next);
-      expect(res.status).toHaveBeenCalledWith(400);
-    });
-
-    test('should accept email with subdomain', () => {
-      req.headers['x-user-email'] = 'test@mail.example.com';
+  describe('Email Format Edge Cases in Token', () => {
+    test('should accept email with subdomain via valid token', () => {
+      const token = createValidToken('test@mail.example.com');
+      req.headers['authorization'] = `Bearer ${token}`;
       
       mockDb.get.mockImplementation((query, params, callback) => {
         callback(null, { email: 'test@mail.example.com' });
