@@ -13,9 +13,9 @@ router.use(authenticateUser);
 
 // Get hourly report for specific client
 router.get('/client/:clientId', (req, res) => {
-  const clientId = parseInt(req.params.clientId);
+  const clientId = Number.parseInt(req.params.clientId);
   
-  if (isNaN(clientId)) {
+  if (Number.isNaN(clientId)) {
     return res.status(400).json({ error: 'Invalid client ID' });
   }
   
@@ -49,7 +49,7 @@ router.get('/client/:clientId', (req, res) => {
           }
           
           // Calculate total hours
-          const totalHours = workEntries.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
+          const totalHours = workEntries.reduce((sum, entry) => sum + Number.parseFloat(entry.hours), 0);
           
           res.json({
             client: client,
@@ -65,9 +65,9 @@ router.get('/client/:clientId', (req, res) => {
 
 // Export client report as CSV
 router.get('/export/csv/:clientId', (req, res) => {
-  const clientId = parseInt(req.params.clientId);
+  const clientId = Number.parseInt(req.params.clientId);
   
-  if (isNaN(clientId)) {
+  if (Number.isNaN(clientId)) {
     return res.status(400).json({ error: 'Invalid client ID' });
   }
   
@@ -148,9 +148,9 @@ router.get('/export/csv/:clientId', (req, res) => {
 
 // Export client report as PDF
 router.get('/export/pdf/:clientId', (req, res) => {
-  const clientId = parseInt(req.params.clientId);
+  const clientId = Number.parseInt(req.params.clientId);
   
-  if (isNaN(clientId)) {
+  if (Number.isNaN(clientId)) {
     return res.status(400).json({ error: 'Invalid client ID' });
   }
   
@@ -199,7 +199,7 @@ router.get('/export/pdf/:clientId', (req, res) => {
           doc.fontSize(20).text(`Time Report for ${client.name}`, { align: 'center' });
           doc.moveDown();
           
-          const totalHours = workEntries.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
+          const totalHours = workEntries.reduce((sum, entry) => sum + Number.parseFloat(entry.hours), 0);
           doc.fontSize(14).text(`Total Hours: ${totalHours.toFixed(2)}`);
           doc.text(`Total Entries: ${workEntries.length}`);
           doc.text(`Generated: ${new Date().toLocaleString()}`);
