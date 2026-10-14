@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const cookieParser = require('cookie-parser');
 
 const authRoutes = require('./routes/auth');
 const clientRoutes = require('./routes/clients');
@@ -28,6 +29,9 @@ const limiter = rateLimit({
   max: 100 // limit each IP to 100 requests per windowMs
 });
 app.use(limiter);
+
+// Cookie parsing
+app.use(cookieParser());
 
 // Logging
 app.use(morgan('combined'));
