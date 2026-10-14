@@ -144,6 +144,68 @@ describe('Database Initialization', () => {
     });
   });
 
+  describe('closeDatabase lifecycle', () => {
+    function loadFreshModule() {
+      let freshModule;
+      jest.isolateModules(() => {
+        jest.doMock('sqlite3', () => {
+          const mockDatabase = {
+            serialize: jest.fn((callback) => callback()),
+            run: jest.fn(),
+            close: jest.fn((callback) => callback(null))
+          };
+
+          return {
+            verbose: jest.fn(() => ({
+              Database: jest.fn((dbPath, callback) => {
+                callback(null);
+                return mockDatabase;
+              })
+            }))
+          };
+        });
+        freshModule = require('../../database/init');
+      });
+      return freshModule;
+    }
+
+    test('should resolve immediately when no connection was ever created', async () => {
+      const freshModule = loadFreshModule();
+
+      await expect(freshModule.closeDatabase()).resolves.toBeUndefined();
+    });
+
+    test('should resolve immediately when the connection is already closed', async () => {
+      const freshModule = loadFreshModule();
+      const db = freshModule.getDatabase();
+
+      await freshModule.closeDatabase();
+      await expect(freshModule.closeDatabase()).resolves.toBeUndefined();
+      expect(db.close).toHaveBeenCalledTimes(1);
+    });
+
+    test('should wait for an in-flight close instead of closing twice', async () => {
+      const freshModule = loadFreshModule();
+      const db = freshModule.getDatabase();
+      db.close.mockImplementation((callback) => setTimeout(() => callback(null), 30));
+
+      await Promise.all([freshModule.closeDatabase(), freshModule.closeDatabase()]);
+
+      expect(db.close).toHaveBeenCalledTimes(1);
+    });
+
+    test('should create a new connection after being closed', async () => {
+      const freshModule = loadFreshModule();
+      freshModule.getDatabase();
+      await freshModule.closeDatabase();
+
+      const reopened = freshModule.getDatabase();
+
+      expect(reopened).toBeDefined();
+      await expect(freshModule.closeDatabase()).resolves.toBeUndefined();
+    });
+  });
+
   describe('Database Schema', () => {
     test('users table should have correct structure', async () => {
       const db = getDatabase();
