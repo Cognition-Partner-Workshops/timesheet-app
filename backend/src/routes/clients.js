@@ -2,6 +2,15 @@ const express = require('express');
 const { getDatabase } = require('../database/init');
 const { authenticateUser } = require('../middleware/auth');
 const { clientSchema, updateClientSchema } = require('../validation/schemas');
+const { validateIdParam, buildUpdateSet, handleDbError } = require('./helpers');
+
+/** Updatable client columns and their request-body keys. */
+const UPDATE_FIELDS = [
+  { column: 'name', key: 'name' },
+  { column: 'description', key: 'description', nullable: true },
+  { column: 'department', key: 'department', nullable: true },
+  { column: 'email', key: 'email', nullable: true },
+];
 
 const router = express.Router();
 
@@ -17,8 +26,7 @@ router.get('/', (req, res) => {
     [req.userEmail],
     (err, rows) => {
       if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ error: 'Internal server error' });
+        return handleDbError(res, err);
       }
       
       res.json({ clients: rows });
@@ -27,13 +35,8 @@ router.get('/', (req, res) => {
 });
 
 // Get specific client
-router.get('/:id', (req, res) => {
-  const clientId = parseInt(req.params.id);
-  
-  if (isNaN(clientId)) {
-    return res.status(400).json({ error: 'Invalid client ID' });
-  }
-  
+router.get('/:id', validateIdParam('client'), (req, res) => {
+  const clientId = req.parsedId;
   const db = getDatabase();
   
   db.get(
@@ -41,8 +44,7 @@ router.get('/:id', (req, res) => {
     [clientId, req.userEmail],
     (err, row) => {
       if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ error: 'Internal server error' });
+        return handleDbError(res, err);
       }
       
       if (!row) {
@@ -70,8 +72,7 @@ router.post('/', (req, res, next) => {
       [name, description || null, department || null, email || null, req.userEmail],
       function(err) {
         if (err) {
-          console.error('Database error:', err);
-          return res.status(500).json({ error: 'Failed to create client' });
+          return handleDbError(res, err, 'Failed to create client');
         }
 
         // Return the created client
@@ -80,8 +81,7 @@ router.post('/', (req, res, next) => {
           [this.lastID],
           (err, row) => {
             if (err) {
-              console.error('Database error:', err);
-              return res.status(500).json({ error: 'Client created but failed to retrieve' });
+              return handleDbError(res, err, 'Client created but failed to retrieve');
             }
 
             res.status(201).json({ 
@@ -98,13 +98,9 @@ router.post('/', (req, res, next) => {
 });
 
 // Update client
-router.put('/:id', (req, res, next) => {
+router.put('/:id', validateIdParam('client'), (req, res, next) => {
   try {
-    const clientId = parseInt(req.params.id);
-    
-    if (isNaN(clientId)) {
-      return res.status(400).json({ error: 'Invalid client ID' });
-    }
+    const clientId = req.parsedId;
 
     const { error, value } = updateClientSchema.validate(req.body);
     if (error) {
@@ -119,47 +115,21 @@ router.put('/:id', (req, res, next) => {
       [clientId, req.userEmail],
       (err, row) => {
         if (err) {
-          console.error('Database error:', err);
-          return res.status(500).json({ error: 'Internal server error' });
+          return handleDbError(res, err);
         }
 
         if (!row) {
           return res.status(404).json({ error: 'Client not found' });
         }
 
-        // Build update query dynamically
-        const updates = [];
-        const values = [];
-
-        if (value.name !== undefined) {
-          updates.push('name = ?');
-          values.push(value.name);
-        }
-
-        if (value.description !== undefined) {
-          updates.push('description = ?');
-          values.push(value.description || null);
-        }
-
-        if (value.department !== undefined) {
-          updates.push('department = ?');
-          values.push(value.department || null);
-        }
-
-        if (value.email !== undefined) {
-          updates.push('email = ?');
-          values.push(value.email || null);
-        }
-
-        updates.push('updated_at = CURRENT_TIMESTAMP');
+        const { setClause, values } = buildUpdateSet(UPDATE_FIELDS, value);
         values.push(clientId, req.userEmail);
 
-        const query = `UPDATE clients SET ${updates.join(', ')} WHERE id = ? AND user_email = ?`;
+        const query = `UPDATE clients SET ${setClause} WHERE id = ? AND user_email = ?`;
 
         db.run(query, values, function(err) {
           if (err) {
-            console.error('Database error:', err);
-            return res.status(500).json({ error: 'Failed to update client' });
+            return handleDbError(res, err, 'Failed to update client');
           }
 
           // Return updated client
@@ -168,8 +138,7 @@ router.put('/:id', (req, res, next) => {
             [clientId],
             (err, row) => {
               if (err) {
-                console.error('Database error:', err);
-                return res.status(500).json({ error: 'Client updated but failed to retrieve' });
+                return handleDbError(res, err, 'Client updated but failed to retrieve');
               }
 
               res.json({
@@ -195,8 +164,7 @@ router.delete('/', (req, res) => {
     [req.userEmail],
     function(err) {
       if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ error: 'Failed to delete clients' });
+        return handleDbError(res, err, 'Failed to delete clients');
       }
       
       res.json({ 
@@ -208,13 +176,8 @@ router.delete('/', (req, res) => {
 });
 
 // Delete client
-router.delete('/:id', (req, res) => {
-  const clientId = parseInt(req.params.id);
-  
-  if (isNaN(clientId)) {
-    return res.status(400).json({ error: 'Invalid client ID' });
-  }
-  
+router.delete('/:id', validateIdParam('client'), (req, res) => {
+  const clientId = req.parsedId;
   const db = getDatabase();
   
   // Check if client exists and belongs to user
@@ -223,8 +186,7 @@ router.delete('/:id', (req, res) => {
     [clientId, req.userEmail],
     (err, row) => {
       if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ error: 'Internal server error' });
+        return handleDbError(res, err);
       }
       
       if (!row) {
@@ -237,8 +199,7 @@ router.delete('/:id', (req, res) => {
         [clientId, req.userEmail],
         function(err) {
           if (err) {
-            console.error('Database error:', err);
-            return res.status(500).json({ error: 'Failed to delete client' });
+            return handleDbError(res, err, 'Failed to delete client');
           }
           
           res.json({ message: 'Client deleted successfully' });
