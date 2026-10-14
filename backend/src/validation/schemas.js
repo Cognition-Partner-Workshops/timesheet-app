@@ -32,10 +32,22 @@ const emailSchema = Joi.object({
   email: Joi.string().email().required()
 });
 
+const registerSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().min(8).required()
+});
+
+const loginSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().required()
+});
+
 module.exports = {
   clientSchema,
   workEntrySchema,
   updateWorkEntrySchema,
   updateClientSchema,
-  emailSchema
+  emailSchema,
+  registerSchema,
+  loginSchema
 };
