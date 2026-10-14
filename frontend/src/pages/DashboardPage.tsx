@@ -82,7 +82,7 @@ const DashboardPage: React.FC = () => {
               onClick={stat.action}
             >
               <CardContent>
-                <Box display="flex" alignItems="center" justifyContent="space-between" gap={3}>
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 3 }}>
                   <Box>
                     <Typography color="textSecondary" gutterBottom variant="h6">
                       {stat.title}
@@ -113,7 +113,7 @@ const DashboardPage: React.FC = () => {
         {/* @ts-expect-error - MUI Grid item prop type issue */}
         <Grid item xs={12} md={8}>
           <Paper sx={{ p: 3 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} gap={3}>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2, gap: 3 }}>
               <Typography variant="h6">Recent Work Entries</Typography>
               <Button
                 variant="outlined"
@@ -147,10 +147,10 @@ const DashboardPage: React.FC = () => {
         {/* @ts-expect-error - MUI Grid item prop type issue */}
         <Grid item xs={12} md={4}>
           <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" mb={2}>
+            <Typography variant="h6" sx={{ mb: 2 }}>
               Quick Actions
             </Typography>
-            <Box display="flex" flexDirection="column" gap={2}>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
