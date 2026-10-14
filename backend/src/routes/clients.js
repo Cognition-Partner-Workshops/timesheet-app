@@ -186,27 +186,6 @@ router.put('/:id', (req, res, next) => {
   }
 });
 
-// Delete all clients for authenticated user
-router.delete('/', (req, res) => {
-  const db = getDatabase();
-  
-  db.run(
-    'DELETE FROM clients WHERE user_email = ?',
-    [req.userEmail],
-    function(err) {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ error: 'Failed to delete clients' });
-      }
-      
-      res.json({ 
-        message: 'All clients deleted successfully',
-        deletedCount: this.changes
-      });
-    }
-  );
-});
-
 // Delete client
 router.delete('/:id', (req, res) => {
   const clientId = parseInt(req.params.id);
