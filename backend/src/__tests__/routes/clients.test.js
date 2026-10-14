@@ -453,5 +453,180 @@ describe('Client Routes', () => {
 
       expect(response.status).toBe(200);
     });
+
+    function setupSuccessfulUpdate(updatedClient) {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, updatedClient);
+      });
+    }
+
+    test('should update client department field', async () => {
+      const updatedClient = { id: 1, name: 'Client', department: 'Engineering' };
+      setupSuccessfulUpdate(updatedClient);
+
+      const response = await request(app)
+        .put('/api/clients/1')
+        .send({ department: 'Engineering' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.client.department).toBe('Engineering');
+    });
+
+    test('should update client email field', async () => {
+      const updatedClient = { id: 1, name: 'Client', email: 'client@example.com' };
+      setupSuccessfulUpdate(updatedClient);
+
+      const response = await request(app)
+        .put('/api/clients/1')
+        .send({ email: 'client@example.com' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.client.email).toBe('client@example.com');
+    });
+
+    test('should update all client fields at once', async () => {
+      const updatedClient = {
+        id: 1, name: 'New Name', description: 'New Desc',
+        department: 'Sales', email: 'new@example.com'
+      };
+      setupSuccessfulUpdate(updatedClient);
+
+      const response = await request(app)
+        .put('/api/clients/1')
+        .send({ name: 'New Name', description: 'New Desc', department: 'Sales', email: 'new@example.com' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.client).toEqual(updatedClient);
+    });
+
+    test('should handle unexpected error in PUT try-catch block', async () => {
+      getDatabase.mockImplementation(() => {
+        throw new Error('Unexpected error');
+      });
+
+      const response = await request(app)
+        .put('/api/clients/1')
+        .send({ name: 'Updated' });
+
+      expect(response.status).toBe(500);
+    });
+  });
+
+  describe('DELETE /api/clients (delete all)', () => {
+    test('should delete all clients for authenticated user', async () => {
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.changes = 3;
+        callback.call(this, null);
+      });
+
+      const response = await request(app).delete('/api/clients');
+
+      expect(response.status).toBe(200);
+      expect(response.body.message).toBe('All clients deleted successfully');
+      expect(response.body.deletedCount).toBe(3);
+    });
+
+    test('should return zero deletedCount when no clients exist', async () => {
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.changes = 0;
+        callback.call(this, null);
+      });
+
+      const response = await request(app).delete('/api/clients');
+
+      expect(response.status).toBe(200);
+      expect(response.body.deletedCount).toBe(0);
+    });
+
+    test('should handle database error when deleting all clients', async () => {
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(new Error('Delete failed'));
+      });
+
+      const response = await request(app).delete('/api/clients');
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Failed to delete clients' });
+    });
+
+    test('should only delete clients scoped to authenticated user', async () => {
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        expect(query).toContain('WHERE user_email = ?');
+        expect(params).toEqual(['test@example.com']);
+        this.changes = 1;
+        callback.call(this, null);
+      });
+
+      await request(app).delete('/api/clients');
+
+      expect(mockDb.run).toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /api/clients - Extended', () => {
+    test('should create client with department and email fields', async () => {
+      const newClient = {
+        name: 'Full Client',
+        description: 'A description',
+        department: 'Engineering',
+        email: 'contact@client.com'
+      };
+      const createdClient = { id: 1, ...newClient, created_at: '2024-01-01', updated_at: '2024-01-01' };
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.lastID = 1;
+        callback.call(this, null);
+      });
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, createdClient);
+      });
+
+      const response = await request(app)
+        .post('/api/clients')
+        .send(newClient);
+
+      expect(response.status).toBe(201);
+      expect(response.body.client.department).toBe('Engineering');
+      expect(response.body.client.email).toBe('contact@client.com');
+    });
+
+    test('should handle unexpected error in POST try-catch block', async () => {
+      getDatabase.mockImplementation(() => {
+        throw new Error('Unexpected error');
+      });
+
+      const response = await request(app)
+        .post('/api/clients')
+        .send({ name: 'Test Client' });
+
+      expect(response.status).toBe(500);
+    });
+
+    test('should create client with name at max length (255 chars)', async () => {
+      const longName = 'a'.repeat(255);
+      const createdClient = { id: 1, name: longName, created_at: '2024-01-01', updated_at: '2024-01-01' };
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.lastID = 1;
+        callback.call(this, null);
+      });
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, createdClient);
+      });
+
+      const response = await request(app)
+        .post('/api/clients')
+        .send({ name: longName });
+
+      expect(response.status).toBe(201);
+    });
   });
 });
