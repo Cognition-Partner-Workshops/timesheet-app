@@ -584,5 +584,48 @@ describe('Work Entry Routes', () => {
       expect(response.status).toBe(200);
       expect(response.body.message).toBe('Work entry updated successfully');
     });
+
+    test('should handle unexpected error in try-catch for update', async () => {
+      getDatabase.mockImplementation(() => {
+        throw new Error('Unexpected error');
+      });
+
+      const response = await request(app)
+        .put('/api/work-entries/1')
+        .send({ hours: 8 });
+
+      expect(response.status).toBe(500);
+    });
+  });
+
+  describe('POST /api/work-entries - Unexpected Error', () => {
+    test('should handle unexpected error in try-catch for create', async () => {
+      getDatabase.mockImplementation(() => {
+        throw new Error('Unexpected error');
+      });
+
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({
+          clientId: 1,
+          hours: 5,
+          date: '2024-01-15'
+        });
+
+      expect(response.status).toBe(500);
+    });
+  });
+
+  describe('GET /api/work-entries - Empty Results', () => {
+    test('should return empty array when no work entries exist', async () => {
+      mockDb.all.mockImplementation((query, params, callback) => {
+        callback(null, []);
+      });
+
+      const response = await request(app).get('/api/work-entries');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ workEntries: [] });
+    });
   });
 });
