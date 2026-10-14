@@ -17,6 +17,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
+import { type WorkEntry } from '../types/api';
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -34,7 +35,7 @@ const DashboardPage: React.FC = () => {
   const clients = clientsData?.clients || [];
   const workEntries = workEntriesData?.workEntries || [];
 
-  const totalHours = workEntries.reduce((sum: number, entry: { hours: number }) => sum + entry.hours, 0);
+  const totalHours = workEntries.reduce((sum: number, entry: WorkEntry) => sum + entry.hours, 0);
   const recentEntries = workEntries.slice(0, 5);
 
   const statsCards = [
@@ -125,7 +126,7 @@ const DashboardPage: React.FC = () => {
               </Button>
             </Box>
             {recentEntries.length > 0 ? (
-              recentEntries.map((entry: { id: number; client_name: string; hours: number; date: string; description?: string }) => (
+              recentEntries.map((entry: WorkEntry) => (
                 <Box key={entry.id} sx={{ mb: 2, pb: 2, borderBottom: '1px solid #eee' }}>
                   <Typography variant="subtitle1">{entry.client_name}</Typography>
                   <Typography variant="body2" color="text.secondary">

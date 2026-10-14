@@ -29,7 +29,23 @@ import {
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
-import { type ClientReport } from '../types/api';
+import { type Client, type ClientReport } from '../types/api';
+
+/** Triggers a file download from a Blob by creating a temporary anchor element. */
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+}
+
+function sanitizeFilename(name: string): string {
+  return name.replace(/[^a-zA-Z0-9]/g, '_');
+}
 
 const ReportsPage: React.FC = () => {
   const [selectedClientId, setSelectedClientId] = useState<number>(0);
@@ -54,15 +70,9 @@ const ReportsPage: React.FC = () => {
     
     try {
       const blob = await apiClient.exportClientReportCsv(selectedClientId);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const client = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
-      a.download = `${client?.name?.replace(/[^a-zA-Z0-9]/g, '_')}_report_${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      const client = clients.find((c: Client) => c.id === selectedClientId);
+      const filename = `${sanitizeFilename(client?.name ?? 'client')}_report_${new Date().toISOString().split('T')[0]}.csv`;
+      downloadBlob(blob, filename);
     } catch (err: unknown) {
       setError('Failed to export CSV report');
       console.error('Export error:', err);
@@ -74,22 +84,16 @@ const ReportsPage: React.FC = () => {
 
     try {
       const blob = await apiClient.exportClientReportPdf(selectedClientId);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const client = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
-      a.download = `${client?.name?.replace(/[^a-zA-Z0-9]/g, '_')}_report_${new Date().toISOString().split('T')[0]}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      const client = clients.find((c: Client) => c.id === selectedClientId);
+      const filename = `${sanitizeFilename(client?.name ?? 'client')}_report_${new Date().toISOString().split('T')[0]}.pdf`;
+      downloadBlob(blob, filename);
     } catch (err: unknown) {
       setError('Failed to export PDF report');
       console.error('Export error:', err);
     }
   };
 
-  const selectedClient = clients.find((c: { id: number; name: string }) => c.id === selectedClientId);
+  const selectedClient = clients.find((c: Client) => c.id === selectedClientId);
 
   if (clientsLoading) {
     return (
@@ -133,7 +137,7 @@ const ReportsPage: React.FC = () => {
                     label="Select Client"
                   >
                     <MenuItem value={0}>Choose a client...</MenuItem>
-                    {clients.map((c: { id: number; name: string }) => (
+                    {clients.map((c: Client) => (
                       <MenuItem key={c.id} value={c.id}>
                         {c.name}
                       </MenuItem>
