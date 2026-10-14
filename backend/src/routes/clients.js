@@ -28,9 +28,9 @@ router.get('/', (req, res) => {
 
 // Get specific client
 router.get('/:id', (req, res) => {
-  const clientId = parseInt(req.params.id);
+  const clientId = Number.parseInt(req.params.id);
   
-  if (isNaN(clientId)) {
+  if (Number.isNaN(clientId)) {
     return res.status(400).json({ error: 'Invalid client ID' });
   }
   
@@ -100,9 +100,9 @@ router.post('/', (req, res, next) => {
 // Update client
 router.put('/:id', (req, res, next) => {
   try {
-    const clientId = parseInt(req.params.id);
+    const clientId = Number.parseInt(req.params.id);
     
-    if (isNaN(clientId)) {
+    if (Number.isNaN(clientId)) {
       return res.status(400).json({ error: 'Invalid client ID' });
     }
 
@@ -209,9 +209,9 @@ router.delete('/', (req, res) => {
 
 // Delete client
 router.delete('/:id', (req, res) => {
-  const clientId = parseInt(req.params.id);
+  const clientId = Number.parseInt(req.params.id);
   
-  if (isNaN(clientId)) {
+  if (Number.isNaN(clientId)) {
     return res.status(400).json({ error: 'Invalid client ID' });
   }
   
