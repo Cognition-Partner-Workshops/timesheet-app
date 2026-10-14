@@ -77,3 +77,9 @@ export interface ApiResponse<T> {
   error?: string;
   message?: string;
 }
+
+/** Extract the user-facing error message from an Axios error or fall back to the provided default. */
+export function getApiErrorMessage(err: unknown, fallback: string): string {
+  const axiosErr = err as { response?: { data?: { error?: string } } };
+  return axiosErr?.response?.data?.error || fallback;
+}
