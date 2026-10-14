@@ -8,6 +8,13 @@ const router = express.Router();
 // All routes require authentication
 router.use(authenticateUser);
 
+// Joi's .date() validator coerces the validated value into a JS Date object.
+// Persist it as a YYYY-MM-DD string so the DATE column holds a readable date
+// instead of an epoch-millisecond timestamp.
+function toDateString(date) {
+  return new Date(date).toISOString().split('T')[0];
+}
+
 // Get all work entries for authenticated user (with optional client filter)
 router.get('/', (req, res) => {
   const { clientId } = req.query;
@@ -104,7 +111,7 @@ router.post('/', (req, res, next) => {
         // Create work entry
         db.run(
           'INSERT INTO work_entries (client_id, user_email, hours, description, date) VALUES (?, ?, ?, ?, ?)',
-          [clientId, req.userEmail, hours, description || null, date],
+          [clientId, req.userEmail, hours, description || null, toDateString(date)],
           function(err) {
             if (err) {
               console.error('Database error:', err);
@@ -214,7 +221,7 @@ router.put('/:id', (req, res, next) => {
 
           if (value.date !== undefined) {
             updates.push('date = ?');
-            values.push(value.date);
+            values.push(toDateString(value.date));
           }
 
           updates.push('updated_at = CURRENT_TIMESTAMP');
