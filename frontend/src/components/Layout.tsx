@@ -14,6 +14,7 @@ import {
   Typography,
   Button,
   Avatar,
+  Tooltip,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -22,9 +23,12 @@ import {
   Assignment as AssignmentIcon,
   Assessment as AssessmentIcon,
   Logout as LogoutIcon,
+  DarkMode as DarkModeIcon,
+  LightMode as LightModeIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useThemeMode } from '../hooks/useThemeMode';
 
 const drawerWidth = 240;
 
@@ -36,6 +40,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
+  const { mode, toggleTheme } = useThemeMode();
   const [mobileOpen, setMobileOpen] = React.useState(false);
 
   const handleDrawerToggle = () => {
@@ -96,6 +101,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             {menuItems.find(item => item.path === location.pathname)?.text || 'Time Tracker'}
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Tooltip title={mode === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}>
+              <IconButton color="inherit" onClick={toggleTheme} aria-label="toggle dark mode">
+                {mode === 'light' ? <DarkModeIcon /> : <LightModeIcon />}
+              </IconButton>
+            </Tooltip>
             <Typography variant="body2">{user?.email}</Typography>
             <Avatar sx={{ width: 32, height: 32 }}>
               {user?.email?.charAt(0).toUpperCase()}
