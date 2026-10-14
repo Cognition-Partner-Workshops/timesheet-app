@@ -142,6 +142,68 @@ describe('Database Initialization', () => {
 
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
+
+    test('should wait when concurrent close is in progress', async () => {
+      jest.resetModules();
+      
+      let closeCallback;
+      jest.doMock('sqlite3', () => {
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, callback) => {
+              callback(null);
+              return {
+                serialize: jest.fn((cb) => cb()),
+                run: jest.fn((query, cb) => { if (typeof cb === 'function') cb(null); }),
+                close: jest.fn((callback) => {
+                  // Delay the callback to simulate slow close
+                  closeCallback = callback;
+                })
+              };
+            })
+          }))
+        };
+      });
+
+      const { getDatabase: getDb, closeDatabase: closeDb } = require('../../database/init');
+      getDb(); // Initialize the database
+
+      // Start first close - this will set isClosing = true
+      const firstClose = closeDb();
+      
+      // Start second close while first is in progress - should hit isClosing branch
+      const secondClose = closeDb();
+
+      // Now complete the first close
+      closeCallback(null);
+
+      // Both should resolve
+      await expect(firstClose).resolves.toBeUndefined();
+      await expect(secondClose).resolves.toBeUndefined();
+    });
+
+    test('should resolve immediately when db is null', async () => {
+      // Create a fresh module where db is null
+      jest.resetModules();
+      jest.doMock('sqlite3', () => {
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, callback) => {
+              callback(null);
+              return {
+                serialize: jest.fn(),
+                run: jest.fn(),
+                close: jest.fn()
+              };
+            })
+          }))
+        };
+      });
+
+      const { closeDatabase: closeFreshDb } = require('../../database/init');
+      // db is null since we never called getDatabase
+      await expect(closeFreshDb()).resolves.toBeUndefined();
+    });
   });
 
   describe('Database Schema', () => {
