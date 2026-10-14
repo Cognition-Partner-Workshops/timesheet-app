@@ -1,7 +1,10 @@
+const jwt = require('jsonwebtoken');
 const { authenticateUser } = require('../../middleware/auth');
 const { getDatabase } = require('../../database/init');
 
 jest.mock('../../database/init');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'default-dev-secret-change-in-production';
 
 describe('Authentication Middleware', () => {
   let req, res, next, mockDb;
@@ -29,12 +32,12 @@ describe('Authentication Middleware', () => {
   });
 
   describe('Email Header Validation', () => {
-    test('should return 401 if x-user-email header is missing', () => {
+    test('should return 401 if no auth header is provided', () => {
       authenticateUser(req, res, next);
 
       expect(res.status).toHaveBeenCalledWith(401);
       expect(res.json).toHaveBeenCalledWith({
-        error: 'User email required in x-user-email header'
+        error: 'Authentication required. Provide a Bearer token in the Authorization header.'
       });
       expect(next).not.toHaveBeenCalled();
     });
@@ -180,6 +183,102 @@ describe('Authentication Middleware', () => {
 
       authenticateUser(req, res, next);
       expect(mockDb.get).toHaveBeenCalled();
+    });
+  });
+
+  describe('JWT Token Authentication', () => {
+    test('should authenticate with valid JWT token', (done) => {
+      const token = jwt.sign({ email: 'jwt@example.com' }, JWT_SECRET, { expiresIn: '1h' });
+      req.headers['authorization'] = `Bearer ${token}`;
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { email: 'jwt@example.com' });
+      });
+
+      authenticateUser(req, res, next);
+
+      setImmediate(() => {
+        expect(req.userEmail).toBe('jwt@example.com');
+        expect(next).toHaveBeenCalled();
+        done();
+      });
+    });
+
+    test('should return 401 for expired JWT token', () => {
+      const token = jwt.sign({ email: 'expired@example.com' }, JWT_SECRET, { expiresIn: '0s' });
+      req.headers['authorization'] = `Bearer ${token}`;
+
+      authenticateUser(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Token expired' });
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    test('should return 401 for invalid JWT token', () => {
+      req.headers['authorization'] = 'Bearer invalidtoken123';
+
+      authenticateUser(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Invalid token' });
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    test('should return 401 for JWT token with wrong secret', () => {
+      const token = jwt.sign({ email: 'wrong@example.com' }, 'wrong-secret', { expiresIn: '1h' });
+      req.headers['authorization'] = `Bearer ${token}`;
+
+      authenticateUser(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Invalid token' });
+    });
+
+    test('should return 401 for JWT token missing email claim', () => {
+      const token = jwt.sign({ sub: 'noemail' }, JWT_SECRET, { expiresIn: '1h' });
+      req.headers['authorization'] = `Bearer ${token}`;
+
+      authenticateUser(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Invalid token: missing email claim' });
+    });
+
+    test('should return 401 if JWT user not found in database', (done) => {
+      const token = jwt.sign({ email: 'missing@example.com' }, JWT_SECRET, { expiresIn: '1h' });
+      req.headers['authorization'] = `Bearer ${token}`;
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, null);
+      });
+
+      authenticateUser(req, res, next);
+
+      setImmediate(() => {
+        expect(res.status).toHaveBeenCalledWith(401);
+        expect(res.json).toHaveBeenCalledWith({ error: 'User not found' });
+        expect(next).not.toHaveBeenCalled();
+        done();
+      });
+    });
+
+    test('should handle database error during JWT auth', (done) => {
+      const token = jwt.sign({ email: 'db-error@example.com' }, JWT_SECRET, { expiresIn: '1h' });
+      req.headers['authorization'] = `Bearer ${token}`;
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(new Error('Database error'), null);
+      });
+
+      authenticateUser(req, res, next);
+
+      setImmediate(() => {
+        expect(res.status).toHaveBeenCalledWith(500);
+        expect(res.json).toHaveBeenCalledWith({ error: 'Internal server error' });
+        expect(next).not.toHaveBeenCalled();
+        done();
+      });
     });
   });
 });

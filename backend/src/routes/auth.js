@@ -1,7 +1,11 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
 const { getDatabase } = require('../database/init');
 const { emailSchema } = require('../validation/schemas');
 const { authenticateUser } = require('../middleware/auth');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'default-dev-secret-change-in-production';
+const JWT_EXPIRES_IN = '24h';
 
 const router = express.Router();
 
@@ -23,15 +27,21 @@ router.post('/login', async (req, res, next) => {
         return res.status(500).json({ error: 'Internal server error' });
       }
 
-      if (row) {
-        // User exists
-        return res.json({
-          message: 'Login successful',
+      const sendTokenResponse = (userEmail, createdAt, statusCode, message) => {
+        const token = jwt.sign({ email: userEmail }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+        return res.status(statusCode).json({
+          message,
+          token,
           user: {
-            email: row.email,
-            createdAt: row.created_at
+            email: userEmail,
+            createdAt
           }
         });
+      };
+
+      if (row) {
+        // User exists
+        return sendTokenResponse(row.email, row.created_at, 200, 'Login successful');
       } else {
         // Create new user
         db.run('INSERT INTO users (email) VALUES (?)', [email], function(err) {
@@ -40,13 +50,7 @@ router.post('/login', async (req, res, next) => {
             return res.status(500).json({ error: 'Failed to create user' });
           }
 
-          res.status(201).json({
-            message: 'User created and logged in successfully',
-            user: {
-              email: email,
-              createdAt: new Date().toISOString()
-            }
-          });
+          return sendTokenResponse(email, new Date().toISOString(), 201, 'User created and logged in successfully');
         });
       }
     });
