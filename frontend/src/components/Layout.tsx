@@ -23,7 +23,7 @@ import {
   Assessment as AssessmentIcon,
   Logout as LogoutIcon,
 } from '@mui/icons-material';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router';
 import { useAuth } from '../hooks/useAuth';
 
 const drawerWidth = 240;

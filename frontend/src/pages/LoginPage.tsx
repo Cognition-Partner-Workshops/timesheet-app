@@ -10,7 +10,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { useAuth } from '../hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
