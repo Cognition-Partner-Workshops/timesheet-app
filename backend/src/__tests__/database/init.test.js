@@ -142,6 +142,47 @@ describe('Database Initialization', () => {
 
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
+
+    test('should resolve immediately when no database connection exists', async () => {
+      // Don't call getDatabase, so db is null
+      jest.resetModules();
+      const { closeDatabase: closeFresh } = require('../../database/init');
+      await expect(closeFresh()).resolves.toBeUndefined();
+    });
+
+    test('should handle concurrent close calls while closing is in progress', async () => {
+      jest.resetModules();
+
+      // Create a mock with async close behavior
+      let closeCallback = null;
+      jest.doMock('sqlite3', () => {
+        const mockDb = {
+          serialize: jest.fn((cb) => cb()),
+          run: jest.fn((query, cb) => { if (typeof cb === 'function') cb(null); }),
+          close: jest.fn((cb) => { closeCallback = cb; })
+        };
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((p, cb) => { cb(null); return mockDb; })
+          }))
+        };
+      });
+
+      const { getDatabase: getDb, closeDatabase: closeDb } = require('../../database/init');
+      getDb(); // ensure db is created
+
+      // Start first close (it will hang because closeCallback isn't called yet)
+      const firstClose = closeDb();
+      // Start second close while first is in progress (isClosing = true)
+      const secondClose = closeDb();
+
+      // Now resolve the first close
+      closeCallback(null);
+
+      await firstClose;
+      // The second close should also resolve (via the interval check)
+      await secondClose;
+    });
   });
 
   describe('Database Schema', () => {
