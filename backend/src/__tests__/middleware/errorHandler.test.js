@@ -114,6 +114,24 @@ describe('Error Handler Middleware', () => {
       });
     });
 
+    test('should treat a non-string error code as a generic error', () => {
+      const systemError = { code: 42, message: 'Numeric code' };
+
+      errorHandler(systemError, req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Numeric code' });
+    });
+
+    test('should not treat non-SQLite string codes as database errors', () => {
+      const fsError = { code: 'ENOENT', message: 'File missing' };
+
+      errorHandler(fsError, req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({ error: 'File missing' });
+    });
+
     test('should use default message if none provided', () => {
       const emptyError = {};
 
