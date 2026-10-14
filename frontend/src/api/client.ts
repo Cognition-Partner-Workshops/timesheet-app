@@ -133,6 +133,12 @@ class ApiClient {
     return response.data;
   }
 
+  // Team dashboard endpoint
+  async getTeamDashboard() {
+    const response = await this.client.get('/api/team-dashboard');
+    return response.data;
+  }
+
   // Health check
   async healthCheck() {
     const response = await this.client.get('/health');
