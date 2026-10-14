@@ -26,6 +26,7 @@ import {
 import {
   PictureAsPdf as PdfIcon,
   Description as CsvIcon,
+  AttachMoney as MoneyIcon,
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
@@ -213,6 +214,24 @@ const ReportsPage: React.FC = () => {
                     </CardContent>
                   </Card>
                 </Grid>
+                {report.hourlyRate != null && (
+                  <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                    <Card>
+                      <CardContent>
+                        <Typography color="textSecondary" gutterBottom>
+                          <MoneyIcon sx={{ fontSize: 16, verticalAlign: 'text-bottom', mr: 0.5 }} />
+                          Estimated Revenue
+                        </Typography>
+                        <Typography variant="h4" component="div" color="success.main">
+                          ${report.estimatedRevenue?.toFixed(2)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          @ ${report.hourlyRate.toFixed(2)}/hr
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                )}
               </Grid>
 
               <Paper>
@@ -222,6 +241,7 @@ const ReportsPage: React.FC = () => {
                       <TableRow>
                         <TableCell>Date</TableCell>
                         <TableCell>Hours</TableCell>
+                        {report.hourlyRate != null && <TableCell>Revenue</TableCell>}
                         <TableCell>Description</TableCell>
                         <TableCell>Created</TableCell>
                       </TableRow>
@@ -242,6 +262,13 @@ const ReportsPage: React.FC = () => {
                                 variant="outlined" 
                               />
                             </TableCell>
+                            {report.hourlyRate != null && (
+                              <TableCell>
+                                <Typography variant="body2" color="success.main" fontWeight="medium">
+                                  ${(entry.hours * report.hourlyRate).toFixed(2)}
+                                </Typography>
+                              </TableCell>
+                            )}
                             <TableCell>
                               {entry.description ? (
                                 <Typography variant="body2" color="text.secondary">
@@ -260,7 +287,7 @@ const ReportsPage: React.FC = () => {
                         ))
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={4} align="center">
+                          <TableCell colSpan={report.hourlyRate != null ? 5 : 4} align="center">
                             <Typography color="text.secondary" sx={{ py: 3 }}>
                               No work entries found for this client.
                             </Typography>
