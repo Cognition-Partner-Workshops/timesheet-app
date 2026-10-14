@@ -199,4 +199,138 @@ describe('Auth Routes', () => {
       expect(response.body).toEqual({ error: 'Internal server error' });
     });
   });
+
+  describe('Invalid Input', () => {
+    test('should return 400 for empty string email', async () => {
+      const response = await request(app)
+        .post('/api/auth/login')
+        .send({ email: '' });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for email without domain', async () => {
+      const response = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'user@' });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for email without local part', async () => {
+      const response = await request(app)
+        .post('/api/auth/login')
+        .send({ email: '@domain.com' });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for numeric email value', async () => {
+      const response = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 12345 });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for null email', async () => {
+      const response = await request(app)
+        .post('/api/auth/login')
+        .send({ email: null });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 for email with spaces', async () => {
+      const response = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'user @example.com' });
+
+      expect(response.status).toBe(400);
+    });
+
+    test('should return 400 when body has extra fields but no email', async () => {
+      const response = await request(app)
+        .post('/api/auth/login')
+        .send({ username: 'test' });
+
+      expect(response.status).toBe(400);
+    });
+  });
+
+  describe('Empty Results', () => {
+    test('should return 404 when GET /me for user not in database', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        if (query.includes('SELECT email FROM users WHERE email = ?')) {
+          callback(null, { email: 'ghost@example.com' });
+        } else {
+          callback(null, null);
+        }
+      });
+
+      const response = await request(app)
+        .get('/api/auth/me')
+        .set('x-user-email', 'ghost@example.com');
+
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({ error: 'User not found' });
+    });
+
+    test('should create new user when email does not exist in login', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, null);
+      });
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        callback.call(this, null);
+      });
+
+      const response = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'brandnew@example.com' });
+
+      expect(response.status).toBe(201);
+      expect(response.body.message).toBe('User created and logged in successfully');
+    });
+  });
+
+  describe('Cross-User Isolation', () => {
+    test('should query database with provided user email in login', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { email: 'alice@example.com', created_at: '2024-01-01' });
+      });
+
+      await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'alice@example.com' });
+
+      expect(mockDb.get).toHaveBeenCalledWith(
+        expect.stringContaining('email = ?'),
+        ['alice@example.com'],
+        expect.any(Function)
+      );
+    });
+
+    test('should query database with header email in GET /me', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, { email: 'bob@example.com', created_at: '2024-01-01' });
+      });
+
+      await request(app)
+        .get('/api/auth/me')
+        .set('x-user-email', 'bob@example.com');
+
+      expect(mockDb.get).toHaveBeenCalledWith(
+        expect.stringContaining('email = ?'),
+        expect.arrayContaining(['bob@example.com']),
+        expect.any(Function)
+      );
+    });
+
+    test('should reject GET /me without authentication header', async () => {
+      const response = await request(app).get('/api/auth/me');
+
+      expect(response.status).toBe(401);
+    });
+  });
 });
