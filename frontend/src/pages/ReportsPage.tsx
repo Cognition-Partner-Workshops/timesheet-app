@@ -29,6 +29,7 @@ import {
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
+import { toLocalDate } from '../utils/dateFormat';
 import { type ClientReport } from '../types/api';
 
 const ReportsPage: React.FC = () => {
@@ -232,7 +233,7 @@ const ReportsPage: React.FC = () => {
                           <TableRow key={entry.id}>
                             <TableCell>
                               <Typography variant="body2">
-                                {new Date(entry.date).toLocaleDateString()}
+                                {toLocalDate(entry.date).toLocaleDateString('en-US')}
                               </Typography>
                             </TableCell>
                             <TableCell>
