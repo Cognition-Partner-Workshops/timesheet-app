@@ -184,4 +184,55 @@ describe('Database Initialization', () => {
       expect(workEntriesQuery[0]).toContain('FOREIGN KEY (user_email) REFERENCES users (email) ON DELETE CASCADE');
     });
   });
+
+  describe('closeDatabase - Edge Cases', () => {
+    function mockSqlite3WithClose(closeFn) {
+      jest.doMock('sqlite3', () => ({
+        verbose: jest.fn(() => ({
+          Database: jest.fn((path, callback) => {
+            callback(null);
+            return {
+              serialize: jest.fn((cb) => cb()),
+              run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
+              close: closeFn || jest.fn((cb) => cb(null))
+            };
+          })
+        }))
+      }));
+    }
+
+    test('should resolve immediately when no database connection exists', async () => {
+      jest.resetModules();
+      mockSqlite3WithClose();
+
+      const { closeDatabase: closeFresh } = require('../../database/init');
+      await expect(closeFresh()).resolves.toBeUndefined();
+    });
+
+    test('should resolve immediately when already closed', async () => {
+      jest.resetModules();
+      mockSqlite3WithClose();
+
+      const { getDatabase: getFresh, closeDatabase: closeFresh } = require('../../database/init');
+      getFresh();
+      await closeFresh();
+      await expect(closeFresh()).resolves.toBeUndefined();
+    });
+
+    test('should wait when isClosing is true and resolve when close completes', async () => {
+      jest.resetModules();
+      let closeCallback;
+      mockSqlite3WithClose(jest.fn((cb) => { closeCallback = cb; }));
+
+      const { getDatabase: getFresh, closeDatabase: closeFresh } = require('../../database/init');
+      getFresh();
+
+      const firstClose = closeFresh();
+      const secondClose = closeFresh();
+      closeCallback(null);
+
+      await firstClose;
+      await secondClose;
+    });
+  });
 });
