@@ -77,3 +77,41 @@ export interface ApiResponse<T> {
   error?: string;
   message?: string;
 }
+
+export interface TimesheetClient {
+  clientId: number;
+  clientName: string;
+  days: Record<string, number>;
+}
+
+export interface TimesheetSubmission {
+  id: number;
+  status: string;
+  submitted_at: string;
+  total_hours: number;
+}
+
+export interface WeeklyTimesheetResponse {
+  weekStart: string;
+  weekEnd: string;
+  clients: TimesheetClient[];
+  submission: TimesheetSubmission | null;
+}
+
+export interface SubmitTimesheetRequest {
+  weekStart: string;
+  weekEnd: string;
+  totalHours: number;
+}
+
+export interface SubmitTimesheetResponse {
+  message: string;
+  submission: {
+    id: number;
+    weekStart: string;
+    weekEnd: string;
+    totalHours: number;
+    status: string;
+    submittedAt: string;
+  };
+}

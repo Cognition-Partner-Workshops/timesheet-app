@@ -133,6 +133,19 @@ class ApiClient {
     return response.data;
   }
 
+  // Timesheet endpoints
+  async getWeeklyTimesheet(weekStart: string) {
+    const response = await this.client.get('/api/timesheets/weekly', {
+      params: { weekStart },
+    });
+    return response.data;
+  }
+
+  async submitTimesheet(data: { weekStart: string; weekEnd: string; totalHours: number }) {
+    const response = await this.client.post('/api/timesheets/submit', data);
+    return response.data;
+  }
+
   // Health check
   async healthCheck() {
     const response = await this.client.get('/health');
