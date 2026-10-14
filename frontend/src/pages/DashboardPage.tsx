@@ -17,25 +17,29 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../api/client';
+import { queryKeys } from '../api/queryKeys';
+import { type WorkEntryWithClient } from '../types/api';
+
+const RECENT_ENTRIES_LIMIT = 5;
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
 
   const { data: clientsData } = useQuery({
-    queryKey: ['clients'],
+    queryKey: queryKeys.clients,
     queryFn: () => apiClient.getClients(),
   });
 
   const { data: workEntriesData } = useQuery({
-    queryKey: ['workEntries'],
+    queryKey: queryKeys.workEntries,
     queryFn: () => apiClient.getWorkEntries(),
   });
 
   const clients = clientsData?.clients || [];
   const workEntries = workEntriesData?.workEntries || [];
 
-  const totalHours = workEntries.reduce((sum: number, entry: { hours: number }) => sum + entry.hours, 0);
-  const recentEntries = workEntries.slice(0, 5);
+  const totalHours = workEntries.reduce((sum: number, entry: WorkEntryWithClient) => sum + entry.hours, 0);
+  const recentEntries = workEntries.slice(0, RECENT_ENTRIES_LIMIT);
 
   const statsCards = [
     {
@@ -68,9 +72,8 @@ const DashboardPage: React.FC = () => {
       </Typography>
 
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        {statsCards.map((stat, index) => (
-          // @ts-expect-error - MUI Grid item prop type issue
-          <Grid item xs={12} sm={6} md={4} key={index}>
+        {statsCards.map((stat) => (
+          <Grid size={{ xs: 12, sm: 6, md: 4 }} key={stat.title}>
             <Card
               sx={{
                 cursor: 'pointer',
@@ -110,8 +113,7 @@ const DashboardPage: React.FC = () => {
       </Grid>
 
       <Grid container spacing={3}>
-        {/* @ts-expect-error - MUI Grid item prop type issue */}
-        <Grid item xs={12} md={8}>
+        <Grid size={{ xs: 12, md: 8 }}>
           <Paper sx={{ p: 3 }}>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} gap={3}>
               <Typography variant="h6">Recent Work Entries</Typography>
@@ -125,7 +127,7 @@ const DashboardPage: React.FC = () => {
               </Button>
             </Box>
             {recentEntries.length > 0 ? (
-              recentEntries.map((entry: { id: number; client_name: string; hours: number; date: string; description?: string }) => (
+              recentEntries.map((entry: WorkEntryWithClient) => (
                 <Box key={entry.id} sx={{ mb: 2, pb: 2, borderBottom: '1px solid #eee' }}>
                   <Typography variant="subtitle1">{entry.client_name}</Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -144,8 +146,7 @@ const DashboardPage: React.FC = () => {
           </Paper>
         </Grid>
 
-        {/* @ts-expect-error - MUI Grid item prop type issue */}
-        <Grid item xs={12} md={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" mb={2}>
               Quick Actions

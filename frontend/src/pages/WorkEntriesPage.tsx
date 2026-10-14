@@ -34,28 +34,33 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import apiClient from '../api/client';
+import { queryKeys } from '../api/queryKeys';
 import { type WorkEntry } from '../types/api';
+
+const MAX_HOURS_PER_ENTRY = 24;
+
+const emptyWorkEntryForm = () => ({
+  clientId: 0,
+  hours: '',
+  description: '',
+  date: new Date(),
+});
 
 const WorkEntriesPage: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<WorkEntry | null>(null);
-  const [formData, setFormData] = useState({
-    clientId: 0,
-    hours: '',
-    description: '',
-    date: new Date(),
-  });
+  const [formData, setFormData] = useState(emptyWorkEntryForm);
   const [error, setError] = useState('');
 
   const queryClient = useQueryClient();
 
   const { data: workEntriesData, isLoading: entriesLoading } = useQuery({
-    queryKey: ['workEntries'],
+    queryKey: queryKeys.workEntries,
     queryFn: () => apiClient.getWorkEntries(),
   });
 
   const { data: clientsData, isLoading: clientsLoading } = useQuery({
-    queryKey: ['clients'],
+    queryKey: queryKeys.clients,
     queryFn: () => apiClient.getClients(),
   });
 
@@ -63,7 +68,7 @@ const WorkEntriesPage: React.FC = () => {
     mutationFn: (entryData: { clientId: number; hours: number; description?: string; date: string }) =>
       apiClient.createWorkEntry(entryData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workEntries'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.workEntries });
       handleClose();
     },
     onError: (err: unknown) => {
@@ -76,7 +81,7 @@ const WorkEntriesPage: React.FC = () => {
     mutationFn: ({ id, data }: { id: number; data: { clientId?: number; hours?: number; description?: string; date?: string } }) =>
       apiClient.updateWorkEntry(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workEntries'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.workEntries });
       handleClose();
     },
     onError: (err: unknown) => {
@@ -88,7 +93,7 @@ const WorkEntriesPage: React.FC = () => {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiClient.deleteWorkEntry(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workEntries'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.workEntries });
     },
     onError: (err: unknown) => {
       const error = err as { response?: { data?: { error?: string } } };
@@ -98,6 +103,7 @@ const WorkEntriesPage: React.FC = () => {
 
   const workEntries = workEntriesData?.workEntries || [];
   const clients = clientsData?.clients || [];
+  const isSaving = createMutation.isPending || updateMutation.isPending;
 
   const handleOpen = (entry?: WorkEntry) => {
     if (entry) {
@@ -110,12 +116,7 @@ const WorkEntriesPage: React.FC = () => {
       });
     } else {
       setEditingEntry(null);
-      setFormData({
-        clientId: 0,
-        hours: '',
-        description: '',
-        date: new Date(),
-      });
+      setFormData(emptyWorkEntryForm());
     }
     setError('');
     setOpen(true);
@@ -124,12 +125,7 @@ const WorkEntriesPage: React.FC = () => {
   const handleClose = () => {
     setOpen(false);
     setEditingEntry(null);
-    setFormData({
-      clientId: 0,
-      hours: '',
-      description: '',
-      date: new Date(),
-    });
+    setFormData(emptyWorkEntryForm());
     setError('');
   };
 
@@ -143,8 +139,8 @@ const WorkEntriesPage: React.FC = () => {
     }
 
     const hours = parseFloat(formData.hours);
-    if (!hours || hours <= 0 || hours > 24) {
-      setError('Hours must be between 0 and 24');
+    if (!hours || hours <= 0 || hours > MAX_HOURS_PER_ENTRY) {
+      setError(`Hours must be between 0 and ${MAX_HOURS_PER_ENTRY}`);
       return;
     }
 
@@ -296,7 +292,7 @@ const WorkEntriesPage: React.FC = () => {
                 <Select
                   value={formData.clientId}
                   onChange={(e) => setFormData({ ...formData, clientId: Number(e.target.value) })}
-                  disabled={createMutation.isPending || updateMutation.isPending}
+                  disabled={isSaving}
                 >
                   {clients.map((client: { id: number; name: string }) => (
                     <MenuItem key={client.id} value={client.id}>
@@ -312,10 +308,10 @@ const WorkEntriesPage: React.FC = () => {
                 type="number"
                 fullWidth
                 required
-                inputProps={{ min: 0.01, max: 24, step: 0.01 }}
+                inputProps={{ min: 0.01, max: MAX_HOURS_PER_ENTRY, step: 0.01 }}
                 value={formData.hours}
                 onChange={(e) => setFormData({ ...formData, hours: e.target.value })}
-                disabled={createMutation.isPending || updateMutation.isPending}
+                disabled={isSaving}
               />
 
               <DatePicker
@@ -327,7 +323,7 @@ const WorkEntriesPage: React.FC = () => {
                     fullWidth: true,
                     margin: 'dense',
                     required: true,
-                    disabled: createMutation.isPending || updateMutation.isPending,
+                    disabled: isSaving,
                   },
                 }}
               />
@@ -340,19 +336,19 @@ const WorkEntriesPage: React.FC = () => {
                 rows={3}
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                disabled={createMutation.isPending || updateMutation.isPending}
+                disabled={isSaving}
               />
             </DialogContent>
             <DialogActions>
-              <Button onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
+              <Button onClick={handleClose} disabled={isSaving}>
                 Cancel
               </Button>
               <Button
                 type="submit"
                 variant="contained"
-                disabled={createMutation.isPending || updateMutation.isPending}
+                disabled={isSaving}
               >
-                {createMutation.isPending || updateMutation.isPending ? (
+                {isSaving ? (
                   <CircularProgress size={24} />
                 ) : (
                   editingEntry ? 'Update' : 'Create'

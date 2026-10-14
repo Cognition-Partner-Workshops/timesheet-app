@@ -28,18 +28,21 @@ import {
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
+import { queryKeys } from '../api/queryKeys';
 import { type Client } from '../types/api';
+
+const EMPTY_CLIENT_FORM = { name: '', description: '', department: '', email: '' };
 
 const ClientsPage: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
-  const [formData, setFormData] = useState({ name: '', description: '', department: '', email: '' });
+  const [formData, setFormData] = useState(EMPTY_CLIENT_FORM);
   const [error, setError] = useState('');
 
   const queryClient = useQueryClient();
 
   const { data: clientsData, isLoading } = useQuery({
-    queryKey: ['clients'],
+    queryKey: queryKeys.clients,
     queryFn: () => apiClient.getClients(),
   });
 
@@ -47,7 +50,7 @@ const ClientsPage: React.FC = () => {
     mutationFn: (clientData: { name: string; description?: string; department?: string; email?: string }) =>
       apiClient.createClient(clientData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.clients });
       handleClose();
     },
     onError: (err: unknown) => {
@@ -60,7 +63,7 @@ const ClientsPage: React.FC = () => {
     mutationFn: ({ id, data }: { id: number; data: { name?: string; description?: string; department?: string; email?: string } }) =>
       apiClient.updateClient(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.clients });
       handleClose();
     },
     onError: (err: unknown) => {
@@ -72,7 +75,7 @@ const ClientsPage: React.FC = () => {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiClient.deleteClient(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.clients });
     },
     onError: (err: unknown) => {
       const error = err as { response?: { data?: { error?: string } } };
@@ -83,7 +86,7 @@ const ClientsPage: React.FC = () => {
   const deleteAllMutation = useMutation({
     mutationFn: () => apiClient.deleteAllClients(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.clients });
     },
     onError: (err: unknown) => {
       const error = err as { response?: { data?: { error?: string } } };
@@ -92,6 +95,7 @@ const ClientsPage: React.FC = () => {
   });
 
   const clients = clientsData?.clients || [];
+  const isSaving = createMutation.isPending || updateMutation.isPending;
 
   const handleOpen = (client?: Client) => {
     if (client) {
@@ -104,7 +108,7 @@ const ClientsPage: React.FC = () => {
       });
     } else {
       setEditingClient(null);
-      setFormData({ name: '', description: '', department: '', email: '' });
+      setFormData(EMPTY_CLIENT_FORM);
     }
     setError('');
     setOpen(true);
@@ -113,7 +117,7 @@ const ClientsPage: React.FC = () => {
   const handleClose = () => {
     setOpen(false);
     setEditingClient(null);
-    setFormData({ name: '', description: '', department: '', email: '' });
+    setFormData(EMPTY_CLIENT_FORM);
     setError('');
   };
 
@@ -126,23 +130,17 @@ const ClientsPage: React.FC = () => {
       return;
     }
 
+    const clientData = {
+      name: formData.name,
+      description: formData.description || undefined,
+      department: formData.department || undefined,
+      email: formData.email || undefined,
+    };
+
     if (editingClient) {
-      updateMutation.mutate({
-        id: editingClient.id,
-        data: {
-          name: formData.name,
-          description: formData.description || undefined,
-          department: formData.department || undefined,
-          email: formData.email || undefined,
-        },
-      });
+      updateMutation.mutate({ id: editingClient.id, data: clientData });
     } else {
-      createMutation.mutate({
-        name: formData.name,
-        description: formData.description || undefined,
-        department: formData.department || undefined,
-        email: formData.email || undefined,
-      });
+      createMutation.mutate(clientData);
     }
   };
 
@@ -294,7 +292,7 @@ const ClientsPage: React.FC = () => {
               required
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={isSaving}
             />
             <TextField
               margin="dense"
@@ -302,7 +300,7 @@ const ClientsPage: React.FC = () => {
               fullWidth
               value={formData.department}
               onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={isSaving}
             />
             <TextField
               margin="dense"
@@ -311,7 +309,7 @@ const ClientsPage: React.FC = () => {
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={isSaving}
             />
             <TextField
               margin="dense"
@@ -321,19 +319,19 @@ const ClientsPage: React.FC = () => {
               rows={3}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={isSaving}
             />
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
+            <Button onClick={handleClose} disabled={isSaving}>
               Cancel
             </Button>
             <Button
               type="submit"
               variant="contained"
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={isSaving}
             >
-              {createMutation.isPending || updateMutation.isPending ? (
+              {isSaving ? (
                 <CircularProgress size={24} />
               ) : (
                 editingClient ? 'Update' : 'Create'

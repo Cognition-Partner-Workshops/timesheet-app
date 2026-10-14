@@ -2,8 +2,18 @@ const express = require('express');
 const { getDatabase } = require('../database/init');
 const { authenticateUser } = require('../middleware/auth');
 const { clientSchema, updateClientSchema } = require('../validation/schemas');
+const { validateIdParam, buildUpdateSet } = require('../utils/routeHelpers');
 
 const router = express.Router();
+
+const validateClientId = validateIdParam('id', 'client');
+
+const CLIENT_UPDATE_FIELDS = [
+  { key: 'name', column: 'name' },
+  { key: 'description', column: 'description', nullable: true },
+  { key: 'department', column: 'department', nullable: true },
+  { key: 'email', column: 'email', nullable: true }
+];
 
 // All routes require authentication
 router.use(authenticateUser);
@@ -27,13 +37,8 @@ router.get('/', (req, res) => {
 });
 
 // Get specific client
-router.get('/:id', (req, res) => {
-  const clientId = parseInt(req.params.id);
-  
-  if (isNaN(clientId)) {
-    return res.status(400).json({ error: 'Invalid client ID' });
-  }
-  
+router.get('/:id', validateClientId, (req, res) => {
+  const clientId = req.params.id;
   const db = getDatabase();
   
   db.get(
@@ -98,13 +103,9 @@ router.post('/', (req, res, next) => {
 });
 
 // Update client
-router.put('/:id', (req, res, next) => {
+router.put('/:id', validateClientId, (req, res, next) => {
   try {
-    const clientId = parseInt(req.params.id);
-    
-    if (isNaN(clientId)) {
-      return res.status(400).json({ error: 'Invalid client ID' });
-    }
+    const clientId = req.params.id;
 
     const { error, value } = updateClientSchema.validate(req.body);
     if (error) {
@@ -127,36 +128,10 @@ router.put('/:id', (req, res, next) => {
           return res.status(404).json({ error: 'Client not found' });
         }
 
-        // Build update query dynamically
-        const updates = [];
-        const values = [];
+        const { setClause, values } = buildUpdateSet(value, CLIENT_UPDATE_FIELDS);
+        const query = `UPDATE clients SET ${setClause} WHERE id = ? AND user_email = ?`;
 
-        if (value.name !== undefined) {
-          updates.push('name = ?');
-          values.push(value.name);
-        }
-
-        if (value.description !== undefined) {
-          updates.push('description = ?');
-          values.push(value.description || null);
-        }
-
-        if (value.department !== undefined) {
-          updates.push('department = ?');
-          values.push(value.department || null);
-        }
-
-        if (value.email !== undefined) {
-          updates.push('email = ?');
-          values.push(value.email || null);
-        }
-
-        updates.push('updated_at = CURRENT_TIMESTAMP');
-        values.push(clientId, req.userEmail);
-
-        const query = `UPDATE clients SET ${updates.join(', ')} WHERE id = ? AND user_email = ?`;
-
-        db.run(query, values, function(err) {
+        db.run(query, [...values, clientId, req.userEmail], function(err) {
           if (err) {
             console.error('Database error:', err);
             return res.status(500).json({ error: 'Failed to update client' });
@@ -208,13 +183,8 @@ router.delete('/', (req, res) => {
 });
 
 // Delete client
-router.delete('/:id', (req, res) => {
-  const clientId = parseInt(req.params.id);
-  
-  if (isNaN(clientId)) {
-    return res.status(400).json({ error: 'Invalid client ID' });
-  }
-  
+router.delete('/:id', validateClientId, (req, res) => {
+  const clientId = req.params.id;
   const db = getDatabase();
   
   // Check if client exists and belongs to user
