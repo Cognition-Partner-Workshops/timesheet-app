@@ -1,0 +1,481 @@
+name: Continuous Quality Gates
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --prefix backend && npm ci --ignore-scripts --prefix frontend
+      - name: Run lint and formatting checks
+        id: checks
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set +e
+          npm run lint --prefix frontend
+          LINT=$?
+          bash scripts/format-check-changed.sh "$BASE_SHA"
+          FORMAT=$?
+          if [ "$LINT" -eq 0 ] && [ "$FORMAT" -eq 0 ]; then
+            echo '{"gate":"lint","status":"pass","metric":"eslint and changed-file prettier checks passed"}' > lint.json
+          else
+            echo '{"gate":"lint","status":"fail","metric":"eslint or changed-file prettier check failed"}' > lint.json
+          fi
+          exit $((LINT || FORMAT))
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-lint
+          path: lint.json
+
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - run: npm ci --ignore-scripts --prefix backend && npm ci --ignore-scripts --prefix frontend
+      - name: Run unit tests
+        id: tests
+        run: |
+          set +e
+          npm test --prefix backend
+          BACKEND=$?
+          npm test --prefix frontend
+          FRONTEND=$?
+          if [ "$BACKEND" -eq 0 ] && [ "$FRONTEND" -eq 0 ]; then
+            echo '{"gate":"unit-tests","status":"pass","metric":"backend Jest and frontend Vitest passed"}' > unit-tests.json
+          else
+            echo '{"gate":"unit-tests","status":"fail","metric":"backend or frontend unit tests failed"}' > unit-tests.json
+          fi
+          exit $((BACKEND || FRONTEND))
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-unit-tests
+          path: unit-tests.json
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - run: npm ci --ignore-scripts --prefix backend && npm ci --ignore-scripts --prefix frontend
+      - name: Compare total and changed-line coverage
+        id: coverage
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          python3 <<'PY'
+          import json
+          import os
+          import re
+          import shutil
+          import subprocess
+          import tempfile
+          from pathlib import Path
+
+          base_sha = os.environ["BASE_SHA"]
+          packages = ("backend", "frontend")
+
+          def run(command, cwd=None):
+              return subprocess.run(command, cwd=cwd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode
+
+          def summary(path):
+              try:
+                  data = json.loads(Path(path).read_text())
+                  return float(data["total"]["lines"]["pct"])
+              except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+                  return None
+
+          def changed_lines(diff):
+              changed = {}
+              current = None
+              for line in diff.splitlines():
+                  if line.startswith("+++ b/"):
+                      current = line[6:]
+                  elif line.startswith("@@") and current:
+                      match = re.search(r"\+(\d+)(?:,(\d+))?", line)
+                      if match:
+                          start = int(match.group(1))
+                          count = int(match.group(2) or 1)
+                          changed.setdefault(current, set()).update(range(start, start + count))
+              return changed
+
+          def patch_percentage(package, changed, lcov_path):
+              covered = total = 0
+              current = None
+              try:
+                  lines = Path(lcov_path).read_text().splitlines()
+              except OSError:
+                  return None
+              for line in lines:
+                  if line.startswith("SF:"):
+                      current = line[3:]
+                  elif line.startswith("DA:") and current:
+                      number, hits = line[3:].split(",", 2)[:2]
+                      normalized = current.removeprefix("file://")
+                      suffix = normalized.split(f"/{package}/", 1)[-1]
+                      filename = f"{package}/{suffix}"
+                      if number.isdigit() and int(number) in changed.get(filename, set()):
+                          total += 1
+                          covered += int(hits.split(",", 1)[0]) > 0
+              return None if total == 0 else covered * 100 / total
+
+          head_status = [run(["npm", "run", "test:coverage"], package) for package in packages]
+          diff = subprocess.check_output(
+              ["git", "diff", "--unified=0", f"{base_sha}...HEAD", "--", "backend/src", "frontend/src"],
+              text=True,
+          )
+          changed = changed_lines(diff)
+          head = {package: summary(f"{package}/coverage/coverage-summary.json") for package in packages}
+          patch = {
+              package: patch_percentage(package, changed, f"{package}/coverage/lcov.info")
+              for package in packages
+          }
+
+          baseline = {}
+          worktree = tempfile.mkdtemp()
+          baseline_available = run(["git", "worktree", "add", "--detach", worktree, base_sha]) == 0
+          if baseline_available:
+              for package in packages:
+                  if run(["npm", "ci"], Path(worktree, package)) != 0 or run(
+                      ["npm", "run", "test:coverage"], Path(worktree, package)
+                  ) != 0:
+                      baseline_available = False
+                      break
+              if baseline_available:
+                  baseline = {
+                      package: summary(Path(worktree, package, "coverage", "coverage-summary.json"))
+                      for package in packages
+                  }
+                  baseline_available = all(value is not None for value in baseline.values())
+          subprocess.run(["git", "worktree", "remove", "--force", worktree], check=False)
+          shutil.rmtree(worktree, ignore_errors=True)
+
+          status = "pass"
+          if any(code != 0 for code in head_status) or any(value is None for value in head.values()):
+              status = "fail"
+          for value in patch.values():
+              if value is not None and value < 80:
+                  status = "fail"
+          if baseline_available:
+              for package in packages:
+                  if head[package] < baseline[package]:
+                      status = "fail"
+              baseline_text = "; ".join(
+                  f"{package} {head[package]:.1f}% vs base {baseline[package]:.1f}%" for package in packages
+              )
+          else:
+              baseline_text = "; ".join(f"{package} {head[package] or 0:.1f}% vs baseline unavailable" for package in packages)
+          patch_text = "; ".join(
+              f"{package} patch {'N/A' if patch[package] is None else f'{patch[package]:.1f}%'}" for package in packages
+          )
+          metric = f"{baseline_text}; {patch_text}"
+          Path("coverage.json").write_text(json.dumps({
+              "gate": "coverage",
+              "status": status,
+              "metric": metric,
+          }) + "\n")
+          raise SystemExit(0 if status == "pass" else 1)
+          PY
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-coverage
+          path: coverage.json
+
+  security:
+    name: Security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - run: npm ci --ignore-scripts --prefix backend && npm ci --ignore-scripts --prefix frontend
+      - name: Audit dependencies
+        id: audit
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          python3 <<'PY'
+          import json
+          import os
+          import shutil
+          import subprocess
+          import tempfile
+          from pathlib import Path
+
+          packages = ("backend", "frontend")
+          base_sha = os.environ["BASE_SHA"]
+
+          def audit(directory, output):
+              with open(output, "w") as stream:
+                  return subprocess.run(
+                      ["npm", "audit", "--json"],
+                      cwd=directory,
+                      stdout=stream,
+                      stderr=subprocess.DEVNULL,
+                  ).returncode
+
+          def read_json(path):
+              try:
+                  return json.loads(Path(path).read_text())
+              except (OSError, ValueError, json.JSONDecodeError):
+                  return {}
+
+          def metadata_count(path, severity):
+              try:
+                  value = subprocess.check_output(
+                      ["jq", "-r", f"(.metadata.vulnerabilities.{severity} // 0)", str(path)],
+                      stderr=subprocess.DEVNULL,
+                      text=True,
+                  ).strip()
+                  return int(value or 0)
+              except (OSError, subprocess.CalledProcessError, ValueError):
+                  return 0
+
+          def findings(data):
+              result = set()
+              for module, item in (data.get("vulnerabilities") or {}).items():
+                  if item.get("severity") not in {"high", "critical"}:
+                      continue
+                  via = item.get("via") or []
+                  advisories = [entry for entry in via if isinstance(entry, dict)]
+                  if advisories:
+                      for advisory in advisories:
+                          identity = advisory.get("source") or advisory.get("url") or advisory.get("title")
+                          result.add(str(identity or f"{module}|{item.get('severity')}|{item.get('range')}"))
+                  else:
+                      result.add(f"{module}|{item.get('severity')}|{item.get('range')}")
+              return result
+
+          head_dir = Path(tempfile.mkdtemp())
+          head_sets = {}
+          for package in packages:
+              audit(package, head_dir / f"{package}-head.json")
+              head_sets[package] = findings(read_json(head_dir / f"{package}-head.json"))
+
+          baseline_dir = Path(tempfile.mkdtemp())
+          baseline_available = subprocess.run(
+              ["git", "worktree", "add", "--detach", str(baseline_dir), base_sha],
+              stdout=subprocess.DEVNULL,
+              stderr=subprocess.DEVNULL,
+          ).returncode == 0
+          base_sets = {}
+          if baseline_available:
+              for package in packages:
+                  audit(baseline_dir / package, baseline_dir / f"{package}-base.json")
+                  data = read_json(baseline_dir / f"{package}-base.json")
+                  if not data:
+                      baseline_available = False
+                      break
+                  base_sets[package] = findings(data)
+          subprocess.run(["git", "worktree", "remove", "--force", str(baseline_dir)], check=False)
+          shutil.rmtree(baseline_dir, ignore_errors=True)
+
+          head_package_count = sum(
+              metadata_count(head_dir / f"{package}-head.json", severity)
+              for package in packages
+              for severity in ("high", "critical")
+          )
+          if baseline_available:
+              new = sum(len(head_sets[package] - base_sets[package]) for package in packages)
+              pre_existing = sum(len(head_sets[package] & base_sets[package]) for package in packages)
+              status = "pass" if new == 0 else "fail"
+              metric = (
+                  f"{new} new advisories ({pre_existing} pre-existing advisories; "
+                  f"{head_package_count} vulnerable packages)"
+              )
+          else:
+              status = "skipped"
+              metric = f"baseline unavailable; {head_package_count} vulnerable packages (high/critical)"
+          Path("security.json").write_text(json.dumps({
+              "gate": "security",
+              "status": status,
+              "metric": metric,
+          }) + "\n")
+          raise SystemExit(0 if status != "fail" else 1)
+          PY
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-security
+          path: security.json
+
+  types:
+    name: Types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --ignore-scripts --prefix frontend
+      - name: Typecheck
+        id: typecheck
+        run: |
+          set +e
+          npm run typecheck --prefix frontend
+          STATUS=$?
+          if [ "$STATUS" -eq 0 ]; then RESULT=pass; else RESULT=fail; fi
+          printf '{"gate":"types","status":"%s","metric":"frontend tsc --noEmit"}\n' "$RESULT" > types.json
+          exit "$STATUS"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-types
+          path: types.json
+
+  bundle-size:
+    name: Bundle size
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --ignore-scripts --prefix frontend
+      - name: Compare gzipped bundles
+        id: bundle
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set +e
+          npm run build --prefix frontend
+          HEAD_STATUS=$?
+          if [ "$HEAD_STATUS" -ne 0 ] || [ ! -d frontend/dist/assets ]; then
+            printf '{"gate":"bundle-size","status":"fail","metric":"build failed"}\n' > bundle-size.json
+            exit 1
+          fi
+          HEAD_SIZE=$(find frontend/dist/assets -type f -print0 | xargs -0 gzip -c | wc -c)
+          BASE_DIR=$(mktemp -d)
+          BASE_AVAILABLE=true
+          git worktree add --detach "$BASE_DIR" "$BASE_SHA" >/dev/null 2>&1 || BASE_AVAILABLE=false
+          if [ "$BASE_AVAILABLE" = true ]; then
+            npm ci --ignore-scripts --prefix "$BASE_DIR/frontend" >/dev/null 2>&1 && npm run build --prefix "$BASE_DIR/frontend" >/dev/null 2>&1 || BASE_AVAILABLE=false
+          fi
+          if [ "$BASE_AVAILABLE" = true ] && [ -d "$BASE_DIR/frontend/dist/assets" ]; then
+            BASE_SIZE=$(find "$BASE_DIR/frontend/dist/assets" -type f -print0 | xargs -0 gzip -c | wc -c)
+            CHANGE=$(awk "BEGIN {printf \"%.1f\", (($HEAD_SIZE - $BASE_SIZE) / $BASE_SIZE) * 100}")
+            awk "BEGIN {exit !($HEAD_SIZE <= $BASE_SIZE * 1.10)}" && STATUS=pass || STATUS=fail
+            METRIC="$(awk "BEGIN {printf \"%.1f\", $HEAD_SIZE / 1024}") KB gz, ${CHANGE}%"
+          else
+            STATUS=skipped
+            METRIC="$(awk "BEGIN {printf \"%.1f\", $HEAD_SIZE / 1024}") KB gz, baseline unavailable"
+          fi
+          git worktree remove --force "$BASE_DIR" >/dev/null 2>&1 || true
+          printf '{"gate":"bundle-size","status":"%s","metric":"%s"}\n' "$STATUS" "$METRIC" > bundle-size.json
+          [ "$HEAD_STATUS" -eq 0 ] && [ "$STATUS" != fail ] || exit 1
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-bundle-size
+          path: bundle-size.json
+
+  quality-dashboard:
+    name: Quality dashboard
+    if: always()
+    needs: [lint, unit-tests, coverage, security, types, bundle-size]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: quality-*
+          path: quality-results
+          merge-multiple: true
+      - name: Render dashboard
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+          SERVER_URL: ${{ github.server_url }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set +e
+          python3 - <<'PY'
+          import glob, json
+          import os
+          expected = ["lint", "unit-tests", "coverage", "security", "types", "bundle-size"]
+          rows = {}
+          for path in glob.glob("quality-results/*.json"):
+              try:
+                  item = json.load(open(path))
+                  rows[item["gate"]] = item
+              except Exception: pass
+          base_url = f"{os.environ['SERVER_URL']}/{os.environ['REPOSITORY']}/blob/{os.environ['HEAD_SHA']}/QUALITY_GATES.md"
+          lines = ["<!-- quality-gates-dashboard -->", "## Continuous quality gates", "", "| Gate | Status | Metric | How to fix |", "| --- | --- | --- | --- |"]
+          for gate in expected:
+              row = rows.get(gate)
+              if row is None:
+                  lines.append(f"| {gate} | skipped | no result | [Troubleshooting]({base_url}#adjusting-thresholds) |")
+              else:
+                  fix = f"[Troubleshooting]({base_url}#{gate})"
+                  lines.append(f"| {gate} | {row['status']} | {row['metric']} | {fix} |")
+          body = "\n".join(lines)
+          print(body)
+          open("dashboard.md", "w").write(body + "\n")
+          PY
+          cat dashboard.md >> "$GITHUB_STEP_SUMMARY"
+          COMMENT_ID=$(gh api "repos/$REPOSITORY/issues/$PR_NUMBER/comments" --paginate --jq '.[] | select(.body | contains("<!-- quality-gates-dashboard -->")) | .id' | head -1)
+          if [ -n "$COMMENT_ID" ]; then
+            gh api --method PATCH "repos/$REPOSITORY/issues/comments/$COMMENT_ID" -f body="$(cat dashboard.md)" >/dev/null
+          else
+            gh api --method POST "repos/$REPOSITORY/issues/$PR_NUMBER/comments" -f body="$(cat dashboard.md)" >/dev/null
+          fi
+          exit 0

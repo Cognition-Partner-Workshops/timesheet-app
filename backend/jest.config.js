@@ -7,7 +7,7 @@ module.exports = {
     '!src/server.js', // Exclude server startup file
     '!**/node_modules/**'
   ],
-  coverageReporters: ['text', 'lcov', 'html'],
+  coverageReporters: ['text', 'lcov', 'json-summary', 'html'],
   testMatch: ['**/__tests__/**/*.test.js'],
   coverageThreshold: {
     global: {
