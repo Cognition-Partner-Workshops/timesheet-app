@@ -8,36 +8,27 @@ function authenticateUser(req, res, next) {
     return res.status(401).json({ error: 'User email required in x-user-email header' });
   }
 
-  // Validate email format
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(userEmail)) {
+  // Validate email format (structural check without backtracking-prone regex)
+  const atIndex = userEmail.indexOf('@');
+  const hasValidStructure = atIndex > 0
+    && atIndex < userEmail.length - 1
+    && !userEmail.includes(' ')
+    && userEmail.indexOf('.', atIndex) > atIndex + 1;
+  if (!hasValidStructure) {
     return res.status(400).json({ error: 'Invalid email format' });
   }
 
   const db = getDatabase();
   
-  // Check if user exists, create if not
-  db.get('SELECT email FROM users WHERE email = ?', [userEmail], (err, row) => {
+  // Ensure user exists (INSERT OR IGNORE is idempotent and race-condition safe)
+  db.run('INSERT OR IGNORE INTO users (email) VALUES (?)', [userEmail], (err) => {
     if (err) {
-      console.error('Database error:', err);
-      return res.status(500).json({ error: 'Internal server error' });
+      console.error('Error ensuring user exists:', err);
+      return res.status(500).json({ error: 'Failed to authenticate user' });
     }
     
-    if (!row) {
-      // Create new user
-      db.run('INSERT INTO users (email) VALUES (?)', [userEmail], (err) => {
-        if (err) {
-          console.error('Error creating user:', err);
-          return res.status(500).json({ error: 'Failed to create user' });
-        }
-        
-        req.userEmail = userEmail;
-        next();
-      });
-    } else {
-      req.userEmail = userEmail;
-      next();
-    }
+    req.userEmail = userEmail;
+    next();
   });
 }
 
