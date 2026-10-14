@@ -1,16 +1,19 @@
 const { getDatabase } = require('../database/init');
+const { logUnauthorizedAccess } = require('./securityLogger');
 
 // Simple email-based authentication middleware
 function authenticateUser(req, res, next) {
   const userEmail = req.headers['x-user-email'];
   
   if (!userEmail) {
+    logUnauthorizedAccess(req.ip, req.originalUrl, 'missing_email_header');
     return res.status(401).json({ error: 'User email required in x-user-email header' });
   }
 
   // Validate email format
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(userEmail)) {
+    logUnauthorizedAccess(req.ip, req.originalUrl, 'invalid_email_format');
     return res.status(400).json({ error: 'Invalid email format' });
   }
 

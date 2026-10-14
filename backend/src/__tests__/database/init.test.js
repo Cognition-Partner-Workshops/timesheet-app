@@ -43,7 +43,7 @@ describe('Database Initialization', () => {
       const db = getDatabase();
       
       expect(db).toBeDefined();
-      expect(consoleLogSpy).toHaveBeenCalledWith('Connected to SQLite in-memory database');
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Connected to SQLite database at'));
     });
 
     test('should return same database instance on multiple calls', () => {

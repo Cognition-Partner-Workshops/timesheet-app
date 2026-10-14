@@ -2,6 +2,7 @@ const express = require('express');
 const { getDatabase } = require('../database/init');
 const { authenticateUser } = require('../middleware/auth');
 const { clientSchema, updateClientSchema } = require('../validation/schemas');
+const { logBulkDelete } = require('../middleware/securityLogger');
 
 const router = express.Router();
 
@@ -198,6 +199,8 @@ router.delete('/', (req, res) => {
         console.error('Database error:', err);
         return res.status(500).json({ error: 'Failed to delete clients' });
       }
+
+      logBulkDelete(req.userEmail, req.ip, 'clients', this.changes);
       
       res.json({ 
         message: 'All clients deleted successfully',

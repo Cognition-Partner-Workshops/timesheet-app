@@ -5,6 +5,7 @@ const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 const PDFDocument = require('pdfkit');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 const router = express.Router();
 
@@ -103,12 +104,17 @@ router.get('/export/csv/:clientId', (req, res) => {
           // Create temporary CSV file
           const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
           const filename = `${client.name.replace(/[^a-zA-Z0-9]/g, '_')}_report_${timestamp}.csv`;
-          const tempPath = path.join(__dirname, '../../temp', filename);
+          const tempDir = path.join(os.tmpdir(), 'timesheet-reports');
+          const tempPath = path.join(tempDir, filename);
           
           // Ensure temp directory exists
-          const tempDir = path.dirname(tempPath);
-          if (!fs.existsSync(tempDir)) {
-            fs.mkdirSync(tempDir, { recursive: true });
+          try {
+            if (!fs.existsSync(tempDir)) {
+              fs.mkdirSync(tempDir, { recursive: true });
+            }
+          } catch (mkdirErr) {
+            console.error('Error creating temp directory:', mkdirErr);
+            return res.status(500).json({ error: 'Failed to generate CSV report' });
           }
           
           const csvWriter = createCsvWriter({
