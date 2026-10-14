@@ -1,5 +1,7 @@
 export interface User {
   email: string;
+  name: string | null;
+  role: 'admin' | 'user';
   createdAt: string;
 }
 
@@ -65,10 +67,24 @@ export interface UpdateWorkEntryRequest {
 
 export interface LoginRequest {
   email: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  name?: string;
+}
+
+export interface AuthResponse {
+  message: string;
+  token: string;
+  user: User;
 }
 
 export interface LoginResponse {
   message: string;
+  token: string;
   user: User;
 }
 

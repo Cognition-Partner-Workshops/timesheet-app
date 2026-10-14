@@ -1,5 +1,6 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fs = require('fs');
 
 let db = null;
 let isClosing = false;
@@ -10,13 +11,20 @@ function getDatabase() {
     // Reset state when creating a new database connection
     isClosing = false;
     isClosed = false;
-    // Use in-memory database as specified in requirements
-    db = new sqlite3.Database(':memory:', (err) => {
+    const dbPath = process.env.DB_PATH || ':memory:';
+    if (dbPath !== ':memory:') {
+      const dbDir = path.dirname(dbPath);
+      if (!fs.existsSync(dbDir)) {
+        fs.mkdirSync(dbDir, { recursive: true });
+      }
+    }
+    db = new sqlite3.Database(dbPath, (err) => {
       if (err) {
         console.error('Error opening database:', err);
         throw err;
       }
-      console.log('Connected to SQLite in-memory database');
+      const label = dbPath === ':memory:' ? 'in-memory' : dbPath;
+      console.log(`Connected to SQLite database: ${label}`);
     });
   }
   return db;
@@ -27,10 +35,16 @@ async function initializeDatabase() {
   
   return new Promise((resolve, reject) => {
     database.serialize(() => {
+      // Enable foreign keys
+      database.run('PRAGMA foreign_keys = ON');
+
       // Create users table
       database.run(`
         CREATE TABLE IF NOT EXISTS users (
           email TEXT PRIMARY KEY,
+          password_hash TEXT,
+          name TEXT,
+          role TEXT NOT NULL DEFAULT 'user',
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
       `);
