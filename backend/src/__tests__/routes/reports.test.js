@@ -1,11 +1,11 @@
 const request = require('supertest');
 const express = require('express');
 const { getDatabase } = require('../../database/init');
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 jest.mock('../../database/init');
-jest.mock('fs');
+jest.mock('node:fs');
 jest.mock('csv-writer', () => ({
   createObjectCsvWriter: jest.fn(() => ({
     writeRecords: jest.fn().mockResolvedValue(undefined)
