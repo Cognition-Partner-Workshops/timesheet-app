@@ -144,6 +144,97 @@ describe('Database Initialization', () => {
     });
   });
 
+  // Edge-case tests for closeDatabase() — each test resets the module to get a
+  // fresh singleton, then exercises a specific branch in the close logic.
+  describe('closeDatabase - Edge Cases', () => {
+    // When getDatabase() was never called, the internal db reference is null
+    test('should resolve immediately when no database connection exists', async () => {
+      jest.resetModules();
+
+      jest.doMock('sqlite3', () => {
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, callback) => {
+              callback(null);
+              return {
+                serialize: jest.fn((cb) => cb()),
+                run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
+                close: jest.fn((cb) => cb(null))
+              };
+            })
+          }))
+        };
+      });
+
+      const { closeDatabase: closeFresh } = require('../../database/init');
+      // db is null since we never called getDatabase
+      await expect(closeFresh()).resolves.toBeUndefined();
+    });
+
+    // After a successful close, the isClosed flag prevents a second db.close() call
+    test('should resolve immediately when already closed', async () => {
+      jest.resetModules();
+
+      jest.doMock('sqlite3', () => {
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, callback) => {
+              callback(null);
+              return {
+                serialize: jest.fn((cb) => cb()),
+                run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
+                close: jest.fn((cb) => cb(null))
+              };
+            })
+          }))
+        };
+      });
+
+      const { getDatabase: getFresh, closeDatabase: closeFresh } = require('../../database/init');
+      getFresh(); // create a connection
+      await closeFresh(); // close it
+      // Second close should resolve immediately since isClosed is true
+      await expect(closeFresh()).resolves.toBeUndefined();
+    });
+
+    // Simulates two concurrent closeDatabase() calls. The first call holds the
+    // db.close callback in a deferred variable; the second call hits the isClosing
+    // branch and polls until the first finishes. Resolving the callback unblocks both.
+    test('should handle concurrent close calls via isClosing branch', async () => {
+      jest.resetModules();
+
+      let closeCallback;
+      jest.doMock('sqlite3', () => {
+        return {
+          verbose: jest.fn(() => ({
+            Database: jest.fn((path, callback) => {
+              callback(null);
+              return {
+                serialize: jest.fn((cb) => cb()),
+                run: jest.fn((q, cb) => { if (typeof cb === 'function') cb(null); }),
+                close: jest.fn((cb) => { closeCallback = cb; })
+              };
+            })
+          }))
+        };
+      });
+
+      const { getDatabase: getFresh, closeDatabase: closeFresh } = require('../../database/init');
+      getFresh();
+
+      // First close call - will hang because we don't call closeCallback yet
+      const firstClose = closeFresh();
+      // Second close call hits the isClosing branch
+      const secondClose = closeFresh();
+
+      // Now resolve the actual close
+      closeCallback(null);
+
+      await expect(firstClose).resolves.toBeUndefined();
+      await expect(secondClose).resolves.toBeUndefined();
+    });
+  });
+
   describe('Database Schema', () => {
     test('users table should have correct structure', async () => {
       const db = getDatabase();
