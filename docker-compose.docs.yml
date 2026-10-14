@@ -1,0 +1,9 @@
+version: "3.9"
+services:
+  repo-docs:
+    build:
+      context: .
+      dockerfile: Dockerfile.docs
+    ports:
+      - "8090:80"
+    restart: unless-stopped
