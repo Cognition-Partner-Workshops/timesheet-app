@@ -206,9 +206,10 @@ router.get('/export/pdf/:clientId', (req, res) => {
           doc.moveDown();
           
           // Add table header
-          doc.fontSize(12).text('Date', 50, doc.y, { width: 100 });
-          doc.text('Hours', 150, doc.y - 15, { width: 80 });
-          doc.text('Description', 230, doc.y - 15, { width: 300 });
+          const headerY = doc.y;
+          doc.fontSize(12).text('Date', 50, headerY, { width: 100 });
+          doc.text('Hours', 150, headerY, { width: 80 });
+          doc.text('Description', 230, headerY, { width: 300 });
           doc.moveDown();
           
           // Add horizontal line
