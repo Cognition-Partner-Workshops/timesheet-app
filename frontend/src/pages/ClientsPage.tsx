@@ -28,6 +28,7 @@ import {
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
+import LoadingState from '../components/LoadingState';
 import { type Client } from '../types/api';
 
 const ClientsPage: React.FC = () => {
@@ -159,11 +160,7 @@ const ClientsPage: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
-      </Box>
-    );
+    return <LoadingState />;
   }
 
   return (

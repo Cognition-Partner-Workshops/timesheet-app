@@ -13,15 +13,29 @@ export interface Client {
   updated_at: string;
 }
 
+export type ProjectStatus = 'active' | 'on_hold' | 'completed' | 'archived';
+
+export interface Project {
+  id: number;
+  client_id: number;
+  name: string;
+  description: string | null;
+  status: ProjectStatus;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface WorkEntry {
   id: number;
   client_id: number;
+  project_id?: number | null;
   hours: number;
   description: string | null;
   date: string;
   created_at: string;
   updated_at: string;
   client_name?: string;
+  project_name?: string;
 }
 
 export interface WorkEntryWithClient extends WorkEntry {
@@ -49,8 +63,22 @@ export interface UpdateClientRequest {
   email?: string;
 }
 
+export interface CreateProjectRequest {
+  clientId: number;
+  name: string;
+  description?: string;
+}
+
+export interface UpdateProjectRequest {
+  clientId?: number;
+  name?: string;
+  description?: string;
+  status?: ProjectStatus;
+}
+
 export interface CreateWorkEntryRequest {
   clientId: number;
+  projectId?: number;
   hours: number;
   description?: string;
   date: string;
@@ -58,6 +86,7 @@ export interface CreateWorkEntryRequest {
 
 export interface UpdateWorkEntryRequest {
   clientId?: number;
+  projectId?: number | null;
   hours?: number;
   description?: string;
   date?: string;
