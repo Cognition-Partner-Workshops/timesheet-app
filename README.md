@@ -295,3 +295,13 @@ MIT
 ## Support
 
 For issues or questions, please contact your system administrator.
+
+## Pre-commit Hooks
+
+This repository uses [pre-commit](https://pre-commit.com/) with [gitleaks](https://github.com/gitleaks/gitleaks) for secret detection.
+
+### Setup
+1. Install pre-commit: `pip install pre-commit`
+2. Install the hooks: `pre-commit install`
+3. (Optional) Run against all files: `pre-commit run --all-files`
+

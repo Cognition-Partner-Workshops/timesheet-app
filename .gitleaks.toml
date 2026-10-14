@@ -1,0 +1,9 @@
+title = "gitleaks config"
+
+[allowlist]
+  description = "Global allowlist"
+  paths = [
+    '(.*)?\.lock$',
+    '(.*)?package-lock\.json$',
+  ]
+
