@@ -2,6 +2,7 @@ const express = require('express');
 const { getDatabase } = require('../database/init');
 const { authenticateUser } = require('../middleware/auth');
 const { clientSchema, updateClientSchema } = require('../validation/schemas');
+const { logAudit } = require('../middleware/auditLogger');
 
 const router = express.Router();
 
@@ -84,6 +85,7 @@ router.post('/', (req, res, next) => {
               return res.status(500).json({ error: 'Client created but failed to retrieve' });
             }
 
+            logAudit(req.userEmail, 'CREATE', 'client', row.id, { name: row.name });
             res.status(201).json({ 
               message: 'Client created successfully',
               client: row 
@@ -172,6 +174,7 @@ router.put('/:id', (req, res, next) => {
                 return res.status(500).json({ error: 'Client updated but failed to retrieve' });
               }
 
+              logAudit(req.userEmail, 'UPDATE', 'client', clientId, { updatedFields: Object.keys(value) });
               res.json({
                 message: 'Client updated successfully',
                 client: row
@@ -199,6 +202,7 @@ router.delete('/', (req, res) => {
         return res.status(500).json({ error: 'Failed to delete clients' });
       }
       
+      logAudit(req.userEmail, 'DELETE', 'client', null, { scope: 'all', deletedCount: this.changes });
       res.json({ 
         message: 'All clients deleted successfully',
         deletedCount: this.changes
@@ -241,6 +245,7 @@ router.delete('/:id', (req, res) => {
             return res.status(500).json({ error: 'Failed to delete client' });
           }
           
+          logAudit(req.userEmail, 'DELETE', 'client', clientId, null);
           res.json({ message: 'Client deleted successfully' });
         }
       );
