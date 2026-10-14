@@ -13,14 +13,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const storedEmail = localStorage.getItem('userEmail');
-      
-      if (storedEmail) {
+      const token = localStorage.getItem('authToken');
+
+      if (token) {
         try {
           const response = await apiClient.getCurrentUser();
           setUser(response.user);
         } catch (error) {
           console.error('Auth check failed:', error);
+          localStorage.removeItem('authToken');
           localStorage.removeItem('userEmail');
         }
       }
@@ -30,25 +31,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkAuth();
   }, []);
 
-  const login = async (email: string) => {
-    try {
-      const response = await apiClient.login(email);
-      setUser(response.user);
-      localStorage.setItem('userEmail', email);
-    } catch (error) {
-      console.error('Login failed:', error);
-      throw error;
-    }
+  const requestOtp = async (email: string) => {
+    await apiClient.requestOtp(email);
+  };
+
+  const verifyOtp = async (email: string, code: string) => {
+    const response = await apiClient.verifyOtp(email, code);
+    setUser(response.user);
+    localStorage.setItem('authToken', response.token);
+    localStorage.setItem('userEmail', email);
+  };
+
+  const resendOtp = async (email: string) => {
+    await apiClient.resendOtp(email);
   };
 
   const logout = () => {
     setUser(null);
+    localStorage.removeItem('authToken');
     localStorage.removeItem('userEmail');
   };
 
   const value: AuthContextType = {
     user,
-    login,
+    requestOtp,
+    verifyOtp,
+    resendOtp,
     logout,
     isLoading,
     isAuthenticated: !!user,
