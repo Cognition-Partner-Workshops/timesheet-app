@@ -104,6 +104,13 @@ describe('Database Initialization', () => {
       expect(queries.some(q => q.includes('CREATE INDEX IF NOT EXISTS idx_work_entries_date'))).toBe(true);
     });
 
+    test('should enable SQLite foreign-key enforcement', async () => {
+      await closeDatabase();
+      const db = getDatabase();
+
+      expect(db.run).toHaveBeenCalledWith('PRAGMA foreign_keys = ON');
+    });
+
     test('should log success message', async () => {
       await initializeDatabase();
       

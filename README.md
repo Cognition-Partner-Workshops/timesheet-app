@@ -218,6 +218,20 @@ npm run test:coverage       # Run tests with coverage report
 npm run test:watch          # Run tests in watch mode
 ```
 
+### E2E tests
+
+With Node.js 18+ installed, run the Playwright suite from `frontend/`:
+
+```bash
+cd frontend
+npm ci
+npx playwright install --with-deps chromium
+npm run test:e2e
+```
+
+The suite starts the backend on port 3001 and the Vite frontend on port 5173,
+reusing already-running servers when available.
+
 ### Test Coverage
 
 The backend has comprehensive test coverage with **161 tests** across 8 test suites:
