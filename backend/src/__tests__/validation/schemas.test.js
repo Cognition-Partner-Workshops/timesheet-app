@@ -253,6 +253,55 @@ describe('Validation Schemas', () => {
     });
   });
 
+  describe('clientSchema - department and email fields', () => {
+    test('should validate client with department', () => {
+      const { error } = clientSchema.validate({ name: 'Test', department: 'Engineering' });
+      expect(error).toBeUndefined();
+    });
+
+    test('should validate client with email', () => {
+      const { error } = clientSchema.validate({ name: 'Test', email: 'client@test.com' });
+      expect(error).toBeUndefined();
+    });
+
+    test('should reject invalid email in client', () => {
+      const { error } = clientSchema.validate({ name: 'Test', email: 'not-an-email' });
+      expect(error).toBeDefined();
+    });
+
+    test('should reject department exceeding max length', () => {
+      const { error } = clientSchema.validate({ name: 'Test', department: 'a'.repeat(256) });
+      expect(error).toBeDefined();
+    });
+
+    test('should allow empty department', () => {
+      const { error } = clientSchema.validate({ name: 'Test', department: '' });
+      expect(error).toBeUndefined();
+    });
+
+    test('should allow empty email', () => {
+      const { error } = clientSchema.validate({ name: 'Test', email: '' });
+      expect(error).toBeUndefined();
+    });
+  });
+
+  describe('updateClientSchema - department and email fields', () => {
+    test('should validate department update', () => {
+      const { error } = updateClientSchema.validate({ department: 'New Dept' });
+      expect(error).toBeUndefined();
+    });
+
+    test('should validate email update', () => {
+      const { error } = updateClientSchema.validate({ email: 'new@test.com' });
+      expect(error).toBeUndefined();
+    });
+
+    test('should reject invalid email in update', () => {
+      const { error } = updateClientSchema.validate({ email: 'invalid' });
+      expect(error).toBeDefined();
+    });
+  });
+
   describe('updateClientSchema', () => {
     test('should validate name update', () => {
       const update = {

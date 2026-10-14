@@ -357,6 +357,138 @@ describe('Client Routes', () => {
     });
   });
 
+  describe('DELETE /api/clients (bulk delete)', () => {
+    test('should successfully bulk delete all clients', async () => {
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.changes = 3;
+        callback.call(this, null);
+      });
+
+      const response = await request(app).delete('/api/clients');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ message: 'All clients deleted successfully', deletedCount: 3 });
+    });
+
+    test('should handle bulk delete with no clients', async () => {
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.changes = 0;
+        callback.call(this, null);
+      });
+
+      const response = await request(app).delete('/api/clients');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ message: 'All clients deleted successfully', deletedCount: 0 });
+    });
+
+    test('should handle database error on bulk delete', async () => {
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        callback.call(this, new Error('Database error'));
+      });
+
+      const response = await request(app).delete('/api/clients');
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Failed to delete clients' });
+    });
+  });
+
+  describe('POST /api/clients - Optional Fields', () => {
+    test('should create client with all optional fields (department, email)', async () => {
+      const newClient = { name: 'Client', description: 'Desc', department: 'Engineering', email: 'client@example.com' };
+      const createdClient = { id: 1, ...newClient, created_at: '2024-01-01', updated_at: '2024-01-01' };
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        this.lastID = 1;
+        callback.call(this, null);
+      });
+
+      mockDb.get.mockImplementation((query, params, callback) => {
+        callback(null, createdClient);
+      });
+
+      const response = await request(app)
+        .post('/api/clients')
+        .send(newClient);
+
+      expect(response.status).toBe(201);
+      expect(response.body.message).toBe('Client created successfully');
+    });
+  });
+
+  describe('PUT /api/clients/:id - Optional Fields', () => {
+    test('should update client department', async () => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1, name: 'Client', department: 'Sales' });
+      });
+
+      const response = await request(app)
+        .put('/api/clients/1')
+        .send({ department: 'Sales' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.message).toBe('Client updated successfully');
+    });
+
+    test('should update client email', async () => {
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1 });
+      });
+
+      mockDb.run.mockImplementation((query, params, callback) => {
+        callback(null);
+      });
+
+      mockDb.get.mockImplementationOnce((query, params, callback) => {
+        callback(null, { id: 1, name: 'Client', email: 'new@example.com' });
+      });
+
+      const response = await request(app)
+        .put('/api/clients/1')
+        .send({ email: 'new@example.com' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.message).toBe('Client updated successfully');
+    });
+  });
+
+  describe('POST /api/clients - Unexpected Error', () => {
+    test('should handle unexpected error in try-catch', async () => {
+      getDatabase.mockImplementation(() => {
+        throw new Error('Unexpected error');
+      });
+
+      const response = await request(app)
+        .post('/api/clients')
+        .send({ name: 'Test Client' });
+
+      expect(response.status).toBe(500);
+    });
+  });
+
+  describe('PUT /api/clients/:id - Unexpected Error', () => {
+    test('should handle unexpected error in try-catch', async () => {
+      getDatabase.mockImplementation(() => {
+        throw new Error('Unexpected error');
+      });
+
+      const response = await request(app)
+        .put('/api/clients/1')
+        .send({ name: 'Updated Name' });
+
+      expect(response.status).toBe(500);
+    });
+  });
+
   describe('PUT /api/clients/:id - Error Handling', () => {
     test('should handle database error when checking client existence', async () => {
       mockDb.get.mockImplementation((query, params, callback) => {

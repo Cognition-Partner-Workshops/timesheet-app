@@ -430,6 +430,63 @@ describe('Work Entry Routes', () => {
     });
   });
 
+  describe('POST /api/work-entries - Unexpected Error', () => {
+    test('should handle unexpected error in try-catch', async () => {
+      getDatabase.mockImplementation(() => {
+        throw new Error('Unexpected error');
+      });
+
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({
+          clientId: 1,
+          hours: 5,
+          date: '2024-01-15'
+        });
+
+      expect(response.status).toBe(500);
+    });
+  });
+
+  describe('PUT /api/work-entries/:id - Unexpected Error', () => {
+    test('should handle unexpected error in try-catch', async () => {
+      getDatabase.mockImplementation(() => {
+        throw new Error('Unexpected error');
+      });
+
+      const response = await request(app)
+        .put('/api/work-entries/1')
+        .send({ hours: 8 });
+
+      expect(response.status).toBe(500);
+    });
+  });
+
+  describe('POST /api/work-entries - Optional Fields', () => {
+    test('should create work entry without description', async () => {
+      mockDb.get.mockImplementation((query, params, callback) => {
+        if (query.includes('clients')) {
+          callback(null, { id: 1 });
+        } else {
+          callback(null, { id: 1, client_id: 1, hours: 5, description: null, date: '2024-01-15', client_name: 'Client A' });
+        }
+      });
+
+      mockDb.run.mockImplementation(function(query, params, callback) {
+        expect(params[3]).toBeNull();
+        this.lastID = 1;
+        callback.call(this, null);
+      });
+
+      const response = await request(app)
+        .post('/api/work-entries')
+        .send({ clientId: 1, hours: 5, date: '2024-01-15' });
+
+      expect(response.status).toBe(201);
+      expect(response.body.message).toBe('Work entry created successfully');
+    });
+  });
+
   describe('PUT /api/work-entries/:id - Error Handling', () => {
     test('should handle database error when checking work entry existence', async () => {
       mockDb.get.mockImplementation((query, params, callback) => {
