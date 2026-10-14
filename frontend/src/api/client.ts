@@ -4,6 +4,18 @@ import axios, { type AxiosInstance, type AxiosResponse } from 'axios';
 // Vite proxy will forward /api requests to the backend
 const API_BASE_URL = '';
 
+export interface ClientHoursSummary {
+  client_id: number;
+  client_name: string;
+  total_hours: number;
+  entry_count: number;
+}
+
+export interface SummaryReportResponse {
+  summary: ClientHoursSummary[];
+  total_hours: number;
+}
+
 class ApiClient {
   private client: AxiosInstance;
 
@@ -114,6 +126,11 @@ class ApiClient {
   }
 
   // Report endpoints
+  async getSummaryReport(days = 30): Promise<SummaryReportResponse> {
+    const response = await this.client.get('/api/reports/summary', { params: { days } });
+    return response.data;
+  }
+
   async getClientReport(clientId: number) {
     const response = await this.client.get(`/api/reports/client/${clientId}`);
     return response.data;
