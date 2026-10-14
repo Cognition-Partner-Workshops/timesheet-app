@@ -11,6 +11,19 @@ const router = express.Router();
 // All routes require authentication
 router.use(authenticateUser);
 
+function sendFileAndCleanup(res, filePath, filename) {
+  res.download(filePath, filename, (err) => {
+    if (err) {
+      console.error('Error sending file:', err);
+    }
+    fs.unlink(filePath, (unlinkErr) => {
+      if (unlinkErr) {
+        console.error('Error deleting temp file:', unlinkErr);
+      }
+    });
+  });
+}
+
 // Get hourly report for specific client
 router.get('/client/:clientId', (req, res) => {
   const clientId = parseInt(req.params.clientId);
@@ -123,18 +136,7 @@ router.get('/export/csv/:clientId', (req, res) => {
           
           csvWriter.writeRecords(workEntries)
             .then(() => {
-              // Send file and clean up
-              res.download(tempPath, filename, (err) => {
-                if (err) {
-                  console.error('Error sending file:', err);
-                }
-                // Clean up temp file
-                fs.unlink(tempPath, (unlinkErr) => {
-                  if (unlinkErr) {
-                    console.error('Error deleting temp file:', unlinkErr);
-                  }
-                });
-              });
+              sendFileAndCleanup(res, tempPath, filename);
             })
             .catch((error) => {
               console.error('Error creating CSV:', error);
