@@ -27,6 +27,9 @@ async function initializeDatabase() {
   
   return new Promise((resolve, reject) => {
     database.serialize(() => {
+      // Enable foreign key constraints
+      database.run('PRAGMA foreign_keys = ON');
+
       // Create users table
       database.run(`
         CREATE TABLE IF NOT EXISTS users (
