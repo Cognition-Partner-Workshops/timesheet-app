@@ -5,6 +5,15 @@ const { workEntrySchema, updateWorkEntrySchema } = require('../validation/schema
 
 const router = express.Router();
 
+// Dates are persisted as ISO calendar days (YYYY-MM-DD) so that exports and
+// clients receive a date rather than a timestamp.
+function toDateOnly(value) {
+  if (value instanceof Date) {
+    return value.toISOString().split('T')[0];
+  }
+  return String(value).split('T')[0];
+}
+
 // All routes require authentication
 router.use(authenticateUser);
 
@@ -104,7 +113,7 @@ router.post('/', (req, res, next) => {
         // Create work entry
         db.run(
           'INSERT INTO work_entries (client_id, user_email, hours, description, date) VALUES (?, ?, ?, ?, ?)',
-          [clientId, req.userEmail, hours, description || null, date],
+          [clientId, req.userEmail, hours, description || null, toDateOnly(date)],
           function(err) {
             if (err) {
               console.error('Database error:', err);
@@ -214,7 +223,7 @@ router.put('/:id', (req, res, next) => {
 
           if (value.date !== undefined) {
             updates.push('date = ?');
-            values.push(value.date);
+            values.push(toDateOnly(value.date));
           }
 
           updates.push('updated_at = CURRENT_TIMESTAMP');

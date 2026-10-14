@@ -27,6 +27,9 @@ async function initializeDatabase() {
   
   return new Promise((resolve, reject) => {
     database.serialize(() => {
+      // Required for the ON DELETE CASCADE constraints below to be enforced
+      database.run('PRAGMA foreign_keys = ON');
+
       // Create users table
       database.run(`
         CREATE TABLE IF NOT EXISTS users (
