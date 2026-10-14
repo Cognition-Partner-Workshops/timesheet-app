@@ -5,18 +5,33 @@ let db = null;
 let isClosing = false;
 let isClosed = false;
 
+function getDatabasePath() {
+  if (process.env.NODE_ENV === 'test') {
+    return ':memory:';
+  }
+  return process.env.DATABASE_PATH || path.join(__dirname, '../../data/timesheet.db');
+}
+
 function getDatabase() {
   if (!db) {
-    // Reset state when creating a new database connection
     isClosing = false;
     isClosed = false;
-    // Use in-memory database as specified in requirements
-    db = new sqlite3.Database(':memory:', (err) => {
+    const dbPath = getDatabasePath();
+    // Ensure data directory exists for file-based databases
+    if (dbPath !== ':memory:') {
+      const fs = require('fs');
+      const dir = path.dirname(dbPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+    }
+    db = new sqlite3.Database(dbPath, (err) => {
       if (err) {
         console.error('Error opening database:', err);
         throw err;
       }
-      console.log('Connected to SQLite in-memory database');
+      const dbType = dbPath === ':memory:' ? 'in-memory' : `file-based (${dbPath})`;
+      console.log(`Connected to SQLite ${dbType} database`);
     });
   }
   return db;
@@ -27,10 +42,15 @@ async function initializeDatabase() {
   
   return new Promise((resolve, reject) => {
     database.serialize(() => {
-      // Create users table
+      // Enable foreign keys
+      database.run('PRAGMA foreign_keys = ON');
+
+      // Create users table with password and role support
       database.run(`
         CREATE TABLE IF NOT EXISTS users (
           email TEXT PRIMARY KEY,
+          password_hash TEXT,
+          role TEXT NOT NULL DEFAULT 'user' CHECK(role IN ('admin', 'user')),
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
       `);
@@ -71,6 +91,15 @@ async function initializeDatabase() {
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_client_id ON work_entries (client_id)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_user_email ON work_entries (user_email)`);
       database.run(`CREATE INDEX IF NOT EXISTS idx_work_entries_date ON work_entries (date)`);
+
+      // Seed first admin user from env var if set
+      const adminEmail = process.env.ADMIN_EMAIL;
+      if (adminEmail) {
+        database.run(
+          'INSERT OR IGNORE INTO users (email, role) VALUES (?, ?)',
+          [adminEmail, 'admin']
+        );
+      }
 
       console.log('Database tables created successfully');
       resolve();
@@ -120,6 +149,7 @@ function closeDatabase() {
 
 module.exports = {
   getDatabase,
+  getDatabasePath,
   initializeDatabase,
   closeDatabase
 };

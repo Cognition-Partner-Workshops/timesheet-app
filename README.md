@@ -2,296 +2,171 @@
 
 A full-stack web application for tracking and reporting employee hourly work across different clients.
 
-## ⚠️ Important Notes
-
-### Data Persistence
-**This application uses SQLite in-memory database as specified in requirements.**
-- ⚠️ **All data is lost when the backend server restarts**
-- Suitable for development and testing
-- For production use, modify `backend/src/database/init.js` to use file-based SQLite instead of `:memory:`
-
-### Authentication
-- Email-only authentication with JWT tokens
-- No password required - assumes trusted internal network
-- Anyone with a valid email can create an account and log in
-- Consider integrating with company SSO for production use
-
 ## Features
 
-- ✅ User authentication (email-based with JWT tokens)
-- ✅ Add, edit, and delete clients
-- ✅ Add, edit, and delete hourly work entries for each client
-- ✅ View hourly reports for each client
-- ✅ Export hourly reports to CSV or PDF
+- User authentication (email-only legacy + password-based with JWT tokens)
+- Role-based access control (admin / user)
+- Add, edit, and delete clients
+- Add, edit, and delete hourly work entries for each client
+- View hourly reports for each client
+- Export hourly reports to CSV or PDF
+- Persistent file-based SQLite database
+- Structured logging with Winston
+- Interactive API documentation via Swagger UI
+- Request ID tracking for observability
+- Health and readiness probe endpoints
 
 ## Tech Stack
 
 ### Frontend
-- **React** with TypeScript
+- **React 19** with TypeScript
 - **Vite** for build tooling
 - **Material UI** for components
 - **React Query** for server state management
 - **React Router** for navigation
-- **Axios** for API calls
+- **Vitest + Testing Library** for unit tests
 
 ### Backend
 - **Node.js** with Express
-- **SQLite** in-memory database
-- **JWT** for authentication
+- **SQLite** (file-based, persistent)
+- **JWT** for authentication (+ legacy email-header support)
+- **bcryptjs** for password hashing
 - **Joi** for validation
+- **Winston** for structured logging
+- **Swagger/OpenAPI** for API documentation
 - **PDFKit** for PDF generation
 - **csv-writer** for CSV export
-
-## Project Structure
-
-```
-.
-├── backend/
-│   ├── src/
-│   │   ├── database/
-│   │   │   └── init.js           # Database initialization
-│   │   ├── middleware/
-│   │   │   ├── auth.js           # JWT authentication
-│   │   │   └── errorHandler.js  # Error handling
-│   │   ├── routes/
-│   │   │   ├── auth.js           # Authentication endpoints
-│   │   │   ├── clients.js        # Client CRUD
-│   │   │   ├── workEntries.js    # Work entry CRUD
-│   │   │   └── reports.js        # Reporting & export
-│   │   ├── validation/
-│   │   │   └── schemas.js        # Joi validation schemas
-│   │   └── server.js             # Express server
-│   ├── package.json
-│   └── DEPLOYMENT.md             # Production deployment guide
-│
-└── frontend/
-    ├── src/
-    │   ├── api/
-    │   │   └── client.ts         # API client with JWT
-    │   ├── components/
-    │   │   └── Layout.tsx        # Main layout
-    │   ├── contexts/
-    │   │   └── AuthContext.tsx   # Auth state management
-    │   ├── pages/
-    │   │   ├── LoginPage.tsx     # Login page
-    │   │   ├── DashboardPage.tsx # Dashboard
-    │   │   ├── ClientsPage.tsx   # Client management
-    │   │   ├── WorkEntriesPage.tsx # Work entry management
-    │   │   └── ReportsPage.tsx   # Reports & exports
-    │   ├── types/
-    │   │   └── api.ts            # TypeScript interfaces
-    │   └── App.tsx               # Main app component
-    └── package.json
-```
+- **Jest + Supertest** for testing (161 tests, 90%+ coverage)
 
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18+ installed
-- npm or yarn package manager
+- Node.js 18+
+- npm
 
 ### Backend Setup
 
-1. Navigate to backend directory:
 ```bash
 cd backend
-```
-
-2. Install dependencies:
-```bash
 npm install
+cp .env.example .env   # Edit with your config
+npm run dev             # Starts on port 3001
 ```
-
-3. Create environment file:
-```bash
-cp .env.example .env
-```
-
-4. Update `.env` with your configuration:
-```bash
-PORT=3001
-NODE_ENV=development
-FRONTEND_URL=http://localhost:5173
-JWT_SECRET=your-secure-secret-key-change-this
-```
-
-5. Start the development server:
-```bash
-npm run dev
-```
-
-Backend will be running at `http://localhost:3001`
 
 ### Frontend Setup
 
-1. Navigate to frontend directory:
 ```bash
 cd frontend
-```
-
-2. Install dependencies:
-```bash
 npm install
-```
-
-3. Create environment file:
-```bash
 cp .env.example .env
+npm run dev             # Starts on port 5173
 ```
 
-4. Update `.env`:
-```bash
-VITE_API_URL=http://localhost:3001
-```
+### Usage
 
-5. Start the development server:
-```bash
-npm run dev
-```
-
-Frontend will be running at `http://localhost:5173`
-
-## Usage
-
-1. Open `http://localhost:5173` in your browser
-2. Enter any email address to log in (no password required)
+1. Open `http://localhost:5173`
+2. Enter any email address to log in (legacy mode), or register with email + password
 3. Start adding clients and tracking work hours
 4. View reports and export data as CSV or PDF
+5. API docs available at `http://localhost:3001/api-docs`
 
 ## API Endpoints
 
 ### Authentication
-- `POST /api/auth/login` - Login with email, returns JWT token
-- `GET /api/auth/me` - Get current user info (requires auth)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/auth/register` | Register with email + password (returns JWT) |
+| `POST` | `/api/auth/login` | Login with password or email-only (returns JWT) |
+| `GET` | `/api/auth/me` | Get current user info |
 
 ### Clients
-- `GET /api/clients` - Get all clients
-- `POST /api/clients` - Create new client
-- `GET /api/clients/:id` - Get specific client
-- `PUT /api/clients/:id` - Update client
-- `DELETE /api/clients/:id` - Delete client
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/clients` | List all clients |
+| `POST` | `/api/clients` | Create a client |
+| `GET` | `/api/clients/:id` | Get a client |
+| `PUT` | `/api/clients/:id` | Update a client |
+| `DELETE` | `/api/clients/:id` | Delete a client |
 
 ### Work Entries
-- `GET /api/work-entries` - Get all work entries (optional ?clientId filter)
-- `POST /api/work-entries` - Create new work entry
-- `GET /api/work-entries/:id` - Get specific work entry
-- `PUT /api/work-entries/:id` - Update work entry
-- `DELETE /api/work-entries/:id` - Delete work entry
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/work-entries` | List entries (optional `?clientId` filter) |
+| `POST` | `/api/work-entries` | Create an entry |
+| `GET` | `/api/work-entries/:id` | Get an entry |
+| `PUT` | `/api/work-entries/:id` | Update an entry |
+| `DELETE` | `/api/work-entries/:id` | Delete an entry |
 
 ### Reports
-- `GET /api/reports/client/:clientId` - Get hourly report for client
-- `GET /api/reports/export/csv/:clientId` - Export report as CSV
-- `GET /api/reports/export/pdf/:clientId` - Export report as PDF
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/reports/client/:id` | Hourly report for client |
+| `GET` | `/api/reports/export/csv/:id` | Export as CSV |
+| `GET` | `/api/reports/export/pdf/:id` | Export as PDF |
 
-All authenticated endpoints require `Authorization: Bearer <token>` header.
+### Operations
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Health check (DB status, uptime, version) |
+| `GET` | `/ready` | Readiness probe |
+| `GET` | `/api-docs` | Swagger UI |
+| `GET` | `/api-docs.json` | OpenAPI spec (JSON) |
 
-## Security Features
+Authenticated endpoints accept either `Authorization: Bearer <token>` or the legacy `x-user-email` header.
 
-- JWT-based authentication with 24-hour token expiration
-- Rate limiting on authentication endpoints (5 attempts per 15 minutes)
+## Security
+
+- Password hashing with bcryptjs (10 rounds)
+- JWT-based authentication with 24-hour expiry
+- Role-based access control (admin / user roles)
+- Rate limiting: 100 req/15min general, 15 req/15min for auth
 - CORS protection
 - Helmet security headers
 - Input validation with Joi schemas
 - SQL injection protection with parameterized queries
 
+### Admin Setup
+
+Set `ADMIN_EMAIL` to seed an admin user on first startup:
+```bash
+ADMIN_EMAIL=admin@example.com npm start
+```
+**Important:** The seeded admin has no password initially and is accessible via legacy email-only login. Immediately call `POST /api/auth/set-password` to secure the account after first login. Once a password is set, the legacy email-only login path is blocked for that account.
+
+## Data Persistence
+
+The database defaults to **file-based SQLite** at `backend/data/timesheet.db`. Data persists across server restarts.
+
+To switch to in-memory mode (for testing), set:
+```bash
+DATABASE_PATH=:memory:
+```
+
 ## Development
-
-### Backend Development
-```bash
-cd backend
-npm run dev  # Starts with nodemon for auto-reload
-```
-
-### Frontend Development
-```bash
-cd frontend
-npm run dev  # Starts Vite dev server with HMR
-```
 
 ### Running Tests
 
 **Backend:**
 ```bash
 cd backend
-npm test                    # Run all tests
-npm run test:coverage       # Run tests with coverage report
-npm run test:watch          # Run tests in watch mode
-```
-
-### Test Coverage
-
-The backend has comprehensive test coverage with **161 tests** across 8 test suites:
-
-| File | Statements | Branches | Functions | Lines |
-|------|------------|----------|-----------|-------|
-| **Overall** | **90.16%** | **93.82%** | **92.18%** | **90.35%** |
-| database/init.js | 100% | 100% | 100% | 100% |
-| middleware/auth.js | 100% | 100% | 100% | 100% |
-| middleware/errorHandler.js | 100% | 100% | 100% | 100% |
-| routes/auth.js | 100% | 100% | 100% | 100% |
-| routes/clients.js | 97.89% | 100% | 100% | 97.89% |
-| routes/workEntries.js | 98.41% | 100% | 100% | 98.41% |
-| routes/reports.js | 64.15% | 69.44% | 68.75% | 64.42% |
-| validation/schemas.js | 100% | 100% | 100% | 100% |
-
-Coverage thresholds are configured in `jest.config.js`:
-- Statements: 60%
-- Branches: 60%
-- Functions: 65%
-- Lines: 60%
-
-### Building for Production
-
-**Backend:**
-```bash
-cd backend
-npm start  # Production mode
+npm test                    # Run all 161 tests
+npm run test:coverage       # With coverage report
 ```
 
 **Frontend:**
 ```bash
 cd frontend
-npm run build  # Creates optimized production build in dist/
-npm run preview  # Preview production build
+npm test                    # Run vitest suite
+npm run test:watch          # Watch mode
 ```
 
-## Production Deployment
+### Building for Production
 
-See `backend/DEPLOYMENT.md` for detailed production deployment instructions.
-
-### Quick Production Checklist
-- [ ] Set strong `JWT_SECRET` in environment variables
-- [ ] Configure proper `FRONTEND_URL` for CORS
-- [ ] Consider switching to file-based SQLite for data persistence
-- [ ] Set up HTTPS/SSL certificates
-- [ ] Configure proper logging and monitoring
-- [ ] Set up automated backups (if using persistent storage)
-- [ ] Review and adjust rate limiting settings
-- [ ] Consider integrating with company SSO
-
-## Known Limitations
-
-1. **In-memory database** - All data is lost on server restart
-2. **Email-only auth** - No password protection, assumes trusted network
-3. **No user roles** - All users have equal access to all data
-4. **Single-server architecture** - Not designed for horizontal scaling
-5. **No real-time updates** - Changes require page refresh
-
-## Future Enhancements
-
-- Persistent database storage
-- User roles and permissions
-- Multi-tenancy support
-- Real-time updates with WebSockets
-- Advanced reporting and analytics
-- Email notifications
-- Mobile app
-- Integration with calendar systems
+```bash
+cd frontend && npm run build   # Creates optimized build in dist/
+cd backend && npm start        # Production mode
+```
 
 ## License
 
 MIT
-
-## Support
-
-For issues or questions, please contact your system administrator.

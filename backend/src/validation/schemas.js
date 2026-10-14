@@ -32,10 +32,47 @@ const emailSchema = Joi.object({
   email: Joi.string().email().required()
 });
 
+const loginSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().min(8).max(128).required()
+});
+
+const registerSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string()
+    .min(8)
+    .max(128)
+    .pattern(/[A-Z]/, 'uppercase letter')
+    .pattern(/[a-z]/, 'lowercase letter')
+    .pattern(/[0-9]/, 'digit')
+    .required()
+    .messages({
+      'string.min': 'Password must be at least 8 characters long',
+      'string.pattern.name': 'Password must contain at least one {#name}',
+    })
+});
+
+const setPasswordSchema = Joi.object({
+  password: Joi.string()
+    .min(8)
+    .max(128)
+    .pattern(/[A-Z]/, 'uppercase letter')
+    .pattern(/[a-z]/, 'lowercase letter')
+    .pattern(/[0-9]/, 'digit')
+    .required()
+    .messages({
+      'string.min': 'Password must be at least 8 characters long',
+      'string.pattern.name': 'Password must contain at least one {#name}',
+    })
+});
+
 module.exports = {
   clientSchema,
   workEntrySchema,
   updateWorkEntrySchema,
   updateClientSchema,
-  emailSchema
+  emailSchema,
+  loginSchema,
+  registerSchema,
+  setPasswordSchema
 };
