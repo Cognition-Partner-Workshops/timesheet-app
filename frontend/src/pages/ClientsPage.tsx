@@ -28,12 +28,15 @@ import {
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
-import { type Client } from '../types/api';
+import { type Client, type CreateClientRequest, type UpdateClientRequest } from '../types/api';
+import { useCrudMutations } from '../hooks/useCrudMutations';
+
+const EMPTY_FORM = { name: '', description: '', department: '', email: '' };
 
 const ClientsPage: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
-  const [formData, setFormData] = useState({ name: '', description: '', department: '', email: '' });
+  const [formData, setFormData] = useState({ ...EMPTY_FORM });
   const [error, setError] = useState('');
 
   const queryClient = useQueryClient();
@@ -43,41 +46,20 @@ const ClientsPage: React.FC = () => {
     queryFn: () => apiClient.getClients(),
   });
 
-  const createMutation = useMutation({
-    mutationFn: (clientData: { name: string; description?: string; department?: string; email?: string }) =>
-      apiClient.createClient(clientData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
-      handleClose();
-    },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to create client');
-    },
-  });
+  const handleClose = () => {
+    setOpen(false);
+    setEditingClient(null);
+    setFormData({ ...EMPTY_FORM });
+    setError('');
+  };
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { name?: string; description?: string; department?: string; email?: string } }) =>
-      apiClient.updateClient(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
-      handleClose();
-    },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to update client');
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiClient.deleteClient(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
-    },
-    onError: (err: unknown) => {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || 'Failed to delete client');
-    },
+  const { createMutation, updateMutation, deleteMutation, isSaving } = useCrudMutations<CreateClientRequest, UpdateClientRequest>({
+    queryKey: 'clients',
+    createFn: (data) => apiClient.createClient(data),
+    updateFn: (id, data) => apiClient.updateClient(id, data),
+    deleteFn: (id) => apiClient.deleteClient(id),
+    onSuccess: handleClose,
+    onError: setError,
   });
 
   const deleteAllMutation = useMutation({
@@ -104,17 +86,10 @@ const ClientsPage: React.FC = () => {
       });
     } else {
       setEditingClient(null);
-      setFormData({ name: '', description: '', department: '', email: '' });
+      setFormData({ ...EMPTY_FORM });
     }
     setError('');
     setOpen(true);
-  };
-
-  const handleClose = () => {
-    setOpen(false);
-    setEditingClient(null);
-    setFormData({ name: '', description: '', department: '', email: '' });
-    setError('');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -170,7 +145,7 @@ const ClientsPage: React.FC = () => {
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4">Clients</Typography>
-        <Box display="flex" gap={2}>
+        <Box display="flex" gap={1}>
           {clients.length > 0 && (
             <Button
               variant="outlined"
@@ -179,7 +154,7 @@ const ClientsPage: React.FC = () => {
               onClick={handleDeleteAll}
               disabled={deleteAllMutation.isPending}
             >
-              {deleteAllMutation.isPending ? 'Clearing...' : 'Clear All'}
+              Delete All
             </Button>
           )}
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpen()}>
@@ -200,9 +175,9 @@ const ClientsPage: React.FC = () => {
             <TableHead>
               <TableRow>
                 <TableCell>Name</TableCell>
+                <TableCell>Description</TableCell>
                 <TableCell>Department</TableCell>
                 <TableCell>Email</TableCell>
-                <TableCell>Description</TableCell>
                 <TableCell>Created</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
@@ -217,10 +192,17 @@ const ClientsPage: React.FC = () => {
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      {client.department ? (
+                      {client.description ? (
                         <Typography variant="body2" color="text.secondary">
-                          {client.department}
+                          {client.description}
                         </Typography>
+                      ) : (
+                        <Chip label="No description" size="small" variant="outlined" />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {client.department ? (
+                        <Chip label={client.department} size="small" color="primary" variant="outlined" />
                       ) : (
                         <Chip label="-" size="small" variant="outlined" />
                       )}
@@ -235,32 +217,15 @@ const ClientsPage: React.FC = () => {
                       )}
                     </TableCell>
                     <TableCell>
-                      {client.description ? (
-                        <Typography variant="body2" color="text.secondary">
-                          {client.description}
-                        </Typography>
-                      ) : (
-                        <Chip label="No description" size="small" variant="outlined" />
-                      )}
-                    </TableCell>
-                    <TableCell>
                       <Typography variant="body2" color="text.secondary">
                         {new Date(client.created_at).toLocaleDateString()}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
-                      <IconButton
-                        onClick={() => handleOpen(client)}
-                        color="primary"
-                        size="small"
-                      >
+                      <IconButton onClick={() => handleOpen(client)} color="primary" size="small">
                         <EditIcon />
                       </IconButton>
-                      <IconButton
-                        onClick={() => handleDelete(client)}
-                        color="error"
-                        size="small"
-                      >
+                      <IconButton onClick={() => handleDelete(client)} color="error" size="small">
                         <DeleteIcon />
                       </IconButton>
                     </TableCell>
@@ -294,7 +259,7 @@ const ClientsPage: React.FC = () => {
               required
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={isSaving}
             />
             <TextField
               margin="dense"
@@ -302,7 +267,7 @@ const ClientsPage: React.FC = () => {
               fullWidth
               value={formData.department}
               onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={isSaving}
             />
             <TextField
               margin="dense"
@@ -311,7 +276,7 @@ const ClientsPage: React.FC = () => {
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={isSaving}
             />
             <TextField
               margin="dense"
@@ -321,23 +286,15 @@ const ClientsPage: React.FC = () => {
               rows={3}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={isSaving}
             />
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleClose} disabled={createMutation.isPending || updateMutation.isPending}>
+            <Button onClick={handleClose} disabled={isSaving}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              variant="contained"
-              disabled={createMutation.isPending || updateMutation.isPending}
-            >
-              {createMutation.isPending || updateMutation.isPending ? (
-                <CircularProgress size={24} />
-              ) : (
-                editingClient ? 'Update' : 'Create'
-              )}
+            <Button type="submit" variant="contained" disabled={isSaving}>
+              {isSaving ? <CircularProgress size={24} /> : (editingClient ? 'Update' : 'Create')}
             </Button>
           </DialogActions>
         </form>
