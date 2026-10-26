@@ -255,6 +255,19 @@ npm run build  # Creates optimized production build in dist/
 npm run preview  # Preview production build
 ```
 
+## End-to-End Tests
+
+Playwright tests for the work entries workflow (login, create, list, edit, delete) live in `e2e/`. With the backend (3001) and frontend (5173) running:
+
+```bash
+cd e2e
+npm install
+npx playwright install chromium
+npm test                # E2E_START_SERVERS=1 npm test starts both dev servers if they are not running
+```
+
+Each run records a video per test under `e2e/test-results/`; `E2E_SLOW_MO=400` slows actions down for a watchable recording.
+
 ## Production Deployment
 
 See `backend/DEPLOYMENT.md` for detailed production deployment instructions.
