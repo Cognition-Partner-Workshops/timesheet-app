@@ -5,11 +5,83 @@ const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 const PDFDocument = require('pdfkit');
 const path = require('path');
 const fs = require('fs');
+const { weeklyReportQuerySchema } = require('../validation/schemas');
 
 const router = express.Router();
+const WEEKLY_HOURS_LIMIT = 40;
+const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
+
+function roundHours(hours) {
+  return Math.round(hours * 100) / 100;
+}
 
 // All routes require authentication
 router.use(authenticateUser);
+
+router.get('/weekly', (req, res) => {
+  const { error, value } = weeklyReportQuerySchema.validate(req.query);
+  if (error) {
+    return res.status(400).json({ error: error.details[0].message });
+  }
+
+  const { weekStart } = value;
+  const startMs = Date.parse(`${weekStart}T00:00:00Z`);
+  const endMs = startMs + 7 * DAY_MILLISECONDS;
+  const db = getDatabase();
+
+  db.all(
+    `SELECT date(date / 1000, 'unixepoch') AS day, SUM(hours) AS hours
+     FROM work_entries
+     WHERE user_email = ? AND date >= ? AND date < ?
+     GROUP BY day`,
+    [req.userEmail, startMs, endMs],
+    (daysError, dayRows) => {
+      if (daysError) {
+        console.error('Database error:', daysError);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      db.all(
+        `SELECT we.client_id AS clientId, c.name AS clientName, SUM(we.hours) AS hours
+         FROM work_entries we
+         JOIN clients c ON c.id = we.client_id AND c.user_email = we.user_email
+         WHERE we.user_email = ? AND we.date >= ? AND we.date < ?
+         GROUP BY we.client_id, c.name
+         ORDER BY hours DESC, c.name ASC`,
+        [req.userEmail, startMs, endMs],
+        (clientsError, clientRows) => {
+          if (clientsError) {
+            console.error('Database error:', clientsError);
+            return res.status(500).json({ error: 'Internal server error' });
+          }
+
+          const hoursByDate = new Map(dayRows.map((row) => [row.day, Number(row.hours)]));
+          const days = Array.from({ length: 7 }, (_, index) => {
+            const date = new Date(startMs + index * DAY_MILLISECONDS).toISOString().slice(0, 10);
+            return { date, hours: roundHours(hoursByDate.get(date) || 0) };
+          });
+          const totalHours = roundHours(days.reduce((sum, day) => sum + day.hours, 0));
+          const clients = clientRows.map((client) => ({
+            clientId: client.clientId,
+            clientName: client.clientName,
+            hours: roundHours(Number(client.hours))
+          }));
+          const weekEnd = new Date(endMs - DAY_MILLISECONDS).toISOString().slice(0, 10);
+
+          res.json({
+            weekStart,
+            weekEnd,
+            totalHours,
+            overLimit: totalHours > WEEKLY_HOURS_LIMIT,
+            limit: WEEKLY_HOURS_LIMIT,
+            days,
+            clients
+          });
+        }
+      );
+    }
+  );
+});
 
 // Get hourly report for specific client
 router.get('/client/:clientId', (req, res) => {

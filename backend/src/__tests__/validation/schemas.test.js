@@ -3,7 +3,8 @@ const {
   workEntrySchema,
   updateWorkEntrySchema,
   updateClientSchema,
-  emailSchema
+  emailSchema,
+  weeklyReportQuerySchema
 } = require('../../validation/schemas');
 
 describe('Validation Schemas', () => {
@@ -324,5 +325,25 @@ describe('Validation Schemas', () => {
       const { error } = emailSchema.validate(data);
       expect(error).toBeUndefined();
     });
+  });
+
+  describe('weeklyReportQuerySchema', () => {
+    test('should accept a Monday in YYYY-MM-DD format', () => {
+      const { error } = weeklyReportQuerySchema.validate({ weekStart: '2026-10-26' });
+      expect(error).toBeUndefined();
+    });
+
+    test('should reject a missing weekStart', () => {
+      const { error } = weeklyReportQuerySchema.validate({});
+      expect(error.details[0].message).toBe('"weekStart" is required');
+    });
+
+    test.each(['not-a-date', '2026-02-30', '2026-10-27', '10/26/2026'])(
+      'should reject invalid weekStart %s',
+      (weekStart) => {
+        const { error } = weeklyReportQuerySchema.validate({ weekStart });
+        expect(error).toBeDefined();
+      }
+    );
   });
 });

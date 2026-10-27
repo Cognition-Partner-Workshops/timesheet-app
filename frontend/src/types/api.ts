@@ -35,6 +35,27 @@ export interface ClientReport {
   entryCount: number;
 }
 
+export interface WeeklyReportDay {
+  date: string;
+  hours: number;
+}
+
+export interface WeeklyReportClient {
+  clientId: number;
+  clientName: string;
+  hours: number;
+}
+
+export interface WeeklyReport {
+  weekStart: string;
+  weekEnd: string;
+  totalHours: number;
+  overLimit: boolean;
+  limit: number;
+  days: WeeklyReportDay[];
+  clients: WeeklyReportClient[];
+}
+
 export interface CreateClientRequest {
   name: string;
   description?: string;

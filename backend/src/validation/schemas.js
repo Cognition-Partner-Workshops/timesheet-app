@@ -32,10 +32,29 @@ const emailSchema = Joi.object({
   email: Joi.string().email().required()
 });
 
+const weeklyReportQuerySchema = Joi.object({
+  weekStart: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).required().custom((value, helpers) => {
+    const date = new Date(`${value}T00:00:00Z`);
+    if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+      return helpers.error('date.format');
+    }
+    if (date.getUTCDay() !== 1) {
+      return helpers.error('date.monday');
+    }
+    return value;
+  }).messages({
+    'any.required': '"weekStart" is required',
+    'string.pattern.base': '"weekStart" must be a date in YYYY-MM-DD format',
+    'date.format': '"weekStart" must be a date in YYYY-MM-DD format',
+    'date.monday': '"weekStart" must be a Monday'
+  })
+});
+
 module.exports = {
   clientSchema,
   workEntrySchema,
   updateWorkEntrySchema,
   updateClientSchema,
-  emailSchema
+  emailSchema,
+  weeklyReportQuerySchema
 };
