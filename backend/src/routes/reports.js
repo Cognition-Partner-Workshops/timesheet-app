@@ -30,9 +30,10 @@ router.get('/weekly', (req, res) => {
   const db = getDatabase();
 
   db.all(
-    `SELECT date(date / 1000, 'unixepoch') AS day, SUM(hours) AS hours
-     FROM work_entries
-     WHERE user_email = ? AND date >= ? AND date < ?
+    `SELECT date(we.date / 1000, 'unixepoch') AS day, SUM(we.hours) AS hours
+     FROM work_entries we
+     JOIN clients c ON c.id = we.client_id AND c.user_email = we.user_email
+     WHERE we.user_email = ? AND we.date >= ? AND we.date < ?
      GROUP BY day`,
     [req.userEmail, startMs, endMs],
     (daysError, dayRows) => {

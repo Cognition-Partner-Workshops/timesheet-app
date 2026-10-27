@@ -155,6 +155,30 @@ describe('GET /api/reports/weekly', () => {
     expect(exactResponse.body.overLimit).toBe(false);
   });
 
+  test('excludes work entries after their client is deleted', async () => {
+    const userEmail = 'weekly-deleted-client@example.com';
+    const clientId = await createClient(userEmail, 'Deleted Client');
+    await createWorkEntry(userEmail, clientId, '2026-10-26', 21);
+    await createWorkEntry(userEmail, clientId, '2026-10-27', 20);
+
+    const beforeDelete = await getWeeklyReport(userEmail);
+    expect(beforeDelete.body.totalHours).toBe(41);
+    expect(beforeDelete.body.overLimit).toBe(true);
+
+    const deleteResponse = await request(app)
+      .delete(`/api/clients/${clientId}`)
+      .set('x-user-email', userEmail);
+    expect(deleteResponse.status).toBe(200);
+
+    const afterDelete = await getWeeklyReport(userEmail);
+    expect(afterDelete.status).toBe(200);
+    expect(afterDelete.body.totalHours).toBe(0);
+    expect(afterDelete.body.overLimit).toBe(false);
+    expect(afterDelete.body.clients).toEqual([]);
+    expect(afterDelete.body.days).toHaveLength(7);
+    expect(afterDelete.body.days.map((day) => day.hours)).toEqual(Array(7).fill(0));
+  });
+
   test('isolates totals and client breakdowns by authenticated user', async () => {
     const firstUser = 'weekly-first-user@example.com';
     const secondUser = 'weekly-second-user@example.com';
