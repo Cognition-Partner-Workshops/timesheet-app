@@ -1,4 +1,5 @@
 import axios, { type AxiosInstance, type AxiosResponse } from 'axios';
+import type { WeeklyReport } from '../types/api';
 
 // Use empty string to make requests relative to the current origin
 // Vite proxy will forward /api requests to the backend
@@ -130,6 +131,11 @@ class ApiClient {
     const response = await this.client.get(`/api/reports/export/pdf/${clientId}`, {
       responseType: 'blob',
     });
+    return response.data;
+  }
+
+  async getWeeklyReport(weekStart: string): Promise<WeeklyReport> {
+    const response = await this.client.get('/api/reports/weekly', { params: { weekStart } });
     return response.data;
   }
 
